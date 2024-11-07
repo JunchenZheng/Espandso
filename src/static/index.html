@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Espanso Snippets</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+  <div id="app">
+    <aside id="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">⚡ Snippets</div>
+        <div class="view-toggle">
+          <button id="btn-tree" class="toggle-btn active" onclick="setView('tree')">Tree</button>
+          <button id="btn-global" class="toggle-btn" onclick="setView('global')">Global</button>
+        </div>
+      </div>
+      <div id="search-wrap" class="hidden">
+        <input id="search-input" type="text" placeholder="Search triggers, content…"
+               oninput="handleSearch(this.value)" autocomplete="off" spellcheck="false">
+      </div>
+      <nav id="tree-nav"></nav>
+      <div class="sidebar-footer" id="sidebar-stats"></div>
+    </aside>
+
+    <main id="content">
+      <div id="content-header"></div>
+      <div id="content-body"></div>
+    </main>
+  </div>
+
+  <div id="modal" class="hidden">
+    <div class="modal-backdrop" onclick="closeModal()"></div>
+    <div class="modal-panel">
+      <div class="modal-header">
+        <span id="modal-title" class="modal-filename"></span>
+        <button class="modal-close" onclick="closeModal()">✕</button>
+      </div>
+      <div id="modal-body"></div>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
