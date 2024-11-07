@@ -1,0 +1,14 @@
+matches:
+  - triggers: [":test-json"]
+    replace: "{{output}}"
+    vars:
+      - name: path
+        type: echo
+        params:
+          # 替换掉后面的路径即可
+          echo: "/Users/zjc/Library/Application Support/espanso/match/test/json.json"
+      - name: output
+        type: shell
+        params:
+          # 防止空格，例如Application Support中间的空格导致的问题
+          cmd: "cat \"{{path}}\""
