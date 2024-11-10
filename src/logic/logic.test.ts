@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { validate } from "./validate";
 import { generateYaml } from "./generateYaml";
 import { importYamlContent } from "./importYaml";
+import { isEspansoYamlConfigFile, parseEspansoConfigDir, sortEspansoConfigFiles } from "./espansoPaths";
 
 describe("validate", () => {
   it("should validate correct snippets", async () => {
@@ -142,5 +143,36 @@ matches:
     expect(res.snippets).toHaveLength(1);
     expect(res.snippets[0]).toEqual({ trigger: ":inc", include_file: "resource_data.json" });
     expect(res.warnings).toContain("[test.yml] Snippet for :unsupported has unsupported var type(s) [date], skipping");
+  });
+});
+
+describe("espansoPaths", () => {
+  it("should parse the Config directory from espanso path output", () => {
+    const output = [
+      "Config: /Users/test/Library/Application Support/espanso",
+      "Packages: /Users/test/Library/Application Support/espanso/match/packages",
+      "Runtime: /Users/test/Library/Caches/espanso",
+    ].join("\n");
+
+    expect(parseEspansoConfigDir(output)).toBe("/Users/test/Library/Application Support/espanso");
+  });
+
+  it("should return null when espanso path output has no Config line", () => {
+    expect(parseEspansoConfigDir("Runtime: /tmp/espanso")).toBeNull();
+  });
+
+  it("should identify Espanso YAML config files case-insensitively", () => {
+    expect(isEspansoYamlConfigFile("base.yml")).toBe(true);
+    expect(isEspansoYamlConfigFile("package.YAML")).toBe(true);
+    expect(isEspansoYamlConfigFile("snippets.json")).toBe(false);
+  });
+
+  it("should sort scanned config files by relative path", () => {
+    const files = sortEspansoConfigFiles([
+      { name: "z.yml", path: "/match/z.yml", relativePath: "z.yml" },
+      { name: "a.yml", path: "/match/nested/a.yml", relativePath: "nested/a.yml" },
+    ]);
+
+    expect(files.map((file) => file.relativePath)).toEqual(["nested/a.yml", "z.yml"]);
   });
 });
