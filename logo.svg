@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Expandso logo</title>
+  <desc id="desc">A neon green letter D crossed by a teal leaf on a dark rounded square.</desc>
+  <defs>
+    <radialGradient id="backgroundGlow" cx="50%" cy="44%" r="58%">
+      <stop offset="0%" stop-color="#14191a"/>
+      <stop offset="58%" stop-color="#050606"/>
+      <stop offset="100%" stop-color="#010202"/>
+    </radialGradient>
+
+    <linearGradient id="tileSurface" x1="230" y1="205" x2="790" y2="820" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#181b20"/>
+      <stop offset="45%" stop-color="#070809"/>
+      <stop offset="100%" stop-color="#010202"/>
+    </linearGradient>
+
+    <linearGradient id="dGradient" x1="365" y1="285" x2="675" y2="745" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#f7ffb3"/>
+      <stop offset="24%" stop-color="#dfff24"/>
+      <stop offset="60%" stop-color="#a2f044"/>
+      <stop offset="100%" stop-color="#36ce73"/>
+    </linearGradient>
+
+    <linearGradient id="dHighlight" x1="394" y1="310" x2="650" y2="700" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#fbffd4" stop-opacity="0.74"/>
+      <stop offset="43%" stop-color="#e6ff34" stop-opacity="0.34"/>
+      <stop offset="100%" stop-color="#43d879" stop-opacity="0"/>
+    </linearGradient>
+
+    <linearGradient id="leafGradient" x1="309" y1="678" x2="721" y2="301" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#007fa4"/>
+      <stop offset="33%" stop-color="#11b8bf"/>
+      <stop offset="66%" stop-color="#65dda5"/>
+      <stop offset="100%" stop-color="#e7ff5f"/>
+    </linearGradient>
+
+    <linearGradient id="leafShadow" x1="331" y1="675" x2="669" y2="393" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#004e72"/>
+      <stop offset="52%" stop-color="#007a9f"/>
+      <stop offset="100%" stop-color="#114f49"/>
+    </linearGradient>
+
+    <linearGradient id="leafRidge" x1="320" y1="640" x2="690" y2="335" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#d6ff4d"/>
+      <stop offset="48%" stop-color="#8bf37e"/>
+      <stop offset="100%" stop-color="#cfff4a"/>
+    </linearGradient>
+
+    <filter id="softGlow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="19" result="blur"/>
+      <feColorMatrix in="blur" type="matrix" values="0 0 0 0 0.70  0 0 0 0 1.00  0 0 0 0 0.14  0 0 0 0.62 0"/>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <filter id="leafGlow" x="-35%" y="-35%" width="170%" height="170%">
+      <feGaussianBlur stdDeviation="10" result="blur"/>
+      <feColorMatrix in="blur" type="matrix" values="0 0 0 0 0.08  0 0 0 0 0.95  0 0 0 0 0.78  0 0 0 0.38 0"/>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <clipPath id="dClip">
+      <path d="M454 310H575C661 310 732 382 732 512C732 642 661 714 575 714H405C384 714 368 697 368 676V594H452V632H575C613 632 648 592 648 512C648 432 613 392 575 392H452V485H368V348C368 327 384 310 405 310H454Z"/>
+    </clipPath>
+  </defs>
+
+  <rect width="1024" height="1024" fill="#020303"/>
+  <circle cx="512" cy="484" r="454" fill="url(#backgroundGlow)" opacity="0.55"/>
+
+  <rect x="196" y="190" width="632" height="642" rx="128" fill="url(#tileSurface)" stroke="#20242a" stroke-width="2"/>
+  <rect x="216" y="210" width="592" height="602" rx="108" fill="none" stroke="#30363c" stroke-width="1.4" opacity="0.32"/>
+
+  <g filter="url(#softGlow)">
+    <path fill="none" stroke="url(#dGradient)" stroke-width="84" stroke-linejoin="round" stroke-linecap="round" d="M410 448V352H574C641 352 691 413 691 512C691 611 641 672 574 672H410V592"/>
+    <path fill="none" stroke="#07100b" stroke-width="44" stroke-linejoin="round" stroke-linecap="round" d="M454 450V392H574C613 392 648 432 648 512C648 592 613 632 574 632H454V592"/>
+    <path clip-path="url(#dClip)" fill="url(#dHighlight)" d="M372 310H724V504C632 435 520 395 372 407V310Z" opacity="0.82"/>
+  </g>
+
+  <g filter="url(#leafGlow)">
+    <path fill="#020807" opacity="0.86" d="M338 734C300 614 350 517 495 450C585 409 649 373 677 298C706 367 683 450 605 504C526 559 409 577 338 734Z"/>
+    <path fill="url(#leafGradient)" d="M349 748C303 622 353 523 501 454C599 409 655 365 640 266C735 346 719 463 612 535C537 586 402 595 349 748Z"/>
+    <path fill="url(#leafShadow)" d="M328 706C335 598 398 530 522 478C600 445 651 404 681 331C681 413 617 485 505 536C415 577 356 625 328 706Z" opacity="0.92"/>
+    <path fill="url(#leafRidge)" d="M332 676C383 585 458 538 558 501C618 479 664 435 690 364C684 442 630 500 542 539C442 584 376 623 332 676Z" opacity="0.86"/>
+    <path fill="#95f5d1" d="M358 552C423 497 492 472 567 440C616 419 651 385 674 335C648 409 592 452 506 488C442 515 392 535 358 552Z" opacity="0.8"/>
+    <path fill="#005f82" d="M338 724C350 643 402 589 500 544C589 503 651 451 687 374C666 467 601 529 498 574C421 608 370 657 338 724Z" opacity="0.74"/>
+  </g>
+</svg>

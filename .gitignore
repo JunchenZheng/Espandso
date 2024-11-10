@@ -241,3 +241,7 @@ dist-gui/
 
 # Local snippet source directories may contain private user data.
 snippets/
+
+# Change log entries
+.change_log/
+
