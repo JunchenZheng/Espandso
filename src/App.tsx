@@ -8,6 +8,7 @@ import {
   ChevronDown,
   ChevronRight,
   ClipboardList,
+  FileSearch,
   FileJson,
   FilePlus2,
   FileText,
@@ -46,6 +47,7 @@ import { validate } from "./logic/validate";
 import { generateYaml } from "./logic/generateYaml";
 import { importYamlContent, ImportedMatch } from "./logic/importYaml";
 import { buildSnippetTree } from "./logic/discoverSnippetFiles";
+import { EspansoConfigFile, EspansoPathSource, scanEspansoConfigFiles } from "./logic/espansoPaths";
 import { setSetting, getSetting } from "./tauri/fileStore";
 import { installAndRestart, InstallResult } from "./tauri/espansoRuntime";
 import { cn } from "./lib/utils";
@@ -83,6 +85,11 @@ function App() {
   const [warnings, setWarnings] = useState<string[]>([]);
   const [isConsoleOpen, setIsConsoleOpen] = useState<boolean>(false);
   const [consoleResult, setConsoleResult] = useState<InstallResult | null>(null);
+  const [espansoMatchDir, setEspansoMatchDir] = useState<string>("");
+  const [espansoPathSource, setEspansoPathSource] = useState<EspansoPathSource | "">("");
+  const [espansoConfigs, setEspansoConfigs] = useState<EspansoConfigFile[]>([]);
+  const [isScanningEspanso, setIsScanningEspanso] = useState<boolean>(false);
+  const [espansoScanMessage, setEspansoScanMessage] = useState<string>("");
 
   // Importer state
   const [isImporterOpen, setIsImporterOpen] = useState<boolean>(false);
@@ -115,6 +122,7 @@ function App() {
       }
     }
     loadSavedRepo();
+    scanDefaultEspansoConfigDir();
   }, []);
 
   // Handle dropped file or folder path
@@ -308,7 +316,7 @@ function App() {
   }
 
   // Choose Repository Directory
-  async function chooseRepo() {
+  async function chooseRepo(): Promise<string | null> {
     const selected = await openDialog({
       directory: true,
       multiple: false,
@@ -321,10 +329,45 @@ function App() {
         setRepoPath(selected);
         await setSetting("repoPath", selected);
         refreshFileTree(selected);
+        return selected;
       } else {
         alert("The selected directory does not contain a 'snippets' folder. Please select a valid workspace.");
       }
     }
+
+    return null;
+  }
+
+  async function scanDefaultEspansoConfigDir() {
+    setIsScanningEspanso(true);
+    setEspansoScanMessage("");
+
+    try {
+      const result = await scanEspansoConfigFiles();
+      setEspansoMatchDir(result.matchDir);
+      setEspansoPathSource(result.pathSource);
+      setEspansoConfigs(result.files);
+      setEspansoScanMessage(result.files.length === 0 ? "No YAML configs found in the default match directory." : "");
+    } catch (e: any) {
+      setEspansoConfigs([]);
+      const message = e.message || String(e);
+      setEspansoScanMessage(
+        message.includes("forbidden path")
+          ? `Espanso path was resolved, but Tauri blocked file access. Add the Espanso match directory to the filesystem scope, then restart the app. (${message})`
+          : `Could not scan the default Espanso match directory: ${message}`,
+      );
+    } finally {
+      setIsScanningEspanso(false);
+    }
+  }
+
+  async function importDetectedEspansoConfig(config: EspansoConfigFile) {
+    if (!repoPath) {
+      const selectedRepo = await chooseRepo();
+      if (!selectedRepo) return;
+    }
+
+    await importYamlFileByPath(config.path);
   }
 
   // Load a Snippet File
@@ -707,6 +750,49 @@ function App() {
                 <FolderOpen />
                 Choose Repository Folder
               </Button>
+              <div className="mt-5 rounded-lg border bg-secondary/40 p-4 text-left">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-background text-primary">
+                    {isScanningEspanso ? <Loader2 className="h-5 w-5 animate-spin" /> : <FileSearch className="h-5 w-5" />}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-3">
+                      <h2 className="text-sm font-semibold">Espanso config scan</h2>
+                      <Button size="sm" variant="outline" onClick={scanDefaultEspansoConfigDir} disabled={isScanningEspanso}>
+                        Scan
+                      </Button>
+                    </div>
+                    <p className="mt-1 truncate text-xs text-muted-foreground">
+                      {espansoMatchDir || "Default match directory"}
+                    </p>
+                    {espansoPathSource && (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {espansoPathSource === "cli" ? "Resolved with espanso path" : "Using platform default path"}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {espansoConfigs.length > 0 ? (
+                  <div className="mt-4 space-y-2">
+                    {espansoConfigs.map((config) => (
+                      <button
+                        key={config.path}
+                        className="flex w-full items-center gap-2 rounded-md border bg-background px-3 py-2 text-left text-sm transition-colors hover:bg-accent"
+                        onClick={() => importDetectedEspansoConfig(config)}
+                      >
+                        <FileText className="h-4 w-4 shrink-0 text-primary" />
+                        <span className="min-w-0 flex-1 truncate">{config.relativePath}</span>
+                        <Import className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-4 text-sm text-muted-foreground">
+                    {isScanningEspanso ? "Scanning Espanso configs..." : espansoScanMessage || "Scanning starts automatically."}
+                  </p>
+                )}
+              </div>
             </CardContent>
           </Card>
         </main>

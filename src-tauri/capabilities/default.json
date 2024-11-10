@@ -14,6 +14,19 @@
     "fs:allow-write-text-file",
     "fs:read-all",
     "fs:write-all",
+    {
+      "identifier": "fs:scope",
+      "allow": [
+        { "path": "$HOME/Library/Application Support/espanso/match" },
+        { "path": "$HOME/Library/Application Support/espanso/match/**" },
+        { "path": "$HOME/AppData/Roaming/espanso/match" },
+        { "path": "$HOME/AppData/Roaming/espanso/match/**" },
+        { "path": "$CONFIG/espanso/match" },
+        { "path": "$CONFIG/espanso/match/**" },
+        { "path": "$DATA/espanso/match" },
+        { "path": "$DATA/espanso/match/**" }
+      ]
+    },
     "dialog:default",
     "store:default",
     {
@@ -23,6 +36,11 @@
           "name": "espanso",
           "cmd": "espanso",
           "args": ["restart"]
+        },
+        {
+          "name": "espanso",
+          "cmd": "espanso",
+          "args": ["path"]
         }
       ]
     }
