@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIGURATION="${CONFIGURATION:-release}"
 DEST_DIR="${1:-/Applications}"
-APP_NAME="${APP_NAME:-tauri-app.app}"
+APP_NAME="${APP_NAME:-Expandso.app}"
 BUILT_APP_PATH="$ROOT_DIR/src-tauri/target/$CONFIGURATION/bundle/macos/$APP_NAME"
 DEST_APP_PATH="$DEST_DIR/$APP_NAME"
 SKIP_NPM_SETUP="${SKIP_NPM_SETUP:-0}"
@@ -20,7 +20,7 @@ Defaults:
 
 Environment:
   CONFIGURATION=release  Tauri/Rust build profile path to install from.
-  APP_NAME=tauri-app.app Expected .app bundle name.
+  APP_NAME=Expandso.app Expected .app bundle name.
   SKIP_NPM_SETUP=1       Skip scripts/setup_npm_env.sh.
 EOF
 }
