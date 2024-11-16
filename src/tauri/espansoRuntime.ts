@@ -14,10 +14,12 @@ export interface InstallResult {
  * backs up the existing file if it exists, and restarts Espanso.
  * @param yamlContent The generated YAML string
  * @param relativePath Relative file path (e.g. "base.yml")
+ * @param backupDir Optional user-selected directory for backup copies
  */
 export async function installAndRestart(
   yamlContent: string,
-  relativePath: string = "base.yml"
+  relativePath: string = "base.yml",
+  backupDir: string = "",
 ): Promise<InstallResult> {
   try {
     const matchDir = await getEspansoMatchDir();
@@ -47,7 +49,15 @@ export async function installAndRestart(
     const fileExists = await exists(targetPath);
     if (fileExists) {
       try {
-        await copyFile(targetPath, backupPath);
+        if (backupDir) {
+          const backupDirExists = await exists(backupDir);
+          if (!backupDirExists) {
+            await mkdir(backupDir, { recursive: true });
+          }
+          await copyFile(targetPath, `${backupDir}/${fileName}.backup`);
+        } else {
+          await copyFile(targetPath, backupPath);
+        }
       } catch (backupError) {
         console.warn(`Could not create backup for ${targetPath}:`, backupError);
       }
