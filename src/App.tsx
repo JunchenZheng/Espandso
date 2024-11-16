@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { readTextFile, writeTextFile, exists, copyFile, mkdir } from "@tauri-apps/plugin-fs";
+import { readTextFile, writeTextFile, exists, copyFile, mkdir, readDir } from "@tauri-apps/plugin-fs";
 import { listen } from "@tauri-apps/api/event";
 import {
   AlertTriangle,
@@ -20,6 +20,8 @@ import {
   Plus,
   Save,
   Search,
+  Settings,
+  ShieldCheck,
   Trash2,
   Upload,
   XCircle,
@@ -79,6 +81,7 @@ function App() {
 
   // Settings
   const [autoInstall, setAutoInstall] = useState<boolean>(true);
+  const [backupDir, setBackupDir] = useState<string>("");
 
   // UI state
   const [errors, setErrors] = useState<ValidationError[]>([]);
@@ -90,6 +93,7 @@ function App() {
   const [espansoConfigs, setEspansoConfigs] = useState<EspansoConfigFile[]>([]);
   const [isScanningEspanso, setIsScanningEspanso] = useState<boolean>(false);
   const [espansoScanMessage, setEspansoScanMessage] = useState<string>("");
+  const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
 
   // Importer state
   const [isImporterOpen, setIsImporterOpen] = useState<boolean>(false);
@@ -110,7 +114,9 @@ function App() {
     async function loadSavedRepo() {
       const savedPath = await getSetting<string>("repoPath", "");
       const savedAuto = await getSetting<boolean>("autoInstall", true);
+      const savedBackupDir = await getSetting<string>("backupDir", "");
       setAutoInstall(savedAuto);
+      setBackupDir(savedBackupDir);
 
       if (savedPath) {
         // Verify snippets folder exists
@@ -130,6 +136,11 @@ function App() {
     try {
       const isDirExists = await exists(path);
       if (!isDirExists) return;
+
+      if (isSettingsOpen) {
+        await saveBackupDir(path);
+        return;
+      }
 
       let resolvedRepoPath = "";
       const hasSubSnippets = await exists(`${path}/snippets`);
@@ -206,7 +217,7 @@ function App() {
       active = false;
       unlisteners.forEach((fn) => fn());
     };
-  }, [repoPath]);
+  }, [repoPath, isSettingsOpen]);
 
   // Recalculate validation on form changes
   useEffect(() => {
@@ -333,6 +344,37 @@ function App() {
       } else {
         alert("The selected directory does not contain a 'snippets' folder. Please select a valid workspace.");
       }
+    }
+
+    return null;
+  }
+
+  async function saveBackupDir(path: string) {
+    if (!path) {
+      setBackupDir("");
+      await setSetting("backupDir", "");
+      return;
+    }
+
+    try {
+      await readDir(path);
+      setBackupDir(path);
+      await setSetting("backupDir", path);
+    } catch (e) {
+      alert("Please choose or drop a directory for backups.");
+    }
+  }
+
+  async function chooseBackupDir(): Promise<string | null> {
+    const selected = await openDialog({
+      directory: true,
+      multiple: false,
+      title: "Select Backup Directory",
+    });
+
+    if (selected && typeof selected === "string") {
+      await saveBackupDir(selected);
+      return selected;
     }
 
     return null;
@@ -605,7 +647,7 @@ function App() {
       await writeTextFile(`${distDir}/base.yml`, yamlContent);
 
       // 3. Install to Espanso & restart (Phase 3 requirement)
-      const installRes = await installAndRestart(yamlContent, "base.yml");
+      const installRes = await installAndRestart(yamlContent, "base.yml", backupDir);
       setConsoleResult(installRes);
     } catch (e: any) {
       setConsoleResult({
@@ -724,10 +766,18 @@ function App() {
           <div className="drag-zone">
             <Upload className="mb-5 h-12 w-12" />
             <div className="text-xl font-semibold">
-              {!repoPath ? "Drop snippets workspace folder here" : "Drop workspace folder or YAML file here"}
+              {isSettingsOpen
+                ? "Drop backup folder here"
+                : !repoPath
+                  ? "Drop snippets workspace folder here"
+                  : "Drop workspace folder or YAML file here"}
             </div>
             <div className="mt-2 text-sm text-muted-foreground">
-              {!repoPath ? "Must contain a snippets folder" : "Folders open a workspace; YAML files open the importer"}
+              {isSettingsOpen
+                ? "This folder stores backup copies before installing to Espanso"
+                : !repoPath
+                  ? "Must contain a snippets folder"
+                  : "Folders open a workspace; YAML files open the importer"}
             </div>
           </div>
         </div>
@@ -855,6 +905,10 @@ function App() {
               </div>
 
               <div className="flex items-center gap-2">
+                <Button variant="outline" onClick={() => setIsSettingsOpen(true)} title="Settings">
+                  <Settings />
+                  Settings
+                </Button>
                 <Button variant="outline" onClick={selectYamlToImport}>
                   <Import />
                   Import YAML
@@ -1078,6 +1132,72 @@ function App() {
               Cancel
             </Button>
             <Button onClick={handleCreateNewFile}>Create File</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Directory Settings</DialogTitle>
+            <DialogDescription>Espanso is the live output directory. Backups are stored separately when configured.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-lg border bg-secondary/40 p-4">
+              <div className="flex items-start gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-background text-primary">
+                  <Zap className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <Label>Live Espanso directory</Label>
+                  <p className="mt-1 truncate text-sm text-muted-foreground">
+                    {espansoMatchDir || "Run scan to resolve the active Espanso match directory."}
+                  </p>
+                  {espansoPathSource && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {espansoPathSource === "cli" ? "Resolved with espanso path" : "Using platform default path"}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <Button className="mt-3" size="sm" variant="outline" onClick={scanDefaultEspansoConfigDir} disabled={isScanningEspanso}>
+                {isScanningEspanso ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSearch className="h-4 w-4" />}
+                Refresh Espanso Directory
+              </Button>
+            </div>
+
+            <button
+              className="flex w-full items-center gap-3 rounded-lg border-2 border-dashed bg-background p-4 text-left transition-colors hover:bg-secondary"
+              onClick={chooseBackupDir}
+            >
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-secondary text-primary">
+                <ShieldCheck className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <Label>Backup directory</Label>
+                <p className="mt-1 truncate text-sm text-muted-foreground">
+                  {backupDir || "Drop a folder here or click to choose one."}
+                </p>
+              </div>
+              <FolderOpen className="h-4 w-4 shrink-0 text-muted-foreground" />
+            </button>
+
+            <div className="rounded-lg border bg-secondary/40 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <Label htmlFor="settings-auto-install" className="text-sm">
+                  Auto install on save
+                </Label>
+                <Switch id="settings-auto-install" checked={autoInstall} onCheckedChange={toggleAutoInstall} />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            {backupDir && (
+              <Button variant="outline" onClick={() => saveBackupDir("")}>
+                Clear Backup Folder
+              </Button>
+            )}
+            <Button onClick={() => setIsSettingsOpen(false)}>Done</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
