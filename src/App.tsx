@@ -796,10 +796,16 @@ function App() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Button className="w-full" onClick={chooseRepo}>
-                <FolderOpen />
-                Choose Repository Folder
-              </Button>
+              <div className="grid grid-cols-2 gap-2">
+                <Button className="w-full" onClick={chooseRepo}>
+                  <FolderOpen />
+                  Choose Folder
+                </Button>
+                <Button className="w-full" variant="outline" onClick={() => setIsSettingsOpen(true)}>
+                  <Settings />
+                  Settings
+                </Button>
+              </div>
               <div className="mt-5 rounded-lg border bg-secondary/40 p-4 text-left">
                 <div className="flex items-start gap-3">
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-background text-primary">
