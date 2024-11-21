@@ -784,7 +784,7 @@ function App() {
       )}
 
       {!repoPath && (
-        <main className="flex h-full w-full items-center justify-center bg-[linear-gradient(180deg,hsl(var(--background))_0%,hsl(var(--secondary))_100%)] p-6">
+        <main className="flex h-full w-full items-start justify-center overflow-y-auto bg-[linear-gradient(180deg,hsl(var(--background))_0%,hsl(var(--secondary))_100%)] p-6 py-8">
           <Card className="w-full max-w-md">
             <CardHeader className="space-y-3 text-center">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-primary text-primary-foreground">
@@ -830,7 +830,7 @@ function App() {
                 </div>
 
                 {espansoConfigs.length > 0 ? (
-                  <div className="mt-4 space-y-2">
+                  <div className="mt-4 max-h-[min(52vh,32rem)] space-y-2 overflow-y-auto pr-1">
                     {espansoConfigs.map((config) => (
                       <button
                         key={config.path}
