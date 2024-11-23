@@ -92,6 +92,7 @@ function App() {
   const [espansoPathSource, setEspansoPathSource] = useState<EspansoPathSource | "">("");
   const [espansoConfigs, setEspansoConfigs] = useState<EspansoConfigFile[]>([]);
   const [isScanningEspanso, setIsScanningEspanso] = useState<boolean>(false);
+  const [isInitializingWorkspace, setIsInitializingWorkspace] = useState<boolean>(false);
   const [espansoScanMessage, setEspansoScanMessage] = useState<string>("");
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
 
@@ -321,9 +322,52 @@ function App() {
   }, [searchQuery, fileTree, repoPath]);
 
   // Refresh File Tree
-  async function refreshFileTree(path: string) {
+  async function refreshFileTree(path: string): Promise<FileTreeItem[]> {
     const tree = await buildSnippetTree(`${path}/snippets`);
     setFileTree(tree);
+    return tree;
+  }
+
+  function hasSnippetFiles(items: FileTreeItem[]): boolean {
+    return items.some((item) => !item.isDir || hasSnippetFiles(item.children || []));
+  }
+
+  async function isWorkspaceEmpty(path: string): Promise<boolean> {
+    const tree = await buildSnippetTree(`${path}/snippets`);
+    return !hasSnippetFiles(tree);
+  }
+
+  async function ensureSnippetsDirectory(path: string) {
+    const snippetsDir = `${path}/snippets`;
+    if (!(await exists(snippetsDir))) {
+      await mkdir(snippetsDir, { recursive: true });
+    }
+  }
+
+  async function activateWorkspace(path: string) {
+    await ensureSnippetsDirectory(path);
+    setRepoPath(path);
+    await setSetting("repoPath", path);
+    await refreshFileTree(path);
+  }
+
+  async function ensureParentDirectory(filePath: string) {
+    const parts = filePath.split("/");
+    parts.pop();
+    const parentPath = parts.join("/");
+    if (parentPath) {
+      await mkdir(parentPath, { recursive: true });
+    }
+  }
+
+  function yamlConfigToJsonRelativePath(relativePath: string): string {
+    return relativePath.replace(/\.ya?ml$/i, ".json");
+  }
+
+  function getContainingDirectory(filePath: string): string {
+    const parts = filePath.split(/[/\\]/);
+    parts.pop();
+    return parts.join("/");
   }
 
   // Choose Repository Directory
@@ -404,19 +448,142 @@ function App() {
   }
 
   async function importDetectedEspansoConfig(config: EspansoConfigFile) {
-    if (!repoPath) {
-      const selectedRepo = await chooseRepo();
-      if (!selectedRepo) return;
+    let activeRepoPath = repoPath || backupDir;
+    if (!activeRepoPath) {
+      const selectedBackupDir = await chooseBackupDir();
+      if (!selectedBackupDir) return;
+      activeRepoPath = selectedBackupDir;
     }
 
+    await ensureSnippetsDirectory(activeRepoPath);
+
+    if (!(await isWorkspaceEmpty(activeRepoPath))) {
+      alert("This import is only available while the Backup directory's snippets/ folder has no JSON configs. After initialization, that directory is the source of truth.");
+      return;
+    }
+
+    await activateWorkspace(activeRepoPath);
     await importYamlFileByPath(config.path);
   }
 
-  // Load a Snippet File
-  async function loadSnippetFile(relPath: string) {
+  async function initializeWorkspaceFromEspanso() {
+    if (isInitializingWorkspace) return;
+
+    setIsInitializingWorkspace(true);
+
     try {
+      let activeRepoPath = backupDir;
+      if (!activeRepoPath) {
+        const selectedBackupDir = await chooseBackupDir();
+        if (!selectedBackupDir) return;
+        activeRepoPath = selectedBackupDir;
+      }
+
+      await ensureSnippetsDirectory(activeRepoPath);
+
+      if (!(await isWorkspaceEmpty(activeRepoPath))) {
+        alert("Initialization is only available while the Backup directory's snippets/ folder has no JSON configs. That directory is already the source of truth.");
+        return;
+      }
+
+      let configs = espansoConfigs;
+      if (configs.length === 0) {
+        const scanResult = await scanEspansoConfigFiles();
+        setEspansoMatchDir(scanResult.matchDir);
+        setEspansoPathSource(scanResult.pathSource);
+        setEspansoConfigs(scanResult.files);
+        configs = scanResult.files;
+      }
+
+      if (configs.length === 0) {
+        alert("No Espanso YAML configs were found to initialize from.");
+        return;
+      }
+
+      if (!confirm(`Initialize the empty Backup directory from ${configs.length} Espanso YAML config${configs.length === 1 ? "" : "s"}? This one-time import writes JSON under ${activeRepoPath}/snippets and keeps future changes flowing from JSON to Espanso only.`)) {
+        return;
+      }
+
+      const warnings: string[] = [];
+      let importedFileCount = 0;
+      let importedSnippetCount = 0;
+      let firstImportedJsonFile = "";
+
+      for (const config of configs) {
+        const content = await readTextFile(config.path);
+        const result = importYamlContent(content, config.name);
+
+        warnings.push(...result.warnings);
+        if (result.snippets.length === 0) {
+          continue;
+        }
+
+        const jsonRelativePath = yamlConfigToJsonRelativePath(config.relativePath);
+        const targetJsonPath = `${activeRepoPath}/snippets/${jsonRelativePath}`;
+        await ensureParentDirectory(targetJsonPath);
+
+        const yamlFolder = getContainingDirectory(config.path);
+        for (const m of result.importedMatches) {
+          if (m.resourcePath && m.resourceName) {
+            let srcPath = m.resourcePath;
+            let srcExists = await exists(srcPath);
+
+            if (!srcExists) {
+              const altPath = `${yamlFolder}/${m.resourcePath}`;
+              if (await exists(altPath)) {
+                srcPath = altPath;
+                srcExists = true;
+              }
+            }
+
+            if (srcExists) {
+              const dstPath = `${activeRepoPath}/snippets/${m.resourceName}`;
+              await ensureParentDirectory(dstPath);
+              await copyFile(srcPath, dstPath);
+            } else {
+              warnings.push(`[${config.name}] Resource file not found: ${m.resourcePath}`);
+            }
+          }
+        }
+
+        const configData: SnippetFile = {
+          version: 1,
+          snippets: result.snippets,
+        };
+
+        await writeTextFile(targetJsonPath, JSON.stringify(configData, null, 2));
+        if (!firstImportedJsonFile) {
+          firstImportedJsonFile = jsonRelativePath;
+        }
+        importedFileCount += 1;
+        importedSnippetCount += result.snippets.length;
+      }
+
+      if (importedFileCount === 0) {
+        alert(`No supported snippets were imported.${warnings.length ? `\n\n${warnings.slice(0, 5).join("\n")}` : ""}`);
+        return;
+      }
+
+      await activateWorkspace(activeRepoPath);
+      if (firstImportedJsonFile) {
+        await loadSnippetFile(firstImportedJsonFile, activeRepoPath);
+      }
+
+      const warningSummary = warnings.length > 0 ? `\n\n${warnings.length} warning${warnings.length === 1 ? "" : "s"}. First warnings:\n${warnings.slice(0, 5).join("\n")}` : "";
+      alert(`Initialized workspace from Espanso: ${importedFileCount} JSON config${importedFileCount === 1 ? "" : "s"}, ${importedSnippetCount} snippet${importedSnippetCount === 1 ? "" : "s"}.${warningSummary}`);
+    } catch (e) {
+      alert(`Initialization failed: ${e}`);
+    } finally {
+      setIsInitializingWorkspace(false);
+    }
+  }
+
+  // Load a Snippet File
+  async function loadSnippetFile(relPath: string, pathOverride?: string) {
+    try {
+      const activeRepoPath = pathOverride || repoPath;
       setSelectedFile(relPath);
-      const filePath = `${repoPath}/snippets/${relPath}`;
+      const filePath = `${activeRepoPath}/snippets/${relPath}`;
       const content = await readTextFile(filePath);
       const data = JSON.parse(content) as SnippetFile;
 
@@ -830,23 +997,49 @@ function App() {
                 </div>
 
                 {espansoConfigs.length > 0 ? (
-                  <div className="mt-4 max-h-[min(52vh,32rem)] space-y-2 overflow-y-auto pr-1">
-                    {espansoConfigs.map((config) => (
-                      <button
-                        key={config.path}
-                        className="flex w-full items-center gap-2 rounded-md border bg-background px-3 py-2 text-left text-sm transition-colors hover:bg-accent"
-                        onClick={() => importDetectedEspansoConfig(config)}
-                      >
-                        <FileText className="h-4 w-4 shrink-0 text-primary" />
-                        <span className="min-w-0 flex-1 truncate">{config.relativePath}</span>
-                        <Import className="h-4 w-4 shrink-0 text-muted-foreground" />
-                      </button>
-                    ))}
+                  <div className="mt-4 space-y-3">
+                    <Button
+                      className="w-full"
+                      onClick={initializeWorkspaceFromEspanso}
+                      disabled={isInitializingWorkspace || isScanningEspanso}
+                    >
+                      {isInitializingWorkspace ? <Loader2 className="h-4 w-4 animate-spin" /> : <Import className="h-4 w-4" />}
+                      Initialize Backup Directory
+                    </Button>
+                    <p className="text-xs text-muted-foreground">
+                      Converts all detected live Espanso YAML into JSON under the configured Backup directory.
+                    </p>
+                    <div className="max-h-[min(44vh,28rem)] space-y-2 overflow-y-auto pr-1">
+                      {espansoConfigs.map((config) => (
+                        <button
+                          key={config.path}
+                          className="flex w-full items-center gap-2 rounded-md border bg-background px-3 py-2 text-left text-sm transition-colors hover:bg-accent"
+                          onClick={() => importDetectedEspansoConfig(config)}
+                        >
+                          <FileText className="h-4 w-4 shrink-0 text-primary" />
+                          <span className="min-w-0 flex-1 truncate">{config.relativePath}</span>
+                          <Import className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 ) : (
-                  <p className="mt-4 text-sm text-muted-foreground">
-                    {isScanningEspanso ? "Scanning Espanso configs..." : espansoScanMessage || "Scanning starts automatically."}
-                  </p>
+                  <div className="mt-4 space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                      {isScanningEspanso ? "Scanning Espanso configs..." : espansoScanMessage || "Scanning starts automatically."}
+                    </p>
+                    {!isScanningEspanso && (
+                      <Button
+                        className="w-full"
+                        variant="outline"
+                        onClick={initializeWorkspaceFromEspanso}
+                        disabled={isInitializingWorkspace}
+                      >
+                        {isInitializingWorkspace ? <Loader2 className="h-4 w-4 animate-spin" /> : <Import className="h-4 w-4" />}
+                        Initialize Backup Directory
+                      </Button>
+                    )}
+                  </div>
                 )}
               </div>
             </CardContent>
@@ -881,8 +1074,23 @@ function App() {
                   <FileTreeNode key={node.path} node={node} activePath={selectedFile} onSelect={loadSnippetFile} />
                 ))}
                 {fileTree.length === 0 && (
-                  <div className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
-                    No JSON configs in snippets/
+                  <div className="space-y-3 rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+                    <div className="text-center">
+                      <div className="font-medium text-foreground">No JSON configs in snippets/</div>
+                      <p className="mt-1 text-xs">
+                        Initialize the configured Backup directory once from your existing Espanso YAML configs.
+                      </p>
+                    </div>
+                    <Button
+                      className="w-full"
+                      size="sm"
+                      variant="outline"
+                      onClick={initializeWorkspaceFromEspanso}
+                      disabled={isInitializingWorkspace || isScanningEspanso}
+                    >
+                      {isInitializingWorkspace ? <Loader2 className="h-4 w-4 animate-spin" /> : <Import className="h-4 w-4" />}
+                      Initialize Backup Directory
+                    </Button>
                   </div>
                 )}
               </div>
