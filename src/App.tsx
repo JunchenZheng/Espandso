@@ -65,7 +65,7 @@ interface EspansoConfigPreview {
   inlineCount: number;
   resourceCount: number;
   warningCount: number;
-  sampleSnippets: Snippet[];
+  snippets: Snippet[];
 }
 
 function App() {
@@ -101,6 +101,7 @@ function App() {
   const [espansoPathSource, setEspansoPathSource] = useState<EspansoPathSource | "">("");
   const [espansoConfigs, setEspansoConfigs] = useState<EspansoConfigFile[]>([]);
   const [espansoConfigPreviews, setEspansoConfigPreviews] = useState<EspansoConfigPreview[]>([]);
+  const [selectedEspansoConfigPath, setSelectedEspansoConfigPath] = useState<string>("");
   const [isScanningEspanso, setIsScanningEspanso] = useState<boolean>(false);
   const [isInitializingWorkspace, setIsInitializingWorkspace] = useState<boolean>(false);
   const [espansoScanMessage, setEspansoScanMessage] = useState<string>("");
@@ -396,7 +397,7 @@ function App() {
           inlineCount,
           resourceCount,
           warningCount: result.warnings.length,
-          sampleSnippets: result.snippets.slice(0, 3),
+          snippets: result.snippets,
         });
       } catch {
         previews.push({
@@ -405,7 +406,7 @@ function App() {
           inlineCount: 0,
           resourceCount: 0,
           warningCount: 1,
-          sampleSnippets: [],
+          snippets: [],
         });
       }
     }
@@ -500,14 +501,22 @@ function App() {
 
     try {
       const result = await scanEspansoConfigFiles();
+      const previews = await buildEspansoConfigPreviews(result.files);
       setEspansoMatchDir(result.matchDir);
       setEspansoPathSource(result.pathSource);
       setEspansoConfigs(result.files);
-      setEspansoConfigPreviews(await buildEspansoConfigPreviews(result.files));
+      setEspansoConfigPreviews(previews);
+      setSelectedEspansoConfigPath((current) => {
+        if (current && previews.some((preview) => preview.config.path === current)) {
+          return current;
+        }
+        return previews[0]?.config.path || "";
+      });
       setEspansoScanMessage(result.files.length === 0 ? "No YAML configs found in the default match directory." : "");
     } catch (e: any) {
       setEspansoConfigs([]);
       setEspansoConfigPreviews([]);
+      setSelectedEspansoConfigPath("");
       const message = e.message || String(e);
       setEspansoScanMessage(
         message.includes("forbidden path")
@@ -561,10 +570,12 @@ function App() {
       let configs = espansoConfigs;
       if (configs.length === 0) {
         const scanResult = await scanEspansoConfigFiles();
+        const previews = await buildEspansoConfigPreviews(scanResult.files);
         setEspansoMatchDir(scanResult.matchDir);
         setEspansoPathSource(scanResult.pathSource);
         setEspansoConfigs(scanResult.files);
-        setEspansoConfigPreviews(await buildEspansoConfigPreviews(scanResult.files));
+        setEspansoConfigPreviews(previews);
+        setSelectedEspansoConfigPath(previews[0]?.config.path || "");
         configs = scanResult.files;
       }
 
@@ -996,6 +1007,19 @@ function App() {
     }),
     { snippets: 0, inline: 0, resources: 0, warnings: 0 },
   );
+  const espansoPreviewList = espansoConfigPreviews.length > 0
+    ? espansoConfigPreviews
+    : espansoConfigs.map((config) => ({
+      config,
+      snippetCount: 0,
+      inlineCount: 0,
+      resourceCount: 0,
+      warningCount: 0,
+      snippets: [],
+    }));
+  const selectedEspansoPreview = espansoPreviewList.find(
+    (preview) => preview.config.path === selectedEspansoConfigPath,
+  ) || espansoPreviewList[0];
 
   return (
     <div className="app-shell">
@@ -1069,63 +1093,81 @@ function App() {
 
                 {espansoConfigs.length > 0 ? (
                   <div className="mt-4 space-y-3">
-                    <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-                      <div className="rounded-md border bg-background p-3">
-                        <div className="text-xl font-semibold">{espansoConfigs.length}</div>
-                        <div className="text-xs text-muted-foreground">YAML files</div>
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-background p-3">
+                      <div className="flex flex-wrap gap-3 text-sm">
+                        <span className="font-semibold">{espansoConfigs.length} YAML files</span>
+                        <span className="text-muted-foreground">{espansoPreviewTotals.snippets} readable snippets</span>
+                        <span className="text-muted-foreground">{espansoPreviewTotals.inline} inline</span>
+                        <span className="text-muted-foreground">{espansoPreviewTotals.resources} external files</span>
+                        {espansoPreviewTotals.warnings > 0 && (
+                          <span className="text-amber-700">{espansoPreviewTotals.warnings} warnings</span>
+                        )}
                       </div>
-                      <div className="rounded-md border bg-background p-3">
-                        <div className="text-xl font-semibold">{espansoPreviewTotals.snippets}</div>
-                        <div className="text-xs text-muted-foreground">Readable snippets</div>
-                      </div>
-                      <div className="rounded-md border bg-background p-3">
-                        <div className="text-xl font-semibold">{espansoPreviewTotals.inline}</div>
-                        <div className="text-xs text-muted-foreground">Inline text</div>
-                      </div>
-                      <div className="rounded-md border bg-background p-3">
-                        <div className="text-xl font-semibold">{espansoPreviewTotals.resources}</div>
-                        <div className="text-xs text-muted-foreground">External files</div>
-                      </div>
+                      <Button
+                        size="sm"
+                        onClick={initializeWorkspaceFromEspanso}
+                        disabled={isInitializingWorkspace || isScanningEspanso}
+                      >
+                        {isInitializingWorkspace ? <Loader2 className="h-4 w-4 animate-spin" /> : <Import className="h-4 w-4" />}
+                        Initialize Backup Directory
+                      </Button>
                     </div>
 
-                    {espansoPreviewTotals.warnings > 0 && (
-                      <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
-                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                        <span>
-                          {espansoPreviewTotals.warnings} item{espansoPreviewTotals.warnings === 1 ? "" : "s"} need review during import.
-                        </span>
-                      </div>
-                    )}
+                    <div className="grid h-[min(58vh,38rem)] min-h-[24rem] grid-cols-1 overflow-hidden rounded-md border bg-background md:grid-cols-[18rem_1fr]">
+                      <aside className="flex min-h-0 flex-col border-b bg-secondary/30 md:border-b-0 md:border-r">
+                        <div className="flex h-10 shrink-0 items-center justify-between border-b px-3">
+                          <h2 className="text-sm font-semibold">Collection</h2>
+                          <span className="text-xs text-muted-foreground">{espansoPreviewList.length}</span>
+                        </div>
+                        <ScrollArea className="min-h-0 flex-1">
+                          <div className="space-y-1 p-2">
+                            {espansoPreviewList.map((preview) => (
+                              <button
+                                key={preview.config.path}
+                                className={cn(
+                                  "flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-accent",
+                                  (selectedEspansoPreview?.config.path || selectedEspansoConfigPath) === preview.config.path
+                                    && "bg-primary text-primary-foreground hover:bg-primary/90",
+                                )}
+                                onClick={() => setSelectedEspansoConfigPath(preview.config.path)}
+                              >
+                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-background/80 text-primary">
+                                  <FileText className="h-5 w-5" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="truncate text-sm font-semibold">
+                                    {preview.config.relativePath.replace(/\.ya?ml$/i, "")}
+                                  </div>
+                                  <div
+                                    className={cn(
+                                      "truncate text-xs text-muted-foreground",
+                                      (selectedEspansoPreview?.config.path || selectedEspansoConfigPath) === preview.config.path
+                                        && "text-primary-foreground/75",
+                                    )}
+                                  >
+                                    {preview.snippetCount} Snippets, {preview.resourceCount} files
+                                  </div>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        </ScrollArea>
+                      </aside>
 
-                    <Button
-                      className="w-full"
-                      onClick={initializeWorkspaceFromEspanso}
-                      disabled={isInitializingWorkspace || isScanningEspanso}
-                    >
-                      {isInitializingWorkspace ? <Loader2 className="h-4 w-4 animate-spin" /> : <Import className="h-4 w-4" />}
-                      Initialize Backup Directory
-                    </Button>
-                    <p className="text-xs text-muted-foreground">
-                      Converts all detected live Espanso YAML into JSON under the configured Backup directory.
-                    </p>
-                    <div className="grid max-h-[min(50vh,34rem)] gap-3 overflow-y-auto pr-1 md:grid-cols-2">
-                      {(espansoConfigPreviews.length > 0
-                        ? espansoConfigPreviews
-                        : espansoConfigs.map((config) => ({
-                          config,
-                          snippetCount: 0,
-                          inlineCount: 0,
-                          resourceCount: 0,
-                          warningCount: 0,
-                          sampleSnippets: [],
-                        }))
-                      ).map((preview) => (
-                        <EspansoConfigPreviewCard
-                          key={preview.config.path}
-                          preview={preview}
-                          onImport={() => importDetectedEspansoConfig(preview.config)}
-                        />
-                      ))}
+                      <section className="flex min-h-0 min-w-0 flex-col">
+                        {selectedEspansoPreview ? (
+                          <EspansoConfigDetail
+                            preview={selectedEspansoPreview}
+                            onImport={() => importDetectedEspansoConfig(selectedEspansoPreview.config)}
+                          />
+                        ) : (
+                          <EmptyState
+                            icon={FileText}
+                            title="No config selected"
+                            description="Select a YAML config from the collection list to preview its snippets."
+                          />
+                        )}
+                      </section>
                     </div>
                   </div>
                 ) : (
@@ -1664,58 +1706,77 @@ interface SnippetPreviewProps {
   snippet: Snippet;
 }
 
-interface EspansoConfigPreviewCardProps {
+interface EspansoConfigDetailProps {
   preview: EspansoConfigPreview;
   onImport: () => void;
 }
 
-function EspansoConfigPreviewCard({ preview, onImport }: EspansoConfigPreviewCardProps) {
+function EspansoConfigDetail({ preview, onImport }: EspansoConfigDetailProps) {
   return (
-    <div className="rounded-md border bg-background p-3 text-sm">
-      <div className="flex items-start gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-secondary text-primary">
-          <FileText className="h-4 w-4" />
-        </div>
+    <>
+      <div className="flex h-14 shrink-0 items-center justify-between gap-3 border-b px-3">
         <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <h3 className="truncate font-semibold">{preview.config.relativePath}</h3>
-              <p className="mt-1 truncate text-xs text-muted-foreground">{preview.config.path}</p>
-            </div>
-            <Button size="sm" variant="outline" onClick={onImport}>
-              <Import className="h-4 w-4" />
-              Import
-            </Button>
-          </div>
+          <h2 className="truncate text-sm font-semibold">{preview.config.relativePath}</h2>
+          <p className="mt-1 truncate text-xs text-muted-foreground">{preview.config.path}</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {preview.warningCount > 0 && (
+            <span className="rounded-md bg-amber-100 px-2 py-1 text-xs text-amber-800">
+              {preview.warningCount} warnings
+            </span>
+          )}
+          <Button size="sm" variant="outline" onClick={onImport}>
+            <Import className="h-4 w-4" />
+            Import
+          </Button>
         </div>
       </div>
 
-      <div className="mt-3 flex flex-wrap gap-2 text-xs">
-        <span className="rounded-md bg-secondary px-2 py-1">{preview.snippetCount} snippets</span>
-        <span className="rounded-md bg-secondary px-2 py-1">{preview.inlineCount} inline</span>
-        <span className="rounded-md bg-secondary px-2 py-1">{preview.resourceCount} files</span>
-        {preview.warningCount > 0 && (
-          <span className="rounded-md bg-amber-100 px-2 py-1 text-amber-800">{preview.warningCount} warnings</span>
-        )}
+      <div className="grid h-9 shrink-0 grid-cols-[minmax(8rem,1.1fr)_3rem_minmax(6rem,0.65fr)_minmax(12rem,2fr)] items-center border-b bg-secondary/40 px-3 text-xs font-semibold text-muted-foreground">
+        <div className="truncate">Name</div>
+        <div className="truncate text-center">A→</div>
+        <div className="truncate">Keyword</div>
+        <div className="truncate">Snippet</div>
       </div>
 
-      <div className="mt-3 space-y-2">
-        {preview.sampleSnippets.length > 0 ? (
-          preview.sampleSnippets.map((snippet, index) => (
-            <div key={`${snippet.trigger}-${index}`} className="rounded-md border bg-secondary/30 px-2 py-1.5">
-              <div className="mono-field truncate text-xs font-semibold text-primary">{snippet.trigger || "Untitled trigger"}</div>
-              <div className="mt-1 truncate text-xs text-muted-foreground">
-                {snippet.description || snippet.include_file || snippet.replace || "Empty replacement"}
+      <ScrollArea className="min-h-0 flex-1">
+        {preview.snippets.length > 0 ? (
+          <div className="divide-y">
+            {preview.snippets.map((snippet, index) => (
+              <div
+                key={`${snippet.trigger}-${index}`}
+                className="grid min-h-9 grid-cols-[minmax(8rem,1.1fr)_3rem_minmax(6rem,0.65fr)_minmax(12rem,2fr)] items-center px-3 text-sm hover:bg-secondary/40"
+              >
+                <div className="min-w-0 pr-3">
+                  <div className="truncate font-medium">
+                    {snippet.description || snippet.trigger || `Snippet ${index + 1}`}
+                  </div>
+                </div>
+                <div className="flex justify-center">
+                  <span
+                    className={cn(
+                      "h-4 w-4 rounded",
+                      snippet.include_file ? "bg-primary/70" : "bg-muted-foreground/35",
+                    )}
+                    title={snippet.include_file ? "External file snippet" : "Inline replacement snippet"}
+                  />
+                </div>
+                <div className="mono-field min-w-0 truncate pr-3 text-sm">{snippet.trigger}</div>
+                <div className="min-w-0 truncate text-muted-foreground">
+                  {snippet.include_file ? `include: ${snippet.include_file}` : snippet.replace || "Empty replacement"}
+                </div>
               </div>
-            </div>
-          ))
-        ) : (
-          <div className="rounded-md border border-dashed px-2 py-2 text-xs text-muted-foreground">
-            No supported snippets could be previewed from this file.
+            ))}
           </div>
+        ) : (
+          <EmptyState
+            icon={FileText}
+            title="No supported snippets"
+            description="This YAML file was found, but no supported Espanso matches could be previewed."
+          />
         )}
-      </div>
-    </div>
+      </ScrollArea>
+    </>
   );
 }
 
