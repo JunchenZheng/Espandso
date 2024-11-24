@@ -59,6 +59,15 @@ interface DragDropPayload {
   position: { x: number; y: number };
 }
 
+interface EspansoConfigPreview {
+  config: EspansoConfigFile;
+  snippetCount: number;
+  inlineCount: number;
+  resourceCount: number;
+  warningCount: number;
+  sampleSnippets: Snippet[];
+}
+
 function App() {
   // Config & State
   const [repoPath, setRepoPath] = useState<string>("");
@@ -91,6 +100,7 @@ function App() {
   const [espansoMatchDir, setEspansoMatchDir] = useState<string>("");
   const [espansoPathSource, setEspansoPathSource] = useState<EspansoPathSource | "">("");
   const [espansoConfigs, setEspansoConfigs] = useState<EspansoConfigFile[]>([]);
+  const [espansoConfigPreviews, setEspansoConfigPreviews] = useState<EspansoConfigPreview[]>([]);
   const [isScanningEspanso, setIsScanningEspanso] = useState<boolean>(false);
   const [isInitializingWorkspace, setIsInitializingWorkspace] = useState<boolean>(false);
   const [espansoScanMessage, setEspansoScanMessage] = useState<string>("");
@@ -370,6 +380,66 @@ function App() {
     return parts.join("/");
   }
 
+  async function buildEspansoConfigPreviews(configs: EspansoConfigFile[]): Promise<EspansoConfigPreview[]> {
+    const previews: EspansoConfigPreview[] = [];
+
+    for (const config of configs) {
+      try {
+        const content = await readTextFile(config.path);
+        const result = importYamlContent(content, config.name);
+        const inlineCount = result.snippets.filter((snippet) => snippet.replace !== undefined).length;
+        const resourceCount = result.snippets.filter((snippet) => snippet.include_file).length;
+
+        previews.push({
+          config,
+          snippetCount: result.snippets.length,
+          inlineCount,
+          resourceCount,
+          warningCount: result.warnings.length,
+          sampleSnippets: result.snippets.slice(0, 3),
+        });
+      } catch {
+        previews.push({
+          config,
+          snippetCount: 0,
+          inlineCount: 0,
+          resourceCount: 0,
+          warningCount: 1,
+          sampleSnippets: [],
+        });
+      }
+    }
+
+    return previews;
+  }
+
+  async function findReadableResourcePath(resourcePath: string, yamlFolder: string): Promise<{ path: string | null; warning?: string }> {
+    const candidates = [resourcePath, `${yamlFolder}/${resourcePath}`];
+
+    for (const candidate of candidates) {
+      try {
+        if (await exists(candidate)) {
+          return { path: candidate };
+        }
+      } catch (e: any) {
+        const message = e?.message || String(e);
+        if (message.includes("forbidden path")) {
+          return {
+            path: null,
+            warning: `Resource path is outside app file permissions and was not copied: ${candidate}`,
+          };
+        }
+
+        return {
+          path: null,
+          warning: `Resource path could not be checked and was not copied: ${candidate} (${message})`,
+        };
+      }
+    }
+
+    return { path: null };
+  }
+
   // Choose Repository Directory
   async function chooseRepo(): Promise<string | null> {
     const selected = await openDialog({
@@ -433,9 +503,11 @@ function App() {
       setEspansoMatchDir(result.matchDir);
       setEspansoPathSource(result.pathSource);
       setEspansoConfigs(result.files);
+      setEspansoConfigPreviews(await buildEspansoConfigPreviews(result.files));
       setEspansoScanMessage(result.files.length === 0 ? "No YAML configs found in the default match directory." : "");
     } catch (e: any) {
       setEspansoConfigs([]);
+      setEspansoConfigPreviews([]);
       const message = e.message || String(e);
       setEspansoScanMessage(
         message.includes("forbidden path")
@@ -492,6 +564,7 @@ function App() {
         setEspansoMatchDir(scanResult.matchDir);
         setEspansoPathSource(scanResult.pathSource);
         setEspansoConfigs(scanResult.files);
+        setEspansoConfigPreviews(await buildEspansoConfigPreviews(scanResult.files));
         configs = scanResult.files;
       }
 
@@ -525,23 +598,18 @@ function App() {
         const yamlFolder = getContainingDirectory(config.path);
         for (const m of result.importedMatches) {
           if (m.resourcePath && m.resourceName) {
-            let srcPath = m.resourcePath;
-            let srcExists = await exists(srcPath);
+            const resource = await findReadableResourcePath(m.resourcePath, yamlFolder);
 
-            if (!srcExists) {
-              const altPath = `${yamlFolder}/${m.resourcePath}`;
-              if (await exists(altPath)) {
-                srcPath = altPath;
-                srcExists = true;
-              }
-            }
-
-            if (srcExists) {
+            if (resource.path) {
               const dstPath = `${activeRepoPath}/snippets/${m.resourceName}`;
               await ensureParentDirectory(dstPath);
-              await copyFile(srcPath, dstPath);
+              try {
+                await copyFile(resource.path, dstPath);
+              } catch (e: any) {
+                warnings.push(`[${config.name}] Resource file could not be copied: ${m.resourcePath} (${e?.message || e})`);
+              }
             } else {
-              warnings.push(`[${config.name}] Resource file not found: ${m.resourcePath}`);
+              warnings.push(`[${config.name}] ${resource.warning || `Resource file not found: ${m.resourcePath}`}`);
             }
           }
         }
@@ -882,24 +950,18 @@ function App() {
 
       for (const m of importResult.importedMatches) {
         if (m.resourcePath && m.resourceName) {
-          // Verify if resource path is absolute or relative
-          // If it is absolute and exists, copy it.
-          // Otherwise check relative to yamlFolder
-          let srcPath = m.resourcePath;
-          let srcExists = await exists(srcPath);
+          const resource = await findReadableResourcePath(m.resourcePath, yamlFolder);
 
-          if (!srcExists) {
-            // Check relative
-            const altPath = `${yamlFolder}/${m.resourcePath}`;
-            if (await exists(altPath)) {
-              srcPath = altPath;
-              srcExists = true;
-            }
-          }
-
-          if (srcExists) {
+          if (resource.path) {
             const dstPath = `${repoPath}/snippets/${m.resourceName}`;
-            await copyFile(srcPath, dstPath);
+            await ensureParentDirectory(dstPath);
+            try {
+              await copyFile(resource.path, dstPath);
+            } catch (e: any) {
+              alert(`Resource file could not be copied: ${m.resourcePath} (${e?.message || e})`);
+            }
+          } else if (resource.warning) {
+            alert(resource.warning);
           }
         }
       }
@@ -925,6 +987,15 @@ function App() {
   }
 
   const currentFileName = selectedFile ? selectedFile.split("/").pop() : "";
+  const espansoPreviewTotals = espansoConfigPreviews.reduce(
+    (total, preview) => ({
+      snippets: total.snippets + preview.snippetCount,
+      inline: total.inline + preview.inlineCount,
+      resources: total.resources + preview.resourceCount,
+      warnings: total.warnings + preview.warningCount,
+    }),
+    { snippets: 0, inline: 0, resources: 0, warnings: 0 },
+  );
 
   return (
     <div className="app-shell">
@@ -952,7 +1023,7 @@ function App() {
 
       {!repoPath && (
         <main className="flex h-full w-full items-start justify-center overflow-y-auto bg-[linear-gradient(180deg,hsl(var(--background))_0%,hsl(var(--secondary))_100%)] p-6 py-8">
-          <Card className="w-full max-w-md">
+          <Card className="w-full max-w-5xl">
             <CardHeader className="space-y-3 text-center">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-primary text-primary-foreground">
                 <ClipboardList className="h-6 w-6" />
@@ -998,6 +1069,34 @@ function App() {
 
                 {espansoConfigs.length > 0 ? (
                   <div className="mt-4 space-y-3">
+                    <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                      <div className="rounded-md border bg-background p-3">
+                        <div className="text-xl font-semibold">{espansoConfigs.length}</div>
+                        <div className="text-xs text-muted-foreground">YAML files</div>
+                      </div>
+                      <div className="rounded-md border bg-background p-3">
+                        <div className="text-xl font-semibold">{espansoPreviewTotals.snippets}</div>
+                        <div className="text-xs text-muted-foreground">Readable snippets</div>
+                      </div>
+                      <div className="rounded-md border bg-background p-3">
+                        <div className="text-xl font-semibold">{espansoPreviewTotals.inline}</div>
+                        <div className="text-xs text-muted-foreground">Inline text</div>
+                      </div>
+                      <div className="rounded-md border bg-background p-3">
+                        <div className="text-xl font-semibold">{espansoPreviewTotals.resources}</div>
+                        <div className="text-xs text-muted-foreground">External files</div>
+                      </div>
+                    </div>
+
+                    {espansoPreviewTotals.warnings > 0 && (
+                      <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                        <span>
+                          {espansoPreviewTotals.warnings} item{espansoPreviewTotals.warnings === 1 ? "" : "s"} need review during import.
+                        </span>
+                      </div>
+                    )}
+
                     <Button
                       className="w-full"
                       onClick={initializeWorkspaceFromEspanso}
@@ -1009,17 +1108,23 @@ function App() {
                     <p className="text-xs text-muted-foreground">
                       Converts all detected live Espanso YAML into JSON under the configured Backup directory.
                     </p>
-                    <div className="max-h-[min(44vh,28rem)] space-y-2 overflow-y-auto pr-1">
-                      {espansoConfigs.map((config) => (
-                        <button
-                          key={config.path}
-                          className="flex w-full items-center gap-2 rounded-md border bg-background px-3 py-2 text-left text-sm transition-colors hover:bg-accent"
-                          onClick={() => importDetectedEspansoConfig(config)}
-                        >
-                          <FileText className="h-4 w-4 shrink-0 text-primary" />
-                          <span className="min-w-0 flex-1 truncate">{config.relativePath}</span>
-                          <Import className="h-4 w-4 shrink-0 text-muted-foreground" />
-                        </button>
+                    <div className="grid max-h-[min(50vh,34rem)] gap-3 overflow-y-auto pr-1 md:grid-cols-2">
+                      {(espansoConfigPreviews.length > 0
+                        ? espansoConfigPreviews
+                        : espansoConfigs.map((config) => ({
+                          config,
+                          snippetCount: 0,
+                          inlineCount: 0,
+                          resourceCount: 0,
+                          warningCount: 0,
+                          sampleSnippets: [],
+                        }))
+                      ).map((preview) => (
+                        <EspansoConfigPreviewCard
+                          key={preview.config.path}
+                          preview={preview}
+                          onImport={() => importDetectedEspansoConfig(preview.config)}
+                        />
                       ))}
                     </div>
                   </div>
@@ -1557,6 +1662,61 @@ function FileTreeNode({ node, activePath, onSelect }: TreeNodeProps) {
 
 interface SnippetPreviewProps {
   snippet: Snippet;
+}
+
+interface EspansoConfigPreviewCardProps {
+  preview: EspansoConfigPreview;
+  onImport: () => void;
+}
+
+function EspansoConfigPreviewCard({ preview, onImport }: EspansoConfigPreviewCardProps) {
+  return (
+    <div className="rounded-md border bg-background p-3 text-sm">
+      <div className="flex items-start gap-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-secondary text-primary">
+          <FileText className="h-4 w-4" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <h3 className="truncate font-semibold">{preview.config.relativePath}</h3>
+              <p className="mt-1 truncate text-xs text-muted-foreground">{preview.config.path}</p>
+            </div>
+            <Button size="sm" variant="outline" onClick={onImport}>
+              <Import className="h-4 w-4" />
+              Import
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-2 text-xs">
+        <span className="rounded-md bg-secondary px-2 py-1">{preview.snippetCount} snippets</span>
+        <span className="rounded-md bg-secondary px-2 py-1">{preview.inlineCount} inline</span>
+        <span className="rounded-md bg-secondary px-2 py-1">{preview.resourceCount} files</span>
+        {preview.warningCount > 0 && (
+          <span className="rounded-md bg-amber-100 px-2 py-1 text-amber-800">{preview.warningCount} warnings</span>
+        )}
+      </div>
+
+      <div className="mt-3 space-y-2">
+        {preview.sampleSnippets.length > 0 ? (
+          preview.sampleSnippets.map((snippet, index) => (
+            <div key={`${snippet.trigger}-${index}`} className="rounded-md border bg-secondary/30 px-2 py-1.5">
+              <div className="mono-field truncate text-xs font-semibold text-primary">{snippet.trigger || "Untitled trigger"}</div>
+              <div className="mt-1 truncate text-xs text-muted-foreground">
+                {snippet.description || snippet.include_file || snippet.replace || "Empty replacement"}
+              </div>
+            </div>
+          ))
+        ) : (
+          <div className="rounded-md border border-dashed px-2 py-2 text-xs text-muted-foreground">
+            No supported snippets could be previewed from this file.
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function SnippetPreview({ snippet }: SnippetPreviewProps) {
