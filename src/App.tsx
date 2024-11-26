@@ -68,6 +68,16 @@ interface EspansoConfigPreview {
   snippets: Snippet[];
 }
 
+interface EspansoConfigPreviewTreeNode {
+  name: string;
+  path: string;
+  isDir: boolean;
+  snippetCount: number;
+  fileCount: number;
+  preview?: EspansoConfigPreview;
+  children?: EspansoConfigPreviewTreeNode[];
+}
+
 function App() {
   // Config & State
   const [repoPath, setRepoPath] = useState<string>("");
@@ -1020,6 +1030,7 @@ function App() {
   const selectedEspansoPreview = espansoPreviewList.find(
     (preview) => preview.config.path === selectedEspansoConfigPath,
   ) || espansoPreviewList[0];
+  const espansoPreviewTree = buildEspansoConfigPreviewTree(espansoPreviewList);
 
   return (
     <div className="app-shell">
@@ -1121,34 +1132,13 @@ function App() {
                         </div>
                         <ScrollArea className="min-h-0 flex-1">
                           <div className="space-y-1 p-2">
-                            {espansoPreviewList.map((preview) => (
-                              <button
-                                key={preview.config.path}
-                                className={cn(
-                                  "flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-accent",
-                                  (selectedEspansoPreview?.config.path || selectedEspansoConfigPath) === preview.config.path
-                                    && "bg-primary text-primary-foreground hover:bg-primary/90",
-                                )}
-                                onClick={() => setSelectedEspansoConfigPath(preview.config.path)}
-                              >
-                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-background/80 text-primary">
-                                  <FileText className="h-5 w-5" />
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                  <div className="truncate text-sm font-semibold">
-                                    {preview.config.relativePath.replace(/\.ya?ml$/i, "")}
-                                  </div>
-                                  <div
-                                    className={cn(
-                                      "truncate text-xs text-muted-foreground",
-                                      (selectedEspansoPreview?.config.path || selectedEspansoConfigPath) === preview.config.path
-                                        && "text-primary-foreground/75",
-                                    )}
-                                  >
-                                    {preview.snippetCount} Snippets, {preview.resourceCount} files
-                                  </div>
-                                </div>
-                              </button>
+                            {espansoPreviewTree.map((node) => (
+                              <EspansoConfigTreeNode
+                                key={node.path}
+                                node={node}
+                                activePath={selectedEspansoPreview?.config.path || selectedEspansoConfigPath}
+                                onSelect={setSelectedEspansoConfigPath}
+                              />
                             ))}
                           </div>
                         </ScrollArea>
@@ -1652,6 +1642,157 @@ function App() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function buildEspansoConfigPreviewTree(previews: EspansoConfigPreview[]): EspansoConfigPreviewTreeNode[] {
+  const root: EspansoConfigPreviewTreeNode[] = [];
+
+  function getOrCreateDir(
+    nodes: EspansoConfigPreviewTreeNode[],
+    name: string,
+    path: string,
+  ): EspansoConfigPreviewTreeNode {
+    let dir = nodes.find((node) => node.isDir && node.name === name);
+    if (!dir) {
+      dir = {
+        name,
+        path,
+        isDir: true,
+        snippetCount: 0,
+        fileCount: 0,
+        children: [],
+      };
+      nodes.push(dir);
+    }
+    return dir;
+  }
+
+  for (const preview of previews) {
+    const parts = preview.config.relativePath.split("/").filter(Boolean);
+    let currentNodes = root;
+    let currentPath = "";
+
+    for (let index = 0; index < parts.length; index += 1) {
+      const part = parts[index];
+      currentPath = currentPath ? `${currentPath}/${part}` : part;
+      const isFile = index === parts.length - 1;
+
+      if (isFile) {
+        currentNodes.push({
+          name: part,
+          path: preview.config.path,
+          isDir: false,
+          snippetCount: preview.snippetCount,
+          fileCount: 1,
+          preview,
+        });
+      } else {
+        const dir = getOrCreateDir(currentNodes, part, currentPath);
+        dir.snippetCount += preview.snippetCount;
+        dir.fileCount += 1;
+        currentNodes = dir.children || [];
+      }
+    }
+  }
+
+  function sortNodes(nodes: EspansoConfigPreviewTreeNode[]) {
+    nodes.sort((a, b) => {
+      if (a.isDir && !b.isDir) return -1;
+      if (!a.isDir && b.isDir) return 1;
+      return a.name.localeCompare(b.name);
+    });
+    nodes.forEach((node) => {
+      if (node.children) {
+        sortNodes(node.children);
+      }
+    });
+  }
+
+  sortNodes(root);
+  return root;
+}
+
+function hasActiveEspansoConfig(node: EspansoConfigPreviewTreeNode, activePath: string): boolean {
+  if (!activePath) {
+    return false;
+  }
+  if (!node.isDir) {
+    return node.preview?.config.path === activePath;
+  }
+  return (node.children || []).some((child) => hasActiveEspansoConfig(child, activePath));
+}
+
+interface EspansoConfigTreeNodeProps {
+  node: EspansoConfigPreviewTreeNode;
+  activePath: string;
+  onSelect: (path: string) => void;
+}
+
+function EspansoConfigTreeNode({ node, activePath, onSelect }: EspansoConfigTreeNodeProps) {
+  const containsActive = hasActiveEspansoConfig(node, activePath);
+  const [isOpen, setIsOpen] = useState<boolean>(containsActive || true);
+
+  if (node.isDir) {
+    return (
+      <div>
+        <button
+          className={cn(
+            "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+            containsActive && "text-foreground",
+          )}
+          onClick={() => setIsOpen(!isOpen)}
+        >
+          {isOpen ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
+          {isOpen ? <FolderOpen className="h-4 w-4 shrink-0" /> : <Folder className="h-4 w-4 shrink-0" />}
+          <div className="min-w-0 flex-1">
+            <div className="truncate font-medium">{node.name}</div>
+            <div className="truncate text-xs text-muted-foreground">
+              {node.fileCount} YAML, {node.snippetCount} Snippets
+            </div>
+          </div>
+        </button>
+        {isOpen && node.children && (
+          <div className="ml-4 mt-1 space-y-1 border-l pl-2">
+            {node.children.map((child) => (
+              <EspansoConfigTreeNode
+                key={child.path}
+                node={child}
+                activePath={activePath}
+                onSelect={onSelect}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  const isActive = node.preview?.config.path === activePath;
+
+  return (
+    <button
+      className={cn(
+        "flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-accent",
+        isActive && "bg-primary text-primary-foreground hover:bg-primary/90",
+      )}
+      onClick={() => node.preview && onSelect(node.preview.config.path)}
+    >
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-background/80 text-primary">
+        <FileText className="h-5 w-5" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-semibold">{node.name.replace(/\.ya?ml$/i, "")}</div>
+        <div
+          className={cn(
+            "truncate text-xs text-muted-foreground",
+            isActive && "text-primary-foreground/75",
+          )}
+        >
+          {node.snippetCount} Snippets, {node.preview?.resourceCount || 0} files
+        </div>
+      </div>
+    </button>
   );
 }
 
