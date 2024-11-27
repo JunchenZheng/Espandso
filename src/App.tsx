@@ -1057,8 +1057,8 @@ function App() {
       )}
 
       {!repoPath && (
-        <main className="flex h-full w-full items-start justify-center overflow-y-auto bg-[linear-gradient(180deg,hsl(var(--background))_0%,hsl(var(--secondary))_100%)] p-6 py-8">
-          <Card className="w-full max-w-5xl">
+        <main className="flex h-full w-full overflow-hidden bg-[linear-gradient(180deg,hsl(var(--background))_0%,hsl(var(--secondary))_100%)] p-4">
+          <Card className="flex h-full w-full flex-col">
             <CardHeader className="space-y-3 text-center">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-primary text-primary-foreground">
                 <ClipboardList className="h-6 w-6" />
@@ -1068,7 +1068,7 @@ function App() {
                 Manage JSON snippet files and build local Espanso YAML configs from one workspace.
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex min-h-0 flex-1 flex-col">
               <div className="grid grid-cols-2 gap-2">
                 <Button className="w-full" onClick={chooseRepo}>
                   <FolderOpen />
@@ -1079,7 +1079,7 @@ function App() {
                   Settings
                 </Button>
               </div>
-              <div className="mt-5 rounded-lg border bg-secondary/40 p-4 text-left">
+              <div className="mt-5 flex min-h-0 flex-1 flex-col rounded-lg border bg-secondary/40 p-4 text-left">
                 <div className="flex items-start gap-3">
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-background text-primary">
                     {isScanningEspanso ? <Loader2 className="h-5 w-5 animate-spin" /> : <FileSearch className="h-5 w-5" />}
@@ -1103,7 +1103,7 @@ function App() {
                 </div>
 
                 {espansoConfigs.length > 0 ? (
-                  <div className="mt-4 space-y-3">
+                  <div className="mt-4 flex min-h-0 flex-1 flex-col gap-3">
                     <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-background p-3">
                       <div className="flex flex-wrap gap-3 text-sm">
                         <span className="font-semibold">{espansoConfigs.length} YAML files</span>
@@ -1124,7 +1124,7 @@ function App() {
                       </Button>
                     </div>
 
-                    <div className="grid h-[min(58vh,38rem)] min-h-[24rem] grid-cols-1 overflow-hidden rounded-md border bg-background md:grid-cols-[18rem_1fr]">
+                    <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden rounded-md border bg-background md:grid-cols-[18rem_1fr]">
                       <aside className="flex min-h-0 flex-col border-b bg-secondary/30 md:border-b-0 md:border-r">
                         <div className="flex h-10 shrink-0 items-center justify-between border-b px-3">
                           <h2 className="text-sm font-semibold">Collection</h2>
@@ -1731,7 +1731,7 @@ interface EspansoConfigTreeNodeProps {
 
 function EspansoConfigTreeNode({ node, activePath, onSelect }: EspansoConfigTreeNodeProps) {
   const containsActive = hasActiveEspansoConfig(node, activePath);
-  const [isOpen, setIsOpen] = useState<boolean>(containsActive || true);
+  const [isOpen, setIsOpen] = useState<boolean>(false);
 
   if (node.isDir) {
     return (
@@ -1747,9 +1747,6 @@ function EspansoConfigTreeNode({ node, activePath, onSelect }: EspansoConfigTree
           {isOpen ? <FolderOpen className="h-4 w-4 shrink-0" /> : <Folder className="h-4 w-4 shrink-0" />}
           <div className="min-w-0 flex-1">
             <div className="truncate font-medium">{node.name}</div>
-            <div className="truncate text-xs text-muted-foreground">
-              {node.fileCount} YAML, {node.snippetCount} Snippets
-            </div>
           </div>
         </button>
         {isOpen && node.children && (
@@ -1783,14 +1780,6 @@ function EspansoConfigTreeNode({ node, activePath, onSelect }: EspansoConfigTree
       </div>
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-semibold">{node.name.replace(/\.ya?ml$/i, "")}</div>
-        <div
-          className={cn(
-            "truncate text-xs text-muted-foreground",
-            isActive && "text-primary-foreground/75",
-          )}
-        >
-          {node.snippetCount} Snippets, {node.preview?.resourceCount || 0} files
-        </div>
       </div>
     </button>
   );
