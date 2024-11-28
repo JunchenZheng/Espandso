@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { readTextFile, writeTextFile, exists, copyFile, mkdir, readDir } from "@tauri-apps/plugin-fs";
 import { listen } from "@tauri-apps/api/event";
@@ -1008,29 +1008,48 @@ function App() {
   }
 
   const currentFileName = selectedFile ? selectedFile.split("/").pop() : "";
-  const espansoPreviewTotals = espansoConfigPreviews.reduce(
-    (total, preview) => ({
-      snippets: total.snippets + preview.snippetCount,
-      inline: total.inline + preview.inlineCount,
-      resources: total.resources + preview.resourceCount,
-      warnings: total.warnings + preview.warningCount,
-    }),
-    { snippets: 0, inline: 0, resources: 0, warnings: 0 },
+  const espansoPreviewList = useMemo(
+    () => espansoConfigPreviews.length > 0
+      ? espansoConfigPreviews
+      : espansoConfigs.map((config) => ({
+        config,
+        snippetCount: 0,
+        inlineCount: 0,
+        resourceCount: 0,
+        warningCount: 0,
+        snippets: [],
+      })),
+    [espansoConfigPreviews, espansoConfigs],
   );
-  const espansoPreviewList = espansoConfigPreviews.length > 0
-    ? espansoConfigPreviews
-    : espansoConfigs.map((config) => ({
-      config,
-      snippetCount: 0,
-      inlineCount: 0,
-      resourceCount: 0,
-      warningCount: 0,
-      snippets: [],
-    }));
-  const selectedEspansoPreview = espansoPreviewList.find(
-    (preview) => preview.config.path === selectedEspansoConfigPath,
-  ) || espansoPreviewList[0];
-  const espansoPreviewTree = buildEspansoConfigPreviewTree(espansoPreviewList);
+  const espansoPreviewTotals = useMemo(
+    () => espansoPreviewList.reduce(
+      (total, preview) => ({
+        snippets: total.snippets + preview.snippetCount,
+        inline: total.inline + preview.inlineCount,
+        resources: total.resources + preview.resourceCount,
+        warnings: total.warnings + preview.warningCount,
+      }),
+      { snippets: 0, inline: 0, resources: 0, warnings: 0 },
+    ),
+    [espansoPreviewList],
+  );
+  const selectedEspansoPreview = useMemo(
+    () => espansoPreviewList.find(
+      (preview) => preview.config.path === selectedEspansoConfigPath,
+    ) || espansoPreviewList[0],
+    [espansoPreviewList, selectedEspansoConfigPath],
+  );
+  const espansoPreviewTree = useMemo(
+    () => buildEspansoConfigPreviewTree(espansoPreviewList),
+    [espansoPreviewList],
+  );
+  const activeEspansoAncestorPaths = useMemo(
+    () => getEspansoConfigAncestorPaths(selectedEspansoPreview?.config.relativePath || ""),
+    [selectedEspansoPreview],
+  );
+  const selectEspansoConfigPath = useCallback((path: string) => {
+    setSelectedEspansoConfigPath(path);
+  }, []);
 
   return (
     <div className="app-shell">
@@ -1137,7 +1156,8 @@ function App() {
                                 key={node.path}
                                 node={node}
                                 activePath={selectedEspansoPreview?.config.path || selectedEspansoConfigPath}
-                                onSelect={setSelectedEspansoConfigPath}
+                                activeAncestorPaths={activeEspansoAncestorPaths}
+                                onSelect={selectEspansoConfigPath}
                               />
                             ))}
                           </div>
@@ -1713,24 +1733,33 @@ function buildEspansoConfigPreviewTree(previews: EspansoConfigPreview[]): Espans
   return root;
 }
 
-function hasActiveEspansoConfig(node: EspansoConfigPreviewTreeNode, activePath: string): boolean {
-  if (!activePath) {
-    return false;
+function getEspansoConfigAncestorPaths(relativePath: string): Set<string> {
+  const ancestors = new Set<string>();
+  const parts = relativePath.split("/").filter(Boolean);
+  let currentPath = "";
+
+  for (let index = 0; index < parts.length - 1; index += 1) {
+    currentPath = currentPath ? `${currentPath}/${parts[index]}` : parts[index];
+    ancestors.add(currentPath);
   }
-  if (!node.isDir) {
-    return node.preview?.config.path === activePath;
-  }
-  return (node.children || []).some((child) => hasActiveEspansoConfig(child, activePath));
+
+  return ancestors;
 }
 
 interface EspansoConfigTreeNodeProps {
   node: EspansoConfigPreviewTreeNode;
   activePath: string;
+  activeAncestorPaths: Set<string>;
   onSelect: (path: string) => void;
 }
 
-function EspansoConfigTreeNode({ node, activePath, onSelect }: EspansoConfigTreeNodeProps) {
-  const containsActive = hasActiveEspansoConfig(node, activePath);
+const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
+  node,
+  activePath,
+  activeAncestorPaths,
+  onSelect,
+}: EspansoConfigTreeNodeProps) {
+  const containsActive = activeAncestorPaths.has(node.path);
   const [isOpen, setIsOpen] = useState<boolean>(false);
 
   if (node.isDir) {
@@ -1756,6 +1785,7 @@ function EspansoConfigTreeNode({ node, activePath, onSelect }: EspansoConfigTree
                 key={child.path}
                 node={child}
                 activePath={activePath}
+                activeAncestorPaths={activeAncestorPaths}
                 onSelect={onSelect}
               />
             ))}
@@ -1783,7 +1813,7 @@ function EspansoConfigTreeNode({ node, activePath, onSelect }: EspansoConfigTree
       </div>
     </button>
   );
-}
+});
 
 // Sidebar File Tree Node helper component
 interface TreeNodeProps {
@@ -1842,6 +1872,40 @@ interface EspansoConfigDetailProps {
 }
 
 function EspansoConfigDetail({ preview, onImport }: EspansoConfigDetailProps) {
+  const ROW_HEIGHT = 36;
+  const OVERSCAN_ROWS = 8;
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [scrollTop, setScrollTop] = useState(0);
+  const [viewportHeight, setViewportHeight] = useState(0);
+  const snippetCount = preview.snippets.length;
+  const totalHeight = snippetCount * ROW_HEIGHT;
+  const startIndex = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN_ROWS);
+  const visibleRowCount = Math.ceil(viewportHeight / ROW_HEIGHT) + OVERSCAN_ROWS * 2;
+  const endIndex = Math.min(snippetCount, startIndex + visibleRowCount);
+  const visibleSnippets = preview.snippets.slice(startIndex, endIndex);
+
+  useLayoutEffect(() => {
+    const viewport = scrollRef.current;
+    if (!viewport) return;
+
+    const updateViewportHeight = () => {
+      setViewportHeight(viewport.clientHeight);
+    };
+
+    updateViewportHeight();
+    const resizeObserver = new ResizeObserver(updateViewportHeight);
+    resizeObserver.observe(viewport);
+
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  useEffect(() => {
+    setScrollTop(0);
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = 0;
+    }
+  }, [preview.config.path]);
+
   return (
     <>
       <div className="flex h-14 shrink-0 items-center justify-between gap-3 border-b px-3">
@@ -1869,13 +1933,24 @@ function EspansoConfigDetail({ preview, onImport }: EspansoConfigDetailProps) {
         <div className="truncate">Snippet</div>
       </div>
 
-      <ScrollArea className="min-h-0 flex-1">
+      <div
+        ref={scrollRef}
+        className="min-h-0 flex-1 overflow-auto"
+        onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
+      >
         {preview.snippets.length > 0 ? (
-          <div className="divide-y">
-            {preview.snippets.map((snippet, index) => (
+          <div className="relative divide-y" style={{ height: totalHeight }}>
+            <div
+              className="absolute inset-x-0 top-0 divide-y"
+              style={{ transform: `translateY(${startIndex * ROW_HEIGHT}px)` }}
+            >
+              {visibleSnippets.map((snippet, offset) => {
+                const index = startIndex + offset;
+
+                return (
               <div
                 key={`${snippet.trigger}-${index}`}
-                className="grid min-h-9 grid-cols-[minmax(8rem,1.1fr)_3rem_minmax(6rem,0.65fr)_minmax(12rem,2fr)] items-center px-3 text-sm hover:bg-secondary/40"
+                    className="grid h-9 grid-cols-[minmax(8rem,1.1fr)_3rem_minmax(6rem,0.65fr)_minmax(12rem,2fr)] items-center px-3 text-sm hover:bg-secondary/40"
               >
                 <div className="min-w-0 pr-3">
                   <div className="truncate font-medium">
@@ -1896,7 +1971,9 @@ function EspansoConfigDetail({ preview, onImport }: EspansoConfigDetailProps) {
                   {snippet.include_file ? `include: ${snippet.include_file}` : snippet.replace || "Empty replacement"}
                 </div>
               </div>
-            ))}
+                );
+              })}
+            </div>
           </div>
         ) : (
           <EmptyState
@@ -1905,7 +1982,7 @@ function EspansoConfigDetail({ preview, onImport }: EspansoConfigDetailProps) {
             description="This YAML file was found, but no supported Espanso matches could be previewed."
           />
         )}
-      </ScrollArea>
+      </div>
     </>
   );
 }
