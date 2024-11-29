@@ -22,6 +22,7 @@ import {
   Search,
   Settings,
   ShieldCheck,
+  SquareArrowOutUpRight,
   Trash2,
   Upload,
   XCircle,
@@ -116,6 +117,7 @@ function App() {
   const [isInitializingWorkspace, setIsInitializingWorkspace] = useState<boolean>(false);
   const [espansoScanMessage, setEspansoScanMessage] = useState<string>("");
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+  const [detailSnippet, setDetailSnippet] = useState<{ snippet: Snippet; file: string; index: number } | null>(null);
 
   // Importer state
   const [isImporterOpen, setIsImporterOpen] = useState<boolean>(false);
@@ -703,6 +705,11 @@ function App() {
       setEditReplace(snippet.replace || "");
       setEditIncludeFile("");
     }
+  }
+
+  function openSnippetDetail(snippet: Snippet, file: string, index: number) {
+    selectSnippet(snippet, index);
+    setDetailSnippet({ snippet, file, index });
   }
 
   // Setup form for new Snippet
@@ -1314,32 +1321,60 @@ function App() {
                   <div className="space-y-2">
                     {searchQuery &&
                       searchResults.map((res, i) => (
-                        <button
+                        <div
                           key={`search-${i}`}
-                          className="w-full rounded-lg border bg-card p-3 text-left shadow-sm transition-colors hover:bg-accent"
-                          onClick={async () => {
-                            await loadSnippetFile(res.file);
-                            selectSnippet(res.snippet, res.index);
-                          }}
+                          className="flex w-full items-start gap-2 rounded-lg border bg-card p-2 shadow-sm transition-colors hover:bg-accent"
                         >
-                          <SnippetPreview snippet={res.snippet} />
-                          <div className="mt-2 truncate text-xs text-primary">in {res.file}</div>
-                        </button>
+                          <button
+                            className="min-w-0 flex-1 p-1 text-left"
+                            onClick={async () => {
+                              await loadSnippetFile(res.file);
+                              selectSnippet(res.snippet, res.index);
+                            }}
+                          >
+                            <SnippetPreview snippet={res.snippet} />
+                            <div className="mt-2 truncate text-xs text-primary">in {res.file}</div>
+                          </button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="mt-0.5 shrink-0"
+                            title="View snippet details"
+                            aria-label={`View details for ${res.snippet.trigger || "snippet"}`}
+                            onClick={async () => {
+                              await loadSnippetFile(res.file);
+                              openSnippetDetail(res.snippet, res.file, res.index);
+                            }}
+                          >
+                            <SquareArrowOutUpRight />
+                          </Button>
+                        </div>
                       ))}
 
                     {!searchQuery &&
                       selectedFile &&
                       snippets.map((snippet, index) => (
-                        <button
+                        <div
                           key={`${snippet.trigger}-${index}`}
                           className={cn(
-                            "w-full rounded-lg border bg-card p-3 text-left shadow-sm transition-colors hover:bg-accent",
+                            "flex w-full items-start gap-2 rounded-lg border bg-card p-2 shadow-sm transition-colors hover:bg-accent",
                             selectedSnippetIndex === index && "border-primary bg-primary/5 ring-1 ring-primary/25",
                           )}
-                          onClick={() => selectSnippet(snippet, index)}
                         >
-                          <SnippetPreview snippet={snippet} />
-                        </button>
+                          <button className="min-w-0 flex-1 p-1 text-left" onClick={() => selectSnippet(snippet, index)}>
+                            <SnippetPreview snippet={snippet} />
+                          </button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="mt-0.5 shrink-0"
+                            title="View snippet details"
+                            aria-label={`View details for ${snippet.trigger || "snippet"}`}
+                            onClick={() => openSnippetDetail(snippet, selectedFile, index)}
+                          >
+                            <SquareArrowOutUpRight />
+                          </Button>
+                        </div>
                       ))}
 
                     {((!selectedFile && !searchQuery) || (searchQuery && searchResults.length === 0)) && (
@@ -1479,6 +1514,12 @@ function App() {
           </main>
         </>
       )}
+
+      <Dialog open={detailSnippet !== null} onOpenChange={(open) => !open && setDetailSnippet(null)}>
+        <DialogContent className="max-h-[calc(100vh-2rem)] max-w-3xl overflow-hidden">
+          {detailSnippet && <SnippetDetail detail={detailSnippet} />}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isNewFileModalOpen} onOpenChange={setIsNewFileModalOpen}>
         <DialogContent>
@@ -1866,6 +1907,10 @@ interface SnippetPreviewProps {
   snippet: Snippet;
 }
 
+interface SnippetDetailProps {
+  detail: { snippet: Snippet; file: string; index: number };
+}
+
 interface EspansoConfigDetailProps {
   preview: EspansoConfigPreview;
   onImport: () => void;
@@ -1998,6 +2043,46 @@ function SnippetPreview({ snippet }: SnippetPreviewProps) {
         </span>
       </div>
       {snippet.description && <div className="truncate text-xs text-muted-foreground/80">{snippet.description}</div>}
+    </div>
+  );
+}
+
+function SnippetDetail({ detail }: SnippetDetailProps) {
+  const { snippet, file, index } = detail;
+  const isExternalFile = Boolean(snippet.include_file);
+  const content = isExternalFile ? snippet.include_file || "" : snippet.replace || "";
+
+  return (
+    <div className="flex min-h-0 flex-col gap-4">
+      <DialogHeader className="pr-8">
+        <DialogTitle className="mono-field break-all text-primary">{snippet.trigger || "Untitled trigger"}</DialogTitle>
+        <DialogDescription className="break-all">
+          {file} · Snippet #{index + 1}
+        </DialogDescription>
+      </DialogHeader>
+
+      <div className="min-h-0 space-y-4 overflow-auto pr-1">
+        {snippet.description && (
+          <div className="space-y-1">
+            <Label>Description</Label>
+            <p className="rounded-md border bg-secondary/30 p-3 text-sm text-foreground">{snippet.description}</p>
+          </div>
+        )}
+
+        <div className="space-y-1">
+          <Label>{isExternalFile ? "Include File" : "Replacement"}</Label>
+          <div className="rounded-md border bg-secondary/30">
+            <div className="flex items-center gap-2 border-b px-3 py-2 text-xs text-muted-foreground">
+              {isExternalFile && <FileText className="h-4 w-4" />}
+              {!isExternalFile && <SquareArrowOutUpRight className="h-4 w-4" />}
+              <span>{isExternalFile ? "External resource path" : "Inline text content"}</span>
+            </div>
+            <pre className="mono-field max-h-[48vh] overflow-auto whitespace-pre-wrap break-words p-3 text-sm leading-relaxed text-foreground">
+              {content || (isExternalFile ? "No include_file set" : "Empty replacement")}
+            </pre>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
