@@ -707,9 +707,13 @@ function App() {
     }
   }
 
+  function showSnippetDetail(snippet: Snippet, file: string, index: number) {
+    setDetailSnippet({ snippet, file, index });
+  }
+
   function openSnippetDetail(snippet: Snippet, file: string, index: number) {
     selectSnippet(snippet, index);
-    setDetailSnippet({ snippet, file, index });
+    showSnippetDetail(snippet, file, index);
   }
 
   // Setup form for new Snippet
@@ -1176,6 +1180,9 @@ function App() {
                           <EspansoConfigDetail
                             preview={selectedEspansoPreview}
                             onImport={() => importDetectedEspansoConfig(selectedEspansoPreview.config)}
+                            onViewSnippet={(snippet, index) =>
+                              showSnippetDetail(snippet, selectedEspansoPreview.config.relativePath, index)
+                            }
                           />
                         ) : (
                           <EmptyState
@@ -1914,9 +1921,10 @@ interface SnippetDetailProps {
 interface EspansoConfigDetailProps {
   preview: EspansoConfigPreview;
   onImport: () => void;
+  onViewSnippet: (snippet: Snippet, index: number) => void;
 }
 
-function EspansoConfigDetail({ preview, onImport }: EspansoConfigDetailProps) {
+function EspansoConfigDetail({ preview, onImport, onViewSnippet }: EspansoConfigDetailProps) {
   const ROW_HEIGHT = 36;
   const OVERSCAN_ROWS = 8;
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -1971,11 +1979,12 @@ function EspansoConfigDetail({ preview, onImport }: EspansoConfigDetailProps) {
         </div>
       </div>
 
-      <div className="grid h-9 shrink-0 grid-cols-[minmax(8rem,1.1fr)_3rem_minmax(6rem,0.65fr)_minmax(12rem,2fr)] items-center border-b bg-secondary/40 px-3 text-xs font-semibold text-muted-foreground">
+      <div className="grid h-9 shrink-0 grid-cols-[minmax(8rem,1.1fr)_3rem_minmax(6rem,0.65fr)_minmax(12rem,2fr)_2.25rem] items-center border-b bg-secondary/40 px-3 text-xs font-semibold text-muted-foreground">
         <div className="truncate">Name</div>
         <div className="truncate text-center">A→</div>
         <div className="truncate">Keyword</div>
         <div className="truncate">Snippet</div>
+        <div className="sr-only">Details</div>
       </div>
 
       <div
@@ -1993,29 +2002,34 @@ function EspansoConfigDetail({ preview, onImport }: EspansoConfigDetailProps) {
                 const index = startIndex + offset;
 
                 return (
-              <div
-                key={`${snippet.trigger}-${index}`}
-                    className="grid h-9 grid-cols-[minmax(8rem,1.1fr)_3rem_minmax(6rem,0.65fr)_minmax(12rem,2fr)] items-center px-3 text-sm hover:bg-secondary/40"
-              >
-                <div className="min-w-0 pr-3">
-                  <div className="truncate font-medium">
-                    {snippet.description || snippet.trigger || `Snippet ${index + 1}`}
-                  </div>
-                </div>
-                <div className="flex justify-center">
-                  <span
-                    className={cn(
-                      "h-4 w-4 rounded",
-                      snippet.include_file ? "bg-primary/70" : "bg-muted-foreground/35",
-                    )}
-                    title={snippet.include_file ? "External file snippet" : "Inline replacement snippet"}
-                  />
-                </div>
-                <div className="mono-field min-w-0 truncate pr-3 text-sm">{snippet.trigger}</div>
-                <div className="min-w-0 truncate text-muted-foreground">
-                  {snippet.include_file ? `include: ${snippet.include_file}` : snippet.replace || "Empty replacement"}
-                </div>
-              </div>
+                  <button
+                    key={`${snippet.trigger}-${index}`}
+                    className="grid h-9 w-full grid-cols-[minmax(8rem,1.1fr)_3rem_minmax(6rem,0.65fr)_minmax(12rem,2fr)_2.25rem] items-center px-3 text-left text-sm transition-colors hover:bg-secondary/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    onClick={() => onViewSnippet(snippet, index)}
+                    title={`View details for ${snippet.trigger || `Snippet ${index + 1}`}`}
+                  >
+                    <div className="min-w-0 pr-3">
+                      <div className="truncate font-medium">
+                        {snippet.description || snippet.trigger || `Snippet ${index + 1}`}
+                      </div>
+                    </div>
+                    <div className="flex justify-center">
+                      <span
+                        className={cn(
+                          "h-4 w-4 rounded",
+                          snippet.include_file ? "bg-primary/70" : "bg-muted-foreground/35",
+                        )}
+                        title={snippet.include_file ? "External file snippet" : "Inline replacement snippet"}
+                      />
+                    </div>
+                    <div className="mono-field min-w-0 truncate pr-3 text-sm">{snippet.trigger}</div>
+                    <div className="min-w-0 truncate text-muted-foreground">
+                      {snippet.include_file ? `include: ${snippet.include_file}` : snippet.replace || "Empty replacement"}
+                    </div>
+                    <div className="flex justify-end text-muted-foreground">
+                      <SquareArrowOutUpRight className="h-4 w-4" />
+                    </div>
+                  </button>
                 );
               })}
             </div>
