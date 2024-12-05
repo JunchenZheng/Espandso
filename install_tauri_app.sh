@@ -2,12 +2,21 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIGURATION="${CONFIGURATION:-release}"
+FAST_BUILD="${FAST_BUILD:-0}"
+CONFIGURATION="${CONFIGURATION:-}"
+if [ -z "$CONFIGURATION" ]; then
+  if [ "$FAST_BUILD" = "1" ]; then
+    CONFIGURATION="debug"
+  else
+    CONFIGURATION="release"
+  fi
+fi
 DEST_DIR="${1:-/Applications}"
 APP_NAME="${APP_NAME:-Expandso.app}"
 BUILT_APP_PATH="$ROOT_DIR/src-tauri/target/$CONFIGURATION/bundle/macos/$APP_NAME"
 DEST_APP_PATH="$DEST_DIR/$APP_NAME"
 SKIP_NPM_SETUP="${SKIP_NPM_SETUP:-0}"
+NO_SIGN="${NO_SIGN:-0}"
 
 usage() {
   cat <<'EOF'
@@ -19,8 +28,12 @@ Defaults:
   destination-dir        /Applications
 
 Environment:
-  CONFIGURATION=release  Tauri/Rust build profile path to install from.
+  CONFIGURATION=release  Tauri/Rust build profile to install from.
+                         Use CONFIGURATION=debug for faster local builds.
+  FAST_BUILD=1           Default to debug, skip signing, and run Vite without tsc.
   APP_NAME=Expandso.app Expected .app bundle name.
+  FORCE_NPM_INSTALL=1    Force scripts/setup_npm_env.sh to reinstall npm dependencies.
+  NO_SIGN=1              Pass --no-sign to tauri build.
   SKIP_NPM_SETUP=1       Skip scripts/setup_npm_env.sh.
 EOF
 }
@@ -82,8 +95,24 @@ install_npm_environment() {
 
 build_tauri_app() {
   cd "$ROOT_DIR"
-  echo "Building Tauri app..."
-  npm run tauri build
+  local tauri_args
+  tauri_args=(build --bundles app)
+
+  if [ "$CONFIGURATION" = "debug" ]; then
+    tauri_args+=(--debug)
+  fi
+
+  if [ "$FAST_BUILD" = "1" ]; then
+    tauri_args+=(--config '{"build":{"beforeBuildCommand":"npm run build:frontend"}}')
+    NO_SIGN=1
+  fi
+
+  if [ "$NO_SIGN" = "1" ]; then
+    tauri_args+=(--no-sign)
+  fi
+
+  echo "Building Tauri app ($CONFIGURATION)..."
+  npm run tauri -- "${tauri_args[@]}"
 }
 
 install_app() {
