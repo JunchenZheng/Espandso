@@ -94,6 +94,14 @@ install_app() {
     exit 1
   fi
 
+  # Automatically kill old process if running
+  local PROCESS_NAME="${APP_NAME%.app}"
+  if pgrep -x "$PROCESS_NAME" >/dev/null 2>&1; then
+    echo "Stopping existing process $PROCESS_NAME..."
+    pkill -x "$PROCESS_NAME" || true
+    sleep 1
+  fi
+
   echo "Installing to $DEST_APP_PATH..."
   run_with_privilege mkdir -p "$DEST_DIR"
   run_with_privilege rm -rf "$DEST_APP_PATH"
@@ -101,6 +109,10 @@ install_app() {
 
   echo "Installed:"
   echo "  $DEST_APP_PATH"
+
+  # Automatically launch the newly installed app
+  echo "Launching $DEST_APP_PATH..."
+  open "$DEST_APP_PATH"
 }
 
 ensure_build_tools
