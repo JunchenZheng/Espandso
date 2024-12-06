@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FAST_BUILD="${FAST_BUILD:-0}"
+FAST_BUILD="${FAST_BUILD:-1}"
 CONFIGURATION="${CONFIGURATION:-}"
 if [ -z "$CONFIGURATION" ]; then
   if [ "$FAST_BUILD" = "1" ]; then
@@ -26,11 +26,13 @@ Builds the Tauri macOS .app bundle and installs it locally.
 
 Defaults:
   destination-dir        /Applications
+  build mode             fast debug build
 
 Environment:
-  CONFIGURATION=release  Tauri/Rust build profile to install from.
-                         Use CONFIGURATION=debug for faster local builds.
-  FAST_BUILD=1           Default to debug, skip signing, and run Vite without tsc.
+  CONFIGURATION=debug    Tauri/Rust build profile to install from.
+                         Use CONFIGURATION=release for full release builds.
+  FAST_BUILD=1           Use debug, skip signing, and run Vite without tsc.
+                         Set FAST_BUILD=0 for the full release install path.
   APP_NAME=Expandso.app Expected .app bundle name.
   FORCE_NPM_INSTALL=1    Force scripts/setup_npm_env.sh to reinstall npm dependencies.
   NO_SIGN=1              Pass --no-sign to tauri build.
@@ -115,6 +117,48 @@ build_tauri_app() {
   npm run tauri -- "${tauri_args[@]}"
 }
 
+app_process_name() {
+  local plist_path=""
+
+  if [ -f "$DEST_APP_PATH/Contents/Info.plist" ]; then
+    plist_path="$DEST_APP_PATH/Contents/Info.plist"
+  elif [ -f "$BUILT_APP_PATH/Contents/Info.plist" ]; then
+    plist_path="$BUILT_APP_PATH/Contents/Info.plist"
+  fi
+
+  if [ -n "$plist_path" ] && command_exists plutil; then
+    local executable_name
+    executable_name="$(plutil -extract CFBundleExecutable raw -o - "$plist_path" 2>/dev/null || true)"
+    if [ -n "$executable_name" ]; then
+      echo "$executable_name"
+      return
+    fi
+  fi
+
+  echo "${APP_NAME%.app}"
+}
+
+stop_existing_app() {
+  local PROCESS_NAME
+  PROCESS_NAME="$(app_process_name)"
+
+  if pgrep -x "$PROCESS_NAME" >/dev/null 2>&1; then
+    echo "Stopping existing process $PROCESS_NAME..."
+    pkill -x "$PROCESS_NAME" || true
+
+    local attempts=0
+    while pgrep -x "$PROCESS_NAME" >/dev/null 2>&1 && [ "$attempts" -lt 10 ]; do
+      sleep 0.5
+      attempts=$((attempts + 1))
+    done
+
+    if pgrep -x "$PROCESS_NAME" >/dev/null 2>&1; then
+      echo "Existing process $PROCESS_NAME is still running after stop request." >&2
+      exit 1
+    fi
+  fi
+}
+
 install_app() {
   if [ ! -d "$BUILT_APP_PATH" ]; then
     echo "Build finished, but the app bundle was not found at:" >&2
@@ -123,13 +167,7 @@ install_app() {
     exit 1
   fi
 
-  # Automatically kill old process if running
-  local PROCESS_NAME="${APP_NAME%.app}"
-  if pgrep -x "$PROCESS_NAME" >/dev/null 2>&1; then
-    echo "Stopping existing process $PROCESS_NAME..."
-    pkill -x "$PROCESS_NAME" || true
-    sleep 1
-  fi
+  stop_existing_app
 
   echo "Installing to $DEST_APP_PATH..."
   run_with_privilege mkdir -p "$DEST_DIR"
