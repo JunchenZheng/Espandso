@@ -7,7 +7,6 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronRight,
-  ClipboardList,
   FileSearch,
   FileJson,
   FilePlus2,
@@ -31,7 +30,7 @@ import {
 import "./App.css";
 
 import { Button } from "./components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/ui/card";
+import { Card, CardContent } from "./components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -1088,17 +1087,8 @@ function App() {
 
       {!repoPath && (
         <main className="flex h-full w-full overflow-hidden bg-[linear-gradient(180deg,hsl(var(--background))_0%,hsl(var(--secondary))_100%)] p-4">
-          <Card className="flex h-full w-full flex-col">
-            <CardHeader className="space-y-3 text-center">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                <ClipboardList className="h-6 w-6" />
-              </div>
-              <CardTitle className="text-2xl">Espanso Snippets</CardTitle>
-              <CardDescription>
-                Manage JSON snippet files and build local Espanso YAML configs from one workspace.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex min-h-0 flex-1 flex-col">
+          <Card className="flex h-full w-full flex-col p-4">
+            <CardContent className="flex min-h-0 flex-1 flex-col p-0">
               <div className="grid grid-cols-2 gap-2">
                 <Button className="w-full" onClick={chooseRepo}>
                   <FolderOpen />
@@ -1109,31 +1099,9 @@ function App() {
                   Settings
                 </Button>
               </div>
-              <div className="mt-5 flex min-h-0 flex-1 flex-col rounded-lg border bg-secondary/40 p-4 text-left">
-                <div className="flex items-start gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-background text-primary">
-                    {isScanningEspanso ? <Loader2 className="h-5 w-5 animate-spin" /> : <FileSearch className="h-5 w-5" />}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-3">
-                      <h2 className="text-sm font-semibold">Espanso config scan</h2>
-                      <Button size="sm" variant="outline" onClick={scanDefaultEspansoConfigDir} disabled={isScanningEspanso}>
-                        Scan
-                      </Button>
-                    </div>
-                    <p className="mt-1 truncate text-xs text-muted-foreground">
-                      {espansoMatchDir || "Default match directory"}
-                    </p>
-                    {espansoPathSource && (
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {espansoPathSource === "cli" ? "Resolved with espanso path" : "Using platform default path"}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
+              <div className="mt-3 flex min-h-0 flex-1 flex-col rounded-lg border bg-secondary/40 p-4 text-left">
                 {espansoConfigs.length > 0 ? (
-                  <div className="mt-4 flex min-h-0 flex-1 flex-col gap-3">
+                  <div className="flex min-h-0 flex-1 flex-col gap-3">
                     <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-background p-3">
                       <div className="flex flex-wrap gap-3 text-sm">
                         <span className="font-semibold">{espansoConfigs.length} YAML files</span>
@@ -1565,12 +1533,18 @@ function App() {
             <div className="rounded-lg border bg-secondary/40 p-4">
               <div className="flex items-start gap-3">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-background text-primary">
-                  <Zap className="h-5 w-5" />
+                  {isScanningEspanso ? <Loader2 className="h-5 w-5 animate-spin" /> : <FileSearch className="h-5 w-5" />}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <Label>Live Espanso directory</Label>
-                  <p className="mt-1 truncate text-sm text-muted-foreground">
-                    {espansoMatchDir || "Run scan to resolve the active Espanso match directory."}
+                  <div className="flex items-center justify-between gap-3">
+                    <Label className="text-sm font-semibold">Espanso config scan</Label>
+                    <Button size="sm" variant="outline" onClick={scanDefaultEspansoConfigDir} disabled={isScanningEspanso}>
+                      {isScanningEspanso ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                      Scan
+                    </Button>
+                  </div>
+                  <p className="mt-1 truncate text-xs text-muted-foreground">
+                    {espansoMatchDir || "Default match directory"}
                   </p>
                   {espansoPathSource && (
                     <p className="mt-1 text-xs text-muted-foreground">
@@ -1579,10 +1553,6 @@ function App() {
                   )}
                 </div>
               </div>
-              <Button className="mt-3" size="sm" variant="outline" onClick={scanDefaultEspansoConfigDir} disabled={isScanningEspanso}>
-                {isScanningEspanso ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSearch className="h-4 w-4" />}
-                Refresh Espanso Directory
-              </Button>
             </div>
 
             <button
