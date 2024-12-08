@@ -7,6 +7,8 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronRight,
+  Copy,
+  Check,
   FileSearch,
   FileJson,
   FilePlus2,
@@ -17,10 +19,12 @@ import {
   Loader2,
   PackageOpen,
   Plus,
+  RefreshCw,
   Save,
   Search,
   Settings,
   ShieldCheck,
+  Sparkles,
   SquareArrowOutUpRight,
   Trash2,
   Upload,
@@ -49,6 +53,7 @@ import { validate } from "./logic/validate";
 import { generateYaml } from "./logic/generateYaml";
 import { importYamlContent, ImportedMatch } from "./logic/importYaml";
 import { buildSnippetTree } from "./logic/discoverSnippetFiles";
+import { resolveAndReadIncludeFile } from "./logic/resolveIncludeFile";
 import { EspansoConfigFile, EspansoPathSource, scanEspansoConfigFiles } from "./logic/espansoPaths";
 import { setSetting, getSetting } from "./tauri/fileStore";
 import { installAndRestart, InstallResult } from "./tauri/espansoRuntime";
@@ -1492,7 +1497,7 @@ function App() {
 
       <Dialog open={detailSnippet !== null} onOpenChange={(open) => !open && setDetailSnippet(null)}>
         <DialogContent className="max-h-[calc(100vh-2rem)] max-w-3xl overflow-hidden">
-          {detailSnippet && <SnippetDetail detail={detailSnippet} />}
+          {detailSnippet && <SnippetDetail detail={detailSnippet} repoPath={repoPath} />}
         </DialogContent>
       </Dialog>
 
@@ -1886,6 +1891,7 @@ interface SnippetPreviewProps {
 
 interface SnippetDetailProps {
   detail: { snippet: Snippet; file: string; index: number };
+  repoPath?: string;
 }
 
 interface EspansoConfigDetailProps {
@@ -2031,10 +2037,60 @@ function SnippetPreview({ snippet }: SnippetPreviewProps) {
   );
 }
 
-function SnippetDetail({ detail }: SnippetDetailProps) {
+function SnippetDetail({ detail, repoPath }: SnippetDetailProps) {
   const { snippet, file, index } = detail;
   const isExternalFile = Boolean(snippet.include_file);
   const content = isExternalFile ? snippet.include_file || "" : snippet.replace || "";
+
+  const [dynamicContent, setDynamicContent] = useState<string | null>(null);
+  const [resolvedPath, setResolvedPath] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const loadIncludeFileContent = useCallback(async () => {
+    if (!isExternalFile || !snippet.include_file) return;
+
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await resolveAndReadIncludeFile(
+        {
+          includeFile: snippet.include_file,
+          repoPath,
+          currentSnippetFile: file,
+        },
+        exists,
+        readTextFile
+      );
+
+      if (res.found && res.content !== undefined) {
+        setDynamicContent(res.content);
+        setResolvedPath(res.resolvedPath || null);
+      } else {
+        setError(res.error || "File not found");
+        setResolvedPath(res.candidatesTried[0] || null);
+      }
+    } catch (err: any) {
+      setError(err?.message || "Failed to read include file");
+    } finally {
+      setLoading(false);
+    }
+  }, [isExternalFile, snippet.include_file, repoPath, file]);
+
+  useEffect(() => {
+    loadIncludeFileContent();
+  }, [loadIncludeFileContent]);
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // ignore
+    }
+  };
 
   return (
     <div className="flex min-h-0 flex-col gap-4">
@@ -2054,18 +2110,91 @@ function SnippetDetail({ detail }: SnippetDetailProps) {
         )}
 
         <div className="space-y-1">
-          <Label>{isExternalFile ? "Include File" : "Replacement"}</Label>
+          <Label>{isExternalFile ? "Include File Path" : "Replacement"}</Label>
           <div className="rounded-md border bg-secondary/30">
-            <div className="flex items-center gap-2 border-b px-3 py-2 text-xs text-muted-foreground">
-              {isExternalFile && <FileText className="h-4 w-4" />}
-              {!isExternalFile && <SquareArrowOutUpRight className="h-4 w-4" />}
-              <span>{isExternalFile ? "External resource path" : "Inline text content"}</span>
+            <div className="flex items-center justify-between border-b px-3 py-2 text-xs text-muted-foreground">
+              <div className="flex items-center gap-2">
+                {isExternalFile ? <FileText className="h-4 w-4 text-primary" /> : <SquareArrowOutUpRight className="h-4 w-4" />}
+                <span>{isExternalFile ? "Configured resource file" : "Inline text content"}</span>
+              </div>
+              {isExternalFile && resolvedPath && (
+                <span className="mono-field truncate max-w-[320px] text-[11px] text-muted-foreground/80" title={resolvedPath}>
+                  {resolvedPath}
+                </span>
+              )}
             </div>
-            <pre className="mono-field max-h-[48vh] overflow-auto whitespace-pre-wrap break-words p-3 text-sm leading-relaxed text-foreground">
+            <pre className="mono-field max-h-[16vh] overflow-auto whitespace-pre-wrap break-words p-3 text-sm leading-relaxed text-foreground">
               {content || (isExternalFile ? "No include_file set" : "Empty replacement")}
             </pre>
           </div>
         </div>
+
+        {isExternalFile && (
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <Label className="flex items-center gap-1.5 text-primary font-medium">
+                <Sparkles className="h-3.5 w-3.5" />
+                <span>Dynamically Injected Content</span>
+              </Label>
+              <div className="flex items-center gap-2">
+                {loading && (
+                  <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <Loader2 className="h-3 w-3 animate-spin" /> Loading file...
+                  </span>
+                )}
+                {!loading && dynamicContent !== null && (
+                  <span className="text-[11px] text-emerald-500 font-mono bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                    Loaded ({dynamicContent.split("\n").length} lines, {new Blob([dynamicContent]).size} B)
+                  </span>
+                )}
+                {!loading && error && (
+                  <span className="text-[11px] text-destructive font-mono bg-destructive/10 px-2 py-0.5 rounded border border-destructive/20">
+                    {error}
+                  </span>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  onClick={loadIncludeFileContent}
+                  disabled={loading}
+                  title="Reload content from disk"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+                </Button>
+                {dynamicContent !== null && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2.5 text-xs gap-1"
+                    onClick={() => copyToClipboard(dynamicContent)}
+                  >
+                    {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+                    <span>{copied ? "Copied" : "Copy"}</span>
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-md border bg-slate-950/90 text-slate-100 dark:bg-slate-950 dark:text-slate-100 shadow-inner">
+              {loading ? (
+                <div className="flex items-center justify-center p-8 text-xs text-slate-400">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin text-primary" />
+                  Reading include_file from workspace...
+                </div>
+              ) : error ? (
+                <div className="p-4 text-xs text-rose-400 space-y-1">
+                  <p className="font-semibold">Unable to load file content</p>
+                  <p className="text-slate-400 font-mono text-[11px]">{error}</p>
+                </div>
+              ) : (
+                <pre className="mono-field max-h-[42vh] overflow-auto whitespace-pre-wrap break-words p-3.5 text-xs leading-relaxed font-mono">
+                  {dynamicContent || <span className="italic text-slate-500">(File is empty)</span>}
+                </pre>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

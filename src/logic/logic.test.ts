@@ -3,6 +3,7 @@ import { validate } from "./validate";
 import { generateYaml } from "./generateYaml";
 import { importYamlContent } from "./importYaml";
 import { isEspansoYamlConfigFile, parseEspansoConfigDir, sortEspansoConfigFiles } from "./espansoPaths";
+import { getIncludeFileCandidates, resolveAndReadIncludeFile } from "./resolveIncludeFile";
 
 describe("validate", () => {
   it("should validate correct snippets", async () => {
@@ -176,3 +177,48 @@ describe("espansoPaths", () => {
     expect(files.map((file) => file.relativePath)).toEqual(["nested/a.yml", "z.yml"]);
   });
 });
+
+describe("resolveIncludeFile", () => {
+  it("should handle absolute paths directly", () => {
+    const candidates = getIncludeFileCandidates({
+      includeFile: "/Users/test/data.json",
+      repoPath: "/Users/repo",
+    });
+    expect(candidates).toEqual(["/Users/test/data.json"]);
+  });
+
+  it("should generate candidate paths in order of preference", () => {
+    const candidates = getIncludeFileCandidates({
+      includeFile: "active/active_data.json",
+      repoPath: "/Workspace",
+      currentSnippetFile: "anki/anki_card.json",
+    });
+
+    expect(candidates).toEqual([
+      "/Workspace/snippets/active/active_data.json",
+      "/Workspace/snippets/anki/active/active_data.json",
+      "/Workspace/active/active_data.json",
+    ]);
+  });
+
+  it("should resolve and read content from first existing candidate", async () => {
+    const mockFiles: Record<string, string> = {
+      "/Workspace/snippets/anki/active_data.json": '{"active": true}',
+    };
+
+    const res = await resolveAndReadIncludeFile(
+      {
+        includeFile: "active_data.json",
+        repoPath: "/Workspace",
+        currentSnippetFile: "anki/test.json",
+      },
+      async (path) => path in mockFiles,
+      async (path) => mockFiles[path]
+    );
+
+    expect(res.found).toBe(true);
+    expect(res.resolvedPath).toBe("/Workspace/snippets/anki/active_data.json");
+    expect(res.content).toBe('{"active": true}');
+  });
+});
+
