@@ -7,6 +7,7 @@ import {
   getIncludeFileCandidates,
   buildIncludeFileShellCommand,
   resolveAndExecuteIncludeFileCommand,
+  resolveExistingIncludeFilePath,
 } from "./resolveIncludeFile";
 
 describe("validate", () => {
@@ -205,9 +206,55 @@ describe("resolveIncludeFile", () => {
     ]);
   });
 
+  it("should include source base directory for YAML preview resources", () => {
+    const candidates = getIncludeFileCandidates({
+      includeFile: "resources/card.md",
+      baseDir: "/Users/test/Library/Application Support/espanso/match",
+    });
+
+    expect(candidates).toEqual([
+      "/Users/test/Library/Application Support/espanso/match/resources/card.md",
+      "resources/card.md",
+    ]);
+  });
+
+  it("should resolve paths relative to an absolute current snippet file", () => {
+    const candidates = getIncludeFileCandidates({
+      includeFile: "resource.md",
+      repoPath: "/Workspace",
+      currentSnippetFile: "/Workspace/snippets/anki/cards.json",
+    });
+
+    expect(candidates).toEqual([
+      "/Workspace/snippets/resource.md",
+      "/Workspace/snippets/anki/resource.md",
+      "/Workspace/resource.md",
+    ]);
+  });
+
   it("should build shell cat command for path", () => {
-    const cmd = buildIncludeFileShellCommand("/path/to/active_data.json");
-    expect(cmd).toBe('cat "/path/to/active_data.json"');
+    const cmd = buildIncludeFileShellCommand("/path/to/active data.json");
+    expect(cmd).toBe("cat '/path/to/active data.json'");
+  });
+
+  it("should quote shell cat command paths with single quotes safely", () => {
+    const cmd = buildIncludeFileShellCommand("/path/to/user's data.json");
+    expect(cmd).toBe("cat '/path/to/user'\\''s data.json'");
+  });
+
+  it("should resolve the first existing include file candidate", async () => {
+    const mockFiles = new Set(["/Workspace/snippets/anki/resource.md"]);
+
+    const resolved = await resolveExistingIncludeFilePath(
+      {
+        includeFile: "resource.md",
+        repoPath: "/Workspace",
+        currentSnippetFile: "anki/cards.json",
+      },
+      async (path) => mockFiles.has(path),
+    );
+
+    expect(resolved).toBe("/Workspace/snippets/anki/resource.md");
   });
 
   it("should resolve and execute command for existing candidate", async () => {
@@ -226,7 +273,7 @@ describe("resolveIncludeFile", () => {
       async (cmd) => {
         executedCmds.push(cmd);
         // Simulate cat command execution
-        const match = cmd.match(/^cat "(.*)"$/);
+        const match = cmd.match(/^cat '(.+)'$/);
         if (match && match[1] in mockFiles) {
           return mockFiles[match[1]];
         }
@@ -236,9 +283,29 @@ describe("resolveIncludeFile", () => {
 
     expect(res.found).toBe(true);
     expect(res.resolvedPath).toBe("/Workspace/snippets/anki/active_data.json");
-    expect(res.command).toBe('cat "/Workspace/snippets/anki/active_data.json"');
+    expect(res.command).toBe("cat '/Workspace/snippets/anki/active_data.json'");
     expect(res.content).toBe('{"active": true}');
-    expect(executedCmds).toEqual(['cat "/Workspace/snippets/anki/active_data.json"']);
+    expect(executedCmds).toEqual(["cat '/Workspace/snippets/anki/active_data.json'"]);
+  });
+
+  it("should execute shell command even when existence checks are unavailable", async () => {
+    const res = await resolveAndExecuteIncludeFileCommand(
+      {
+        includeFile: "/Users/test/private/resource.md",
+      },
+      async () => {
+        throw new Error("forbidden path");
+      },
+      async (cmd) => {
+        if (cmd === "cat '/Users/test/private/resource.md'") {
+          return "loaded through shell";
+        }
+        throw new Error("Command failed");
+      }
+    );
+
+    expect(res.found).toBe(true);
+    expect(res.resolvedPath).toBe("/Users/test/private/resource.md");
+    expect(res.content).toBe("loaded through shell");
   });
 });
-
