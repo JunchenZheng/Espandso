@@ -54,7 +54,11 @@ import { validate } from "./logic/validate";
 import { generateYaml } from "./logic/generateYaml";
 import { importYamlContent, ImportedMatch } from "./logic/importYaml";
 import { buildSnippetTree } from "./logic/discoverSnippetFiles";
-import { resolveAndExecuteIncludeFileCommand } from "./logic/resolveIncludeFile";
+import {
+  getIncludeFileCandidates,
+  resolveAndExecuteIncludeFileCommand,
+  resolveExistingIncludeFilePath,
+} from "./logic/resolveIncludeFile";
 import { EspansoConfigFile, EspansoPathSource, scanEspansoConfigFiles } from "./logic/espansoPaths";
 import { setSetting, getSetting } from "./tauri/fileStore";
 import { installAndRestart, InstallResult } from "./tauri/espansoRuntime";
@@ -72,6 +76,7 @@ interface EspansoConfigPreview {
   resourceCount: number;
   warningCount: number;
   snippets: Snippet[];
+  importedMatches: ImportedMatch[];
 }
 
 interface EspansoConfigPreviewTreeNode {
@@ -82,6 +87,14 @@ interface EspansoConfigPreviewTreeNode {
   fileCount: number;
   preview?: EspansoConfigPreview;
   children?: EspansoConfigPreviewTreeNode[];
+}
+
+interface SnippetDetailData {
+  snippet: Snippet;
+  file: string;
+  index: number;
+  sourceResourcePath?: string;
+  sourceBaseDir?: string;
 }
 
 function App() {
@@ -122,7 +135,7 @@ function App() {
   const [isInitializingWorkspace, setIsInitializingWorkspace] = useState<boolean>(false);
   const [espansoScanMessage, setEspansoScanMessage] = useState<string>("");
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
-  const [detailSnippet, setDetailSnippet] = useState<{ snippet: Snippet; file: string; index: number } | null>(null);
+  const [detailSnippet, setDetailSnippet] = useState<SnippetDetailData | null>(null);
 
   // Importer state
   const [isImporterOpen, setIsImporterOpen] = useState<boolean>(false);
@@ -270,14 +283,23 @@ function App() {
       };
 
       const checkFileExists = async (relPath: string) => {
-        // Resolve path relative to selectedFile's folder
-        const parts = selectedFile.split("/");
-        parts.pop(); // Remove filename
-        const folder = parts.length > 0 ? parts.join("/") : "";
-        const target = folder
-          ? `${repoPath}/snippets/${folder}/${relPath}`
-          : `${repoPath}/snippets/${relPath}`;
-        return await exists(target);
+        const candidates = getIncludeFileCandidates({
+          includeFile: relPath,
+          repoPath,
+          currentSnippetFile: selectedFile,
+        });
+
+        for (const candidate of candidates) {
+          try {
+            if (await exists(candidate)) {
+              return true;
+            }
+          } catch {
+            // Try next candidate path
+          }
+        }
+
+        return false;
       };
 
       const result = await validate(fileData, {
@@ -415,6 +437,7 @@ function App() {
           resourceCount,
           warningCount: result.warnings.length,
           snippets: result.snippets,
+          importedMatches: result.importedMatches,
         });
       } catch {
         previews.push({
@@ -424,6 +447,7 @@ function App() {
           resourceCount: 0,
           warningCount: 1,
           snippets: [],
+          importedMatches: [],
         });
       }
     }
@@ -712,8 +736,8 @@ function App() {
     }
   }
 
-  function showSnippetDetail(snippet: Snippet, file: string, index: number) {
-    setDetailSnippet({ snippet, file, index });
+  function showSnippetDetail(snippet: Snippet, file: string, index: number, source?: Pick<SnippetDetailData, "sourceResourcePath" | "sourceBaseDir">) {
+    setDetailSnippet({ snippet, file, index, ...source });
   }
 
   function openSnippetDetail(snippet: Snippet, file: string, index: number) {
@@ -897,18 +921,34 @@ function App() {
         return;
       }
 
-      // 2. Resolve absolute paths for generateYaml
-      // Path resolution helper
-      const resolvePath = (relPath: string) => {
-        // Relpath is relative to the snippet json file's folder
-        // For absolute generation, we resolve it relative to snippets/
-        return `${repoPath}/snippets/${relPath}`;
-      };
+      // 2. Resolve include_file paths per source JSON before generating YAML.
+      const snippetsOnly = await Promise.all(allSnippets.map(async ({ snippet, relFile }) => {
+        if (!snippet.include_file) {
+          return snippet;
+        }
+
+        const resolvedPath = await resolveExistingIncludeFilePath(
+          {
+            includeFile: snippet.include_file,
+            repoPath,
+            currentSnippetFile: relFile,
+          },
+          exists,
+        );
+
+        return {
+          ...snippet,
+          include_file: resolvedPath || getIncludeFileCandidates({
+            includeFile: snippet.include_file,
+            repoPath,
+            currentSnippetFile: relFile,
+          })[0] || snippet.include_file,
+        };
+      }));
 
       // Generate the consolidated YAML
       // We will generate the base.yml output
-      const snippetsOnly = allSnippets.map((s) => s.snippet);
-      const yamlContent = generateYaml(snippetsOnly, { resolvePath });
+      const yamlContent = generateYaml(snippetsOnly);
 
       // Write to local dist/base.yml first (Phase 2 requirement)
       const distDir = `${repoPath}/dist`;
@@ -1034,6 +1074,7 @@ function App() {
         resourceCount: 0,
         warningCount: 0,
         snippets: [],
+        importedMatches: [],
       })),
     [espansoConfigPreviews, espansoConfigs],
   );
@@ -1154,8 +1195,11 @@ function App() {
                           <EspansoConfigDetail
                             preview={selectedEspansoPreview}
                             onImport={() => importDetectedEspansoConfig(selectedEspansoPreview.config)}
-                            onViewSnippet={(snippet, index) =>
-                              showSnippetDetail(snippet, selectedEspansoPreview.config.relativePath, index)
+                            onViewSnippet={(match, index) =>
+                              showSnippetDetail(match.snippet, selectedEspansoPreview.config.relativePath, index, {
+                                sourceResourcePath: match.resourcePath,
+                                sourceBaseDir: getContainingDirectory(selectedEspansoPreview.config.path),
+                              })
                             }
                           />
                         ) : (
@@ -1891,14 +1935,14 @@ interface SnippetPreviewProps {
 }
 
 interface SnippetDetailProps {
-  detail: { snippet: Snippet; file: string; index: number };
+  detail: SnippetDetailData;
   repoPath?: string;
 }
 
 interface EspansoConfigDetailProps {
   preview: EspansoConfigPreview;
   onImport: () => void;
-  onViewSnippet: (snippet: Snippet, index: number) => void;
+  onViewSnippet: (match: ImportedMatch, index: number) => void;
 }
 
 function EspansoConfigDetail({ preview, onImport, onViewSnippet }: EspansoConfigDetailProps) {
@@ -1982,7 +2026,7 @@ function EspansoConfigDetail({ preview, onImport, onViewSnippet }: EspansoConfig
                   <button
                     key={`${snippet.trigger}-${index}`}
                     className="grid h-9 w-full grid-cols-[minmax(8rem,1.1fr)_3rem_minmax(6rem,0.65fr)_minmax(12rem,2fr)_2.25rem] items-center px-3 text-left text-sm transition-colors hover:bg-secondary/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                    onClick={() => onViewSnippet(snippet, index)}
+                    onClick={() => onViewSnippet(preview.importedMatches[index] || { snippet }, index)}
                     title={`View details for ${snippet.trigger || `Snippet ${index + 1}`}`}
                   >
                     <div className="min-w-0 pr-3">
@@ -2039,7 +2083,7 @@ function SnippetPreview({ snippet }: SnippetPreviewProps) {
 }
 
 function SnippetDetail({ detail, repoPath }: SnippetDetailProps) {
-  const { snippet, file, index } = detail;
+  const { snippet, file, index, sourceResourcePath, sourceBaseDir } = detail;
   const isExternalFile = Boolean(snippet.include_file);
   const content = isExternalFile ? snippet.include_file || "" : snippet.replace || "";
 
@@ -2055,11 +2099,15 @@ function SnippetDetail({ detail, repoPath }: SnippetDetailProps) {
 
     setLoading(true);
     setError(null);
+    setDynamicContent(null);
+    setResolvedPath(null);
+    setExecutedCmd(null);
     try {
       const res = await resolveAndExecuteIncludeFileCommand(
         {
-          includeFile: snippet.include_file,
-          repoPath,
+          includeFile: sourceResourcePath || snippet.include_file,
+          baseDir: sourceBaseDir,
+          repoPath: sourceResourcePath ? undefined : repoPath,
           currentSnippetFile: file,
         },
         exists,
@@ -2082,7 +2130,7 @@ function SnippetDetail({ detail, repoPath }: SnippetDetailProps) {
     } finally {
       setLoading(false);
     }
-  }, [isExternalFile, snippet.include_file, repoPath, file]);
+  }, [isExternalFile, snippet.include_file, sourceResourcePath, sourceBaseDir, repoPath, file]);
 
   useEffect(() => {
     loadIncludeFileContent();
