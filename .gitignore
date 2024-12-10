@@ -245,3 +245,11 @@ snippets/
 # Change log entries
 .change_log/
 
+# Internal dev documentation
+.dev_doc/
+
+# Git helper scripts
+git*.sh
+
+
+
