@@ -43,18 +43,24 @@ export function getIncludeFileCandidates(options: ResolveIncludeFileOptions): st
   return Array.from(new Set(candidates));
 }
 
+export function buildIncludeFileShellCommand(absPath: string): string {
+  return `cat "${absPath}"`;
+}
+
 export interface ReadIncludeFileResult {
   found: boolean;
   resolvedPath?: string;
+  command?: string;
   content?: string;
   error?: string;
   candidatesTried: string[];
 }
 
-export async function resolveAndReadIncludeFile(
+export async function resolveAndExecuteIncludeFileCommand(
   options: ResolveIncludeFileOptions,
   checkExists: (path: string) => Promise<boolean>,
-  readText: (path: string) => Promise<string>
+  executeCmd: (cmd: string) => Promise<string>,
+  readTextFallback?: (path: string) => Promise<string>
 ): Promise<ReadIncludeFileResult> {
   const candidates = getIncludeFileCandidates(options);
   if (candidates.length === 0) {
@@ -69,13 +75,36 @@ export async function resolveAndReadIncludeFile(
     try {
       const exists = await checkExists(path);
       if (exists) {
-        const content = await readText(path);
-        return {
-          found: true,
-          resolvedPath: path,
-          content,
-          candidatesTried: candidates,
-        };
+        const command = buildIncludeFileShellCommand(path);
+        try {
+          const content = await executeCmd(command);
+          return {
+            found: true,
+            resolvedPath: path,
+            command,
+            content,
+            candidatesTried: candidates,
+          };
+        } catch (execErr: any) {
+          // If shell command execution is unavailable or fails, fallback to direct text read if available
+          if (readTextFallback) {
+            const content = await readTextFallback(path);
+            return {
+              found: true,
+              resolvedPath: path,
+              command,
+              content,
+              candidatesTried: candidates,
+            };
+          }
+          return {
+            found: false,
+            resolvedPath: path,
+            command,
+            error: execErr?.message || String(execErr),
+            candidatesTried: candidates,
+          };
+        }
       }
     } catch {
       // Try next candidate path
@@ -88,3 +117,6 @@ export async function resolveAndReadIncludeFile(
     candidatesTried: candidates,
   };
 }
+
+// Backward compatible alias
+export const resolveAndReadIncludeFile = resolveAndExecuteIncludeFileCommand;

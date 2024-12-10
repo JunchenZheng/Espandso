@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { readTextFile, writeTextFile, exists, copyFile, mkdir, readDir } from "@tauri-apps/plugin-fs";
 import { listen } from "@tauri-apps/api/event";
@@ -53,7 +54,7 @@ import { validate } from "./logic/validate";
 import { generateYaml } from "./logic/generateYaml";
 import { importYamlContent, ImportedMatch } from "./logic/importYaml";
 import { buildSnippetTree } from "./logic/discoverSnippetFiles";
-import { resolveAndReadIncludeFile } from "./logic/resolveIncludeFile";
+import { resolveAndExecuteIncludeFileCommand } from "./logic/resolveIncludeFile";
 import { EspansoConfigFile, EspansoPathSource, scanEspansoConfigFiles } from "./logic/espansoPaths";
 import { setSetting, getSetting } from "./tauri/fileStore";
 import { installAndRestart, InstallResult } from "./tauri/espansoRuntime";
@@ -2044,6 +2045,7 @@ function SnippetDetail({ detail, repoPath }: SnippetDetailProps) {
 
   const [dynamicContent, setDynamicContent] = useState<string | null>(null);
   const [resolvedPath, setResolvedPath] = useState<string | null>(null);
+  const [executedCmd, setExecutedCmd] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -2054,25 +2056,29 @@ function SnippetDetail({ detail, repoPath }: SnippetDetailProps) {
     setLoading(true);
     setError(null);
     try {
-      const res = await resolveAndReadIncludeFile(
+      const res = await resolveAndExecuteIncludeFileCommand(
         {
           includeFile: snippet.include_file,
           repoPath,
           currentSnippetFile: file,
         },
         exists,
+        async (cmd: string) => {
+          return await invoke<string>("execute_shell_cmd", { cmd });
+        },
         readTextFile
       );
 
+      setResolvedPath(res.resolvedPath || null);
+      setExecutedCmd(res.command || null);
+
       if (res.found && res.content !== undefined) {
         setDynamicContent(res.content);
-        setResolvedPath(res.resolvedPath || null);
       } else {
-        setError(res.error || "File not found");
-        setResolvedPath(res.candidatesTried[0] || null);
+        setError(res.error || "Command execution returned empty output or failed");
       }
     } catch (err: any) {
-      setError(err?.message || "Failed to read include file");
+      setError(err?.message || "Failed to execute shell command");
     } finally {
       setLoading(false);
     }
@@ -2132,19 +2138,26 @@ function SnippetDetail({ detail, repoPath }: SnippetDetailProps) {
         {isExternalFile && (
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <Label className="flex items-center gap-1.5 text-primary font-medium">
-                <Sparkles className="h-3.5 w-3.5" />
-                <span>Dynamically Injected Content</span>
-              </Label>
+              <div className="space-y-0.5">
+                <Label className="flex items-center gap-1.5 text-primary font-medium">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  <span>Dynamically Injected Content (via Shell Command)</span>
+                </Label>
+                {executedCmd && (
+                  <p className="mono-field text-[11px] text-muted-foreground">
+                    Executed: <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-foreground">{executedCmd}</code>
+                  </p>
+                )}
+              </div>
               <div className="flex items-center gap-2">
                 {loading && (
                   <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <Loader2 className="h-3 w-3 animate-spin" /> Loading file...
+                    <Loader2 className="h-3 w-3 animate-spin" /> Executing cmd...
                   </span>
                 )}
                 {!loading && dynamicContent !== null && (
                   <span className="text-[11px] text-emerald-500 font-mono bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                    Loaded ({dynamicContent.split("\n").length} lines, {new Blob([dynamicContent]).size} B)
+                    Command Output ({dynamicContent.split("\n").length} lines, {new Blob([dynamicContent]).size} B)
                   </span>
                 )}
                 {!loading && error && (
@@ -2158,7 +2171,7 @@ function SnippetDetail({ detail, repoPath }: SnippetDetailProps) {
                   className="h-7 px-2 text-xs"
                   onClick={loadIncludeFileContent}
                   disabled={loading}
-                  title="Reload content from disk"
+                  title="Re-execute command"
                 >
                   <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
                 </Button>
@@ -2180,16 +2193,16 @@ function SnippetDetail({ detail, repoPath }: SnippetDetailProps) {
               {loading ? (
                 <div className="flex items-center justify-center p-8 text-xs text-slate-400">
                   <Loader2 className="mr-2 h-4 w-4 animate-spin text-primary" />
-                  Reading include_file from workspace...
+                  Executing Shell command: {executedCmd || "..."}...
                 </div>
               ) : error ? (
                 <div className="p-4 text-xs text-rose-400 space-y-1">
-                  <p className="font-semibold">Unable to load file content</p>
+                  <p className="font-semibold">Shell Command Execution Failed</p>
                   <p className="text-slate-400 font-mono text-[11px]">{error}</p>
                 </div>
               ) : (
                 <pre className="mono-field max-h-[42vh] overflow-auto whitespace-pre-wrap break-words p-3.5 text-xs leading-relaxed font-mono">
-                  {dynamicContent || <span className="italic text-slate-500">(File is empty)</span>}
+                  {dynamicContent || <span className="italic text-slate-500">(Command returned empty output)</span>}
                 </pre>
               )}
             </div>

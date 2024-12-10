@@ -3,7 +3,11 @@ import { validate } from "./validate";
 import { generateYaml } from "./generateYaml";
 import { importYamlContent } from "./importYaml";
 import { isEspansoYamlConfigFile, parseEspansoConfigDir, sortEspansoConfigFiles } from "./espansoPaths";
-import { getIncludeFileCandidates, resolveAndReadIncludeFile } from "./resolveIncludeFile";
+import {
+  getIncludeFileCandidates,
+  buildIncludeFileShellCommand,
+  resolveAndExecuteIncludeFileCommand,
+} from "./resolveIncludeFile";
 
 describe("validate", () => {
   it("should validate correct snippets", async () => {
@@ -201,24 +205,40 @@ describe("resolveIncludeFile", () => {
     ]);
   });
 
-  it("should resolve and read content from first existing candidate", async () => {
+  it("should build shell cat command for path", () => {
+    const cmd = buildIncludeFileShellCommand("/path/to/active_data.json");
+    expect(cmd).toBe('cat "/path/to/active_data.json"');
+  });
+
+  it("should resolve and execute command for existing candidate", async () => {
     const mockFiles: Record<string, string> = {
       "/Workspace/snippets/anki/active_data.json": '{"active": true}',
     };
+    const executedCmds: string[] = [];
 
-    const res = await resolveAndReadIncludeFile(
+    const res = await resolveAndExecuteIncludeFileCommand(
       {
         includeFile: "active_data.json",
         repoPath: "/Workspace",
         currentSnippetFile: "anki/test.json",
       },
       async (path) => path in mockFiles,
-      async (path) => mockFiles[path]
+      async (cmd) => {
+        executedCmds.push(cmd);
+        // Simulate cat command execution
+        const match = cmd.match(/^cat "(.*)"$/);
+        if (match && match[1] in mockFiles) {
+          return mockFiles[match[1]];
+        }
+        throw new Error("Command failed");
+      }
     );
 
     expect(res.found).toBe(true);
     expect(res.resolvedPath).toBe("/Workspace/snippets/anki/active_data.json");
+    expect(res.command).toBe('cat "/Workspace/snippets/anki/active_data.json"');
     expect(res.content).toBe('{"active": true}');
+    expect(executedCmds).toEqual(['cat "/Workspace/snippets/anki/active_data.json"']);
   });
 });
 
