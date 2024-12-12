@@ -1,6 +1,6 @@
-# Espanso Snippet Generator
+# Expandso
 
-A Tauri desktop app and CLI workflow for managing Espanso snippets from JSON source files.
+A Tauri desktop app for scanning, previewing, and editing Espanso YAML match files directly.
 
 ## Current App Stack
 
@@ -10,7 +10,14 @@ A Tauri desktop app and CLI workflow for managing Espanso snippets from JSON sou
 - Vite
 - Rust
 
-The previous Swift/Xcode macOS app has been removed. Native desktop builds now go through `src-tauri/`.
+## Features
+
+- **YAML-First Source Of Truth**: Scans the Espanso match directory and edits YAML files in place.
+- **Static Text Snippet Editor**: Adds single-line or multi-line text replacement snippets directly to the selected YAML config.
+- **Multiple Triggers (Aliases)**: Supports Espanso `triggers: [...]` for a single snippet alias group.
+- **Block Literal YAML Writing**: Multi-line replacement texts are written with YAML block literal style.
+- **Validation & Restart**: Validates trigger shape and duplicate triggers before saving, then restarts Espanso.
+- **Resource Preview**: Previews existing external resource snippets by resolving their configured shell/echo paths.
 
 ## Setup
 
@@ -50,16 +57,6 @@ Install to a custom directory:
 
 macOS builds still require Rust/Cargo and Apple Command Line Tools because Tauri produces a native macOS app bundle.
 
-## CLI Build
+## Current Editing Model
 
-Generate Espanso YAML from JSON snippets:
-
-```bash
-python build.py
-```
-
-Install generated Espanso config and restart Espanso:
-
-```bash
-python build.py --install
-```
+Expandso treats existing Espanso YAML files as the source of truth and writes changes directly to the selected match file.
