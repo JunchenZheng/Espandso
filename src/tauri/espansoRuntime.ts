@@ -1,4 +1,4 @@
-import { copyFile, exists, writeTextFile, mkdir } from "@tauri-apps/plugin-fs";
+import { exists, writeTextFile, mkdir } from "@tauri-apps/plugin-fs";
 import { Command } from "@tauri-apps/plugin-shell";
 import { getEspansoMatchDir } from "../logic/espansoPaths";
 
@@ -10,16 +10,14 @@ export interface InstallResult {
 }
 
 /**
- * Installs the generated YAML into the local Espanso match directory,
- * backs up the existing file if it exists, and restarts Espanso.
+ * Installs the generated YAML into the local Espanso match directory
+ * and restarts Espanso.
  * @param yamlContent The generated YAML string
  * @param relativePath Relative file path (e.g. "base.yml")
- * @param backupDir Optional user-selected directory for backup copies
  */
 export async function installAndRestart(
   yamlContent: string,
   relativePath: string = "base.yml",
-  backupDir: string = "",
 ): Promise<InstallResult> {
   try {
     const matchDir = await getEspansoMatchDir();
@@ -43,30 +41,11 @@ export async function installAndRestart(
     }
 
     const targetPath = `${currentDir}/${fileName}`;
-    const backupPath = `${targetPath}.backup`;
 
-    // 1. Backup if file exists
-    const fileExists = await exists(targetPath);
-    if (fileExists) {
-      try {
-        if (backupDir) {
-          const backupDirExists = await exists(backupDir);
-          if (!backupDirExists) {
-            await mkdir(backupDir, { recursive: true });
-          }
-          await copyFile(targetPath, `${backupDir}/${fileName}.backup`);
-        } else {
-          await copyFile(targetPath, backupPath);
-        }
-      } catch (backupError) {
-        console.warn(`Could not create backup for ${targetPath}:`, backupError);
-      }
-    }
-
-    // 2. Write YAML
+    // 1. Write YAML
     await writeTextFile(targetPath, yamlContent);
 
-    // 3. Restart Espanso via Command
+    // 2. Restart Espanso via Command
     try {
       const command = Command.create("espanso", ["restart"]);
       const output = await command.execute();
