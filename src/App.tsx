@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { readTextFile, writeTextFile, exists, copyFile, mkdir, readDir } from "@tauri-apps/plugin-fs";
+import { readTextFile, writeTextFile, exists, copyFile, mkdir } from "@tauri-apps/plugin-fs";
 import { listen } from "@tauri-apps/api/event";
 import {
   AlertTriangle,
@@ -24,7 +24,6 @@ import {
   Save,
   Search,
   Settings,
-  ShieldCheck,
   Sparkles,
   SquareArrowOutUpRight,
   Trash2,
@@ -119,7 +118,6 @@ function App() {
 
   // Settings
   const [autoInstall, setAutoInstall] = useState<boolean>(true);
-  const [backupDir, setBackupDir] = useState<string>("");
 
   // UI state
   const [errors, setErrors] = useState<ValidationError[]>([]);
@@ -132,7 +130,6 @@ function App() {
   const [espansoConfigPreviews, setEspansoConfigPreviews] = useState<EspansoConfigPreview[]>([]);
   const [selectedEspansoConfigPath, setSelectedEspansoConfigPath] = useState<string>("");
   const [isScanningEspanso, setIsScanningEspanso] = useState<boolean>(false);
-  const [isInitializingWorkspace, setIsInitializingWorkspace] = useState<boolean>(false);
   const [espansoScanMessage, setEspansoScanMessage] = useState<string>("");
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [detailSnippet, setDetailSnippet] = useState<SnippetDetailData | null>(null);
@@ -156,9 +153,7 @@ function App() {
     async function loadSavedRepo() {
       const savedPath = await getSetting<string>("repoPath", "");
       const savedAuto = await getSetting<boolean>("autoInstall", true);
-      const savedBackupDir = await getSetting<string>("backupDir", "");
       setAutoInstall(savedAuto);
-      setBackupDir(savedBackupDir);
 
       if (savedPath) {
         // Verify snippets folder exists
@@ -178,11 +173,6 @@ function App() {
     try {
       const isDirExists = await exists(path);
       if (!isDirExists) return;
-
-      if (isSettingsOpen) {
-        await saveBackupDir(path);
-        return;
-      }
 
       let resolvedRepoPath = "";
       const hasSubSnippets = await exists(`${path}/snippets`);
@@ -378,29 +368,6 @@ function App() {
     return tree;
   }
 
-  function hasSnippetFiles(items: FileTreeItem[]): boolean {
-    return items.some((item) => !item.isDir || hasSnippetFiles(item.children || []));
-  }
-
-  async function isWorkspaceEmpty(path: string): Promise<boolean> {
-    const tree = await buildSnippetTree(`${path}/snippets`);
-    return !hasSnippetFiles(tree);
-  }
-
-  async function ensureSnippetsDirectory(path: string) {
-    const snippetsDir = `${path}/snippets`;
-    if (!(await exists(snippetsDir))) {
-      await mkdir(snippetsDir, { recursive: true });
-    }
-  }
-
-  async function activateWorkspace(path: string) {
-    await ensureSnippetsDirectory(path);
-    setRepoPath(path);
-    await setSetting("repoPath", path);
-    await refreshFileTree(path);
-  }
-
   async function ensureParentDirectory(filePath: string) {
     const parts = filePath.split("/");
     parts.pop();
@@ -408,10 +375,6 @@ function App() {
     if (parentPath) {
       await mkdir(parentPath, { recursive: true });
     }
-  }
-
-  function yamlConfigToJsonRelativePath(relativePath: string): string {
-    return relativePath.replace(/\.ya?ml$/i, ".json");
   }
 
   function getContainingDirectory(filePath: string): string {
@@ -482,60 +445,6 @@ function App() {
     return { path: null };
   }
 
-  // Choose Repository Directory
-  async function chooseRepo(): Promise<string | null> {
-    const selected = await openDialog({
-      directory: true,
-      multiple: false,
-      title: "Select Repository Directory",
-    });
-
-    if (selected && typeof selected === "string") {
-      const hasSnippets = await exists(`${selected}/snippets`);
-      if (hasSnippets) {
-        setRepoPath(selected);
-        await setSetting("repoPath", selected);
-        refreshFileTree(selected);
-        return selected;
-      } else {
-        alert("The selected directory does not contain a 'snippets' folder. Please select a valid workspace.");
-      }
-    }
-
-    return null;
-  }
-
-  async function saveBackupDir(path: string) {
-    if (!path) {
-      setBackupDir("");
-      await setSetting("backupDir", "");
-      return;
-    }
-
-    try {
-      await readDir(path);
-      setBackupDir(path);
-      await setSetting("backupDir", path);
-    } catch (e) {
-      alert("Please choose or drop a directory for backups.");
-    }
-  }
-
-  async function chooseBackupDir(): Promise<string | null> {
-    const selected = await openDialog({
-      directory: true,
-      multiple: false,
-      title: "Select Backup Directory",
-    });
-
-    if (selected && typeof selected === "string") {
-      await saveBackupDir(selected);
-      return selected;
-    }
-
-    return null;
-  }
-
   async function scanDefaultEspansoConfigDir() {
     setIsScanningEspanso(true);
     setEspansoScanMessage("");
@@ -566,135 +475,6 @@ function App() {
       );
     } finally {
       setIsScanningEspanso(false);
-    }
-  }
-
-  async function importDetectedEspansoConfig(config: EspansoConfigFile) {
-    let activeRepoPath = repoPath || backupDir;
-    if (!activeRepoPath) {
-      const selectedBackupDir = await chooseBackupDir();
-      if (!selectedBackupDir) return;
-      activeRepoPath = selectedBackupDir;
-    }
-
-    await ensureSnippetsDirectory(activeRepoPath);
-
-    if (!(await isWorkspaceEmpty(activeRepoPath))) {
-      alert("This import is only available while the Backup directory's snippets/ folder has no JSON configs. After initialization, that directory is the source of truth.");
-      return;
-    }
-
-    await activateWorkspace(activeRepoPath);
-    await importYamlFileByPath(config.path);
-  }
-
-  async function initializeWorkspaceFromEspanso() {
-    if (isInitializingWorkspace) return;
-
-    setIsInitializingWorkspace(true);
-
-    try {
-      let activeRepoPath = backupDir;
-      if (!activeRepoPath) {
-        const selectedBackupDir = await chooseBackupDir();
-        if (!selectedBackupDir) return;
-        activeRepoPath = selectedBackupDir;
-      }
-
-      await ensureSnippetsDirectory(activeRepoPath);
-
-      if (!(await isWorkspaceEmpty(activeRepoPath))) {
-        alert("Initialization is only available while the Backup directory's snippets/ folder has no JSON configs. That directory is already the source of truth.");
-        return;
-      }
-
-      let configs = espansoConfigs;
-      if (configs.length === 0) {
-        const scanResult = await scanEspansoConfigFiles();
-        const previews = await buildEspansoConfigPreviews(scanResult.files);
-        setEspansoMatchDir(scanResult.matchDir);
-        setEspansoPathSource(scanResult.pathSource);
-        setEspansoConfigs(scanResult.files);
-        setEspansoConfigPreviews(previews);
-        setSelectedEspansoConfigPath(previews[0]?.config.path || "");
-        configs = scanResult.files;
-      }
-
-      if (configs.length === 0) {
-        alert("No Espanso YAML configs were found to initialize from.");
-        return;
-      }
-
-      if (!confirm(`Initialize the empty Backup directory from ${configs.length} Espanso YAML config${configs.length === 1 ? "" : "s"}? This one-time import writes JSON under ${activeRepoPath}/snippets and keeps future changes flowing from JSON to Espanso only.`)) {
-        return;
-      }
-
-      const warnings: string[] = [];
-      let importedFileCount = 0;
-      let importedSnippetCount = 0;
-      let firstImportedJsonFile = "";
-
-      for (const config of configs) {
-        const content = await readTextFile(config.path);
-        const result = importYamlContent(content, config.name);
-
-        warnings.push(...result.warnings);
-        if (result.snippets.length === 0) {
-          continue;
-        }
-
-        const jsonRelativePath = yamlConfigToJsonRelativePath(config.relativePath);
-        const targetJsonPath = `${activeRepoPath}/snippets/${jsonRelativePath}`;
-        await ensureParentDirectory(targetJsonPath);
-
-        const yamlFolder = getContainingDirectory(config.path);
-        for (const m of result.importedMatches) {
-          if (m.resourcePath && m.resourceName) {
-            const resource = await findReadableResourcePath(m.resourcePath, yamlFolder);
-
-            if (resource.path) {
-              const dstPath = `${activeRepoPath}/snippets/${m.resourceName}`;
-              await ensureParentDirectory(dstPath);
-              try {
-                await copyFile(resource.path, dstPath);
-              } catch (e: any) {
-                warnings.push(`[${config.name}] Resource file could not be copied: ${m.resourcePath} (${e?.message || e})`);
-              }
-            } else {
-              warnings.push(`[${config.name}] ${resource.warning || `Resource file not found: ${m.resourcePath}`}`);
-            }
-          }
-        }
-
-        const configData: SnippetFile = {
-          version: 1,
-          snippets: result.snippets,
-        };
-
-        await writeTextFile(targetJsonPath, JSON.stringify(configData, null, 2));
-        if (!firstImportedJsonFile) {
-          firstImportedJsonFile = jsonRelativePath;
-        }
-        importedFileCount += 1;
-        importedSnippetCount += result.snippets.length;
-      }
-
-      if (importedFileCount === 0) {
-        alert(`No supported snippets were imported.${warnings.length ? `\n\n${warnings.slice(0, 5).join("\n")}` : ""}`);
-        return;
-      }
-
-      await activateWorkspace(activeRepoPath);
-      if (firstImportedJsonFile) {
-        await loadSnippetFile(firstImportedJsonFile, activeRepoPath);
-      }
-
-      const warningSummary = warnings.length > 0 ? `\n\n${warnings.length} warning${warnings.length === 1 ? "" : "s"}. First warnings:\n${warnings.slice(0, 5).join("\n")}` : "";
-      alert(`Initialized workspace from Espanso: ${importedFileCount} JSON config${importedFileCount === 1 ? "" : "s"}, ${importedSnippetCount} snippet${importedSnippetCount === 1 ? "" : "s"}.${warningSummary}`);
-    } catch (e) {
-      alert(`Initialization failed: ${e}`);
-    } finally {
-      setIsInitializingWorkspace(false);
     }
   }
 
@@ -959,7 +739,7 @@ function App() {
       await writeTextFile(`${distDir}/base.yml`, yamlContent);
 
       // 3. Install to Espanso & restart (Phase 3 requirement)
-      const installRes = await installAndRestart(yamlContent, "base.yml", backupDir);
+      const installRes = await installAndRestart(yamlContent, "base.yml");
       setConsoleResult(installRes);
     } catch (e: any) {
       setConsoleResult({
@@ -1115,18 +895,14 @@ function App() {
           <div className="drag-zone">
             <Upload className="mb-5 h-12 w-12" />
             <div className="text-xl font-semibold">
-              {isSettingsOpen
-                ? "Drop backup folder here"
-                : !repoPath
-                  ? "Drop snippets workspace folder here"
-                  : "Drop workspace folder or YAML file here"}
+              {!repoPath
+                ? "Drop snippets workspace folder here"
+                : "Drop workspace folder or YAML file here"}
             </div>
             <div className="mt-2 text-sm text-muted-foreground">
-              {isSettingsOpen
-                ? "This folder stores backup copies before installing to Espanso"
-                : !repoPath
-                  ? "Must contain a snippets folder"
-                  : "Folders open a workspace; YAML files open the importer"}
+              {!repoPath
+                ? "Must contain a snippets folder"
+                : "Folders open a workspace; YAML files open the importer"}
             </div>
           </div>
         </div>
@@ -1136,12 +912,8 @@ function App() {
         <main className="flex h-full w-full overflow-hidden bg-[linear-gradient(180deg,hsl(var(--background))_0%,hsl(var(--secondary))_100%)] p-4">
           <Card className="flex h-full w-full flex-col p-4">
             <CardContent className="flex min-h-0 flex-1 flex-col p-0">
-              <div className="grid grid-cols-2 gap-2">
-                <Button className="w-full" onClick={chooseRepo}>
-                  <FolderOpen />
-                  Choose Folder
-                </Button>
-                <Button className="w-full" variant="outline" onClick={() => setIsSettingsOpen(true)}>
+              <div className="flex justify-end">
+                <Button variant="outline" onClick={() => setIsSettingsOpen(true)}>
                   <Settings />
                   Settings
                 </Button>
@@ -1159,14 +931,6 @@ function App() {
                           <span className="text-amber-700">{espansoPreviewTotals.warnings} warnings</span>
                         )}
                       </div>
-                      <Button
-                        size="sm"
-                        onClick={initializeWorkspaceFromEspanso}
-                        disabled={isInitializingWorkspace || isScanningEspanso}
-                      >
-                        {isInitializingWorkspace ? <Loader2 className="h-4 w-4 animate-spin" /> : <Import className="h-4 w-4" />}
-                        Initialize Backup Directory
-                      </Button>
                     </div>
 
                     <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden rounded-md border bg-background md:grid-cols-[18rem_1fr]">
@@ -1194,7 +958,6 @@ function App() {
                         {selectedEspansoPreview ? (
                           <EspansoConfigDetail
                             preview={selectedEspansoPreview}
-                            onImport={() => importDetectedEspansoConfig(selectedEspansoPreview.config)}
                             onViewSnippet={(match, index) =>
                               showSnippetDetail(match.snippet, selectedEspansoPreview.config.relativePath, index, {
                                 sourceResourcePath: match.resourcePath,
@@ -1221,11 +984,10 @@ function App() {
                       <Button
                         className="w-full"
                         variant="outline"
-                        onClick={initializeWorkspaceFromEspanso}
-                        disabled={isInitializingWorkspace}
+                        onClick={scanDefaultEspansoConfigDir}
                       >
-                        {isInitializingWorkspace ? <Loader2 className="h-4 w-4 animate-spin" /> : <Import className="h-4 w-4" />}
-                        Initialize Backup Directory
+                        <RefreshCw className="h-4 w-4" />
+                        Scan Default Espanso Directory
                       </Button>
                     )}
                   </div>
@@ -1242,14 +1004,10 @@ function App() {
             <div className="space-y-4 border-b p-4">
               <div>
                 <h1 className="text-base font-semibold">Snippet Manager</h1>
-                <button
-                  className="mt-2 flex w-full items-center gap-2 rounded-md border bg-background px-3 py-2 text-left text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                  onClick={chooseRepo}
-                  title="Click to change workspace folder"
-                >
+                <div className="mt-2 flex w-full items-center gap-2 rounded-md border bg-background px-3 py-2 text-left text-xs text-muted-foreground">
                   <FolderOpen className="h-4 w-4 shrink-0" />
                   <span className="truncate">{repoPath.split("/").pop()}</span>
-                </button>
+                </div>
               </div>
               <Button variant="outline" className="w-full justify-start" onClick={() => setIsNewFileModalOpen(true)}>
                 <FilePlus2 />
@@ -1267,18 +1025,17 @@ function App() {
                     <div className="text-center">
                       <div className="font-medium text-foreground">No JSON configs in snippets/</div>
                       <p className="mt-1 text-xs">
-                        Initialize the configured Backup directory once from your existing Espanso YAML configs.
+                        Create a JSON config or import a YAML file when you are ready to edit snippets.
                       </p>
                     </div>
                     <Button
                       className="w-full"
                       size="sm"
                       variant="outline"
-                      onClick={initializeWorkspaceFromEspanso}
-                      disabled={isInitializingWorkspace || isScanningEspanso}
+                      onClick={() => setIsNewFileModalOpen(true)}
                     >
-                      {isInitializingWorkspace ? <Loader2 className="h-4 w-4 animate-spin" /> : <Import className="h-4 w-4" />}
-                      Initialize Backup Directory
+                      <FilePlus2 className="h-4 w-4" />
+                      New JSON Config
                     </Button>
                   </div>
                 )}
@@ -1576,8 +1333,8 @@ function App() {
       <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Directory Settings</DialogTitle>
-            <DialogDescription>Espanso is the live output directory. Backups are stored separately when configured.</DialogDescription>
+            <DialogTitle>Settings</DialogTitle>
+            <DialogDescription>Scan the default Espanso match directory and control install behavior.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="rounded-lg border bg-secondary/40 p-4">
@@ -1605,22 +1362,6 @@ function App() {
               </div>
             </div>
 
-            <button
-              className="flex w-full items-center gap-3 rounded-lg border-2 border-dashed bg-background p-4 text-left transition-colors hover:bg-secondary"
-              onClick={chooseBackupDir}
-            >
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-secondary text-primary">
-                <ShieldCheck className="h-5 w-5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <Label>Backup directory</Label>
-                <p className="mt-1 truncate text-sm text-muted-foreground">
-                  {backupDir || "Drop a folder here or click to choose one."}
-                </p>
-              </div>
-              <FolderOpen className="h-4 w-4 shrink-0 text-muted-foreground" />
-            </button>
-
             <div className="rounded-lg border bg-secondary/40 p-4">
               <div className="flex items-center justify-between gap-3">
                 <Label htmlFor="settings-auto-install" className="text-sm">
@@ -1631,11 +1372,6 @@ function App() {
             </div>
           </div>
           <DialogFooter>
-            {backupDir && (
-              <Button variant="outline" onClick={() => saveBackupDir("")}>
-                Clear Backup Folder
-              </Button>
-            )}
             <Button onClick={() => setIsSettingsOpen(false)}>Done</Button>
           </DialogFooter>
         </DialogContent>
@@ -1941,11 +1677,10 @@ interface SnippetDetailProps {
 
 interface EspansoConfigDetailProps {
   preview: EspansoConfigPreview;
-  onImport: () => void;
   onViewSnippet: (match: ImportedMatch, index: number) => void;
 }
 
-function EspansoConfigDetail({ preview, onImport, onViewSnippet }: EspansoConfigDetailProps) {
+function EspansoConfigDetail({ preview, onViewSnippet }: EspansoConfigDetailProps) {
   const ROW_HEIGHT = 36;
   const OVERSCAN_ROWS = 8;
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -1987,17 +1722,11 @@ function EspansoConfigDetail({ preview, onImport, onViewSnippet }: EspansoConfig
           <h2 className="truncate text-sm font-semibold">{preview.config.relativePath}</h2>
           <p className="mt-1 truncate text-xs text-muted-foreground">{preview.config.path}</p>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          {preview.warningCount > 0 && (
-            <span className="rounded-md bg-amber-100 px-2 py-1 text-xs text-amber-800">
-              {preview.warningCount} warnings
-            </span>
-          )}
-          <Button size="sm" variant="outline" onClick={onImport}>
-            <Import className="h-4 w-4" />
-            Import
-          </Button>
-        </div>
+        {preview.warningCount > 0 && (
+          <span className="shrink-0 rounded-md bg-amber-100 px-2 py-1 text-xs text-amber-800">
+            {preview.warningCount} warnings
+          </span>
+        )}
       </div>
 
       <div className="grid h-9 shrink-0 grid-cols-[minmax(8rem,1.1fr)_3rem_minmax(6rem,0.65fr)_minmax(12rem,2fr)_2.25rem] items-center border-b bg-secondary/40 px-3 text-xs font-semibold text-muted-foreground">
