@@ -4,9 +4,9 @@ This file provides guidance to Codex when working in this repository.
 
 ## Project Overview
 
-Espanso Snippet Generator is a Tauri v2 desktop app for managing Espanso snippets from user-selected JSON snippet workspaces. The app lets users choose or drag in a directory that contains a `snippets/` folder, edit snippet JSON files, validate entries, import legacy Espanso YAML, generate Espanso YAML, and optionally install/restart Espanso.
+Expandso is a Tauri v2 desktop app for managing Espanso snippets directly in Espanso YAML match files. The app scans the Espanso match directory, previews YAML configs, adds static text snippets to the selected YAML file, validates trigger rules, writes YAML in place, and restarts Espanso.
 
-The current architecture is Tauri + React + TypeScript + Rust. Legacy Python scripts still exist as reference/CLI utilities, but new app features should be implemented in TypeScript/Rust unless the user explicitly asks for Python work.
+The current architecture is Tauri + React + TypeScript + Rust. New app features should be implemented in TypeScript/Rust unless the user explicitly asks for another toolchain.
 
 ## Commands
 
@@ -33,38 +33,28 @@ npm run tauri build
 npx vitest run
 ```
 
-Legacy CLI/reference commands:
-
-```bash
-# Legacy Python JSON -> YAML generator
-python build.py
-
-# Legacy Python install flow
-python build.py --install
-```
-
 ## Architecture
 
 Primary app flow:
 
 ```text
-User-selected repo path
-  -> repoPath/snippets/**/*.json
-  -> src/logic/discoverSnippetFiles.ts
-  -> src/logic/validate.ts
-  -> src/logic/generateYaml.ts
-  -> src/tauri/espansoRuntime.ts
-  -> Espanso config + espanso restart
+Espanso match directory
+  -> src/logic/espansoPaths.ts
+  -> src/logic/importYaml.ts
+  -> src/App.tsx YAML preview + editor
+  -> src/logic/yamlEditor.ts
+  -> selected Espanso YAML file
+  -> src/tauri/espansoRuntime.ts restart
 ```
 
-Legacy YAML import flow:
+Existing resource preview flow:
 
 ```text
 Espanso YAML
   -> src/logic/importYaml.ts
-  -> Snippet JSON shape
-  -> optional resource file copy
-  -> user-selected snippets workspace
+  -> resource path from echo/shell vars
+  -> src/logic/resolveIncludeFile.ts
+  -> detail dialog preview
 ```
 
 Important directories:
@@ -74,41 +64,32 @@ src/
   App.tsx                    Main React application and workflow orchestration
   components/ui/             shadcn/ui-style primitives used by the app
   lib/utils.ts               Shared frontend utilities
-  logic/                     Pure TypeScript snippet parsing, validation, import, and YAML generation
-  tauri/                     Tauri-facing storage/runtime helpers
+  logic/                     Pure TypeScript YAML parsing, validation, editing, and path resolution
+  tauri/                     Tauri-facing Espanso runtime helpers
 
 src-tauri/
   src/                       Rust Tauri entry points
   capabilities/              Tauri v2 permissions/capabilities
   tauri.conf.json            Desktop app configuration
 
-tools/
-  migrate_legacy.py          Legacy/reference migration script
-
-snippets/
-  Local user data only. This directory is intentionally gitignored.
 ```
 
 ## Data And Privacy Rules
 
-- `snippets/` is a local user-selected data directory and may contain sensitive personal snippets. Never add it to git.
-- Do not assume the project root contains the user's active snippet workspace. The app should work with a manually selected directory containing `snippets/`.
+- Espanso YAML files may contain sensitive personal snippets. Do not add user match files or copied personal resources to git.
+- Do not assume the project root contains active snippet data. The app reads the user's Espanso match directory at runtime.
 - Do not hardcode personal absolute paths into source files, tests, or docs.
 - Generated files and build outputs must stay out of git: `dist/`, `dist-gui/`, `node_modules/`, `src-tauri/target/`, and `src-tauri/gen/schemas/`.
-- If adding sample snippets, put synthetic fixtures under `test_data/` or another clearly named fixture directory, not under `snippets/`.
+- If adding sample snippets, put synthetic fixtures under `test_data/` or another clearly named fixture directory.
 
-## Snippet JSON Shape
+## Snippet Shape
 
-Snippet files use this shape:
+The UI uses this internal shape for preview, validation, and YAML append operations:
 
 ```ts
-interface SnippetFile {
-  version: number;
-  snippets: Snippet[];
-}
-
 interface Snippet {
-  trigger: string;
+  trigger?: string;
+  triggers?: string[];
   replace?: string;
   include_file?: string;
   description?: string;
@@ -117,26 +98,27 @@ interface Snippet {
 
 Rules:
 
-- `trigger` is required and must be a non-empty string.
-- A snippet should use either `replace` or `include_file`.
+- Use either `trigger` or `triggers`.
+- Trigger values must be non-empty strings.
+- Static text snippets use `replace`.
 - `replace` is inline text content.
-- `include_file` points to a resource file relative to the snippet JSON file/workspace context.
-- Trigger uniqueness and include-file existence should be validated before build/install actions.
+- `include_file` is used for previewing existing external resource snippets parsed from YAML vars.
+- Trigger uniqueness should be validated before writing to YAML.
 
-## YAML Output Rules
+## YAML Editing Rules
 
-- Espanso output root key is `matches`.
-- Inline snippets emit `trigger`, `replace`, and optional `description`.
+- Espanso YAML root key is `matches`.
+- New static snippets append a new match to the selected YAML file.
+- New snippets emit `trigger` or `triggers`, `replace`, and optional `description`.
 - Multi-line `replace` values should use YAML block literal style.
-- `include_file` snippets are converted into Espanso `vars` that read the file content and expose it as `{{output}}`.
-- Prefer the existing `yaml` package and `src/logic/generateYaml.ts`; do not hand-roll YAML with string concatenation.
+- Preserve unsupported existing YAML match fields when appending new snippets.
+- Prefer the existing `yaml` package and `src/logic/yamlEditor.ts`; do not hand-roll YAML with string concatenation.
 
 ## Development Rules
 
-- Prefer TypeScript logic in `src/logic/` for parsing, validation, YAML generation, and migration behavior.
-- Prefer Tauri helpers in `src/tauri/` for filesystem, settings, Espanso path detection, installation, and restart behavior.
+- Prefer TypeScript logic in `src/logic/` for parsing, validation, YAML editing, and migration behavior.
+- Prefer Tauri helpers in `src/tauri/` for filesystem, Espanso path detection, and restart behavior.
 - Keep React components focused on UI state and workflows; move reusable pure behavior into `src/logic/`.
-- When porting behavior from `build.py` or `tools/migrate_legacy.py`, treat Python as a reference, not as the long-term implementation target.
 - Keep Rust changes in `src-tauri/src/` small and limited to native functionality that cannot be handled cleanly through Tauri plugins.
 - Use existing UI primitives in `src/components/ui/` and shared `cn()` from `src/lib/utils.ts`.
 - Run relevant tests/builds after changes. For frontend logic, prefer `npx vitest run`; for UI/build changes, run `npm run build`; for desktop integration, run `npm run tauri dev` or `npm run tauri build` when appropriate.
