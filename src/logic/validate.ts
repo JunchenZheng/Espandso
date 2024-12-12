@@ -1,4 +1,5 @@
 import { ValidationError } from "./types";
+import { getSnippetTriggers } from "./snippetUtils";
 
 export interface ValidateOptions {
   snippetsDir?: string;
@@ -37,23 +38,43 @@ export async function validate(
     }
 
     const trigger = snippet.trigger;
+    const triggers = snippet.triggers;
     const replace = snippet.replace;
     const includeFile = snippet.include_file;
     const description = snippet.description;
 
-    // Trigger validation
-    if (typeof trigger !== "string" || !trigger) {
-      errors.push({ message: `snippet #${i}: 'trigger' must be a non-empty string` });
-    } else {
-      if (trigger in seenTriggers) {
+    const hasTrigger = trigger !== undefined && trigger !== null;
+    const hasTriggers = triggers !== undefined && triggers !== null;
+
+    if (hasTrigger && hasTriggers) {
+      errors.push({ message: `snippet #${i}: cannot have both 'trigger' and 'triggers'` });
+    } else if (!hasTrigger && !hasTriggers) {
+      errors.push({ message: `snippet #${i}: must have either 'trigger' or 'triggers'` });
+    } else if (hasTrigger) {
+      if (typeof trigger !== "string" || !trigger) {
+        errors.push({ message: `snippet #${i}: 'trigger' must be a non-empty string` });
+      }
+    } else if (hasTriggers) {
+      if (!Array.isArray(triggers) || triggers.length === 0) {
+        errors.push({ message: `snippet #${i}: 'triggers' must be a non-empty list` });
+      } else {
+        for (const item of triggers) {
+          if (typeof item !== "string" || !item) {
+            errors.push({ message: `snippet #${i}: 'triggers' elements must be non-empty strings` });
+            break;
+          }
+        }
+      }
+    }
+
+    const effectiveTriggers = getSnippetTriggers(snippet);
+    for (const tr of effectiveTriggers) {
+      if (tr in seenTriggers) {
         errors.push({
-          message: `snippet #${i}: duplicate trigger '${trigger}' (first at #${seenTriggers[trigger]})`,
+          message: `snippet #${i}: duplicate trigger '${tr}' (first at #${seenTriggers[tr]})`,
         });
       } else {
-        seenTriggers[trigger] = i;
-        if (!trigger.startsWith(":")) {
-          warnings.push(`snippet #${i}: trigger '${trigger}' does not start with ':'`);
-        }
+        seenTriggers[tr] = i;
       }
     }
 

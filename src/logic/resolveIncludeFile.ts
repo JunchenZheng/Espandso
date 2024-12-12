@@ -1,8 +1,7 @@
 export interface ResolveIncludeFileOptions {
   includeFile: string;
   baseDir?: string;
-  repoPath?: string;
-  currentSnippetFile?: string;
+  currentYamlFile?: string;
 }
 
 function normalizePath(path: string): string {
@@ -39,7 +38,7 @@ function addUnique(candidates: string[], path: string) {
 }
 
 export function getIncludeFileCandidates(options: ResolveIncludeFileOptions): string[] {
-  const { includeFile, baseDir, repoPath, currentSnippetFile } = options;
+  const { includeFile, baseDir, currentYamlFile } = options;
   if (!includeFile) return [];
 
   const normalized = normalizePath(includeFile);
@@ -55,36 +54,14 @@ export function getIncludeFileCandidates(options: ResolveIncludeFileOptions): st
     addUnique(candidates, joinPath(baseDir, normalized));
   }
 
-  if (repoPath) {
-    const cleanRepo = stripTrailingSlashes(repoPath);
-    const snippetsRoot = `${cleanRepo}/snippets`;
-
-    // 1. Relative to repoPath/snippets/
-    addUnique(candidates, joinPath(snippetsRoot, normalized));
-
-    // 2. Relative to current snippet file folder
-    if (currentSnippetFile) {
-      const currentFile = normalizePath(currentSnippetFile);
-      const currentFolder = getDirectory(currentFile);
-      if (currentFolder) {
-        const currentFolderPath = isAbsolutePath(currentFolder)
-          ? currentFolder
-          : joinPath(snippetsRoot, currentFolder);
-        addUnique(candidates, joinPath(currentFolderPath, normalized));
-      }
+  if (currentYamlFile) {
+    const currentFolder = getDirectory(currentYamlFile);
+    if (currentFolder) {
+      addUnique(candidates, joinPath(currentFolder, normalized));
     }
-
-    // 3. Relative to repoPath root
-    addUnique(candidates, joinPath(cleanRepo, normalized));
-  } else {
-    if (currentSnippetFile) {
-      const currentFolder = getDirectory(currentSnippetFile);
-      if (currentFolder) {
-        addUnique(candidates, joinPath(currentFolder, normalized));
-      }
-    }
-    addUnique(candidates, normalized);
   }
+
+  addUnique(candidates, normalized);
 
   return candidates;
 }
