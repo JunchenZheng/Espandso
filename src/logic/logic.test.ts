@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { validate } from "./validate";
 import { importYamlContent } from "./importYaml";
-import { appendSnippetToYamlContent } from "./yamlEditor";
+import { appendSnippetToYamlContent, deleteSnippetFromYamlContent, replaceSnippetInYamlContent } from "./yamlEditor";
 import { isEspansoYamlConfigFile, parseEspansoConfigDir, sortEspansoConfigFiles } from "./espansoPaths";
 import {
   getIncludeFileCandidates,
@@ -116,6 +116,8 @@ matches:
     expect(res.snippets[0]).toEqual({ trigger: ":hello", replace: "world", description: "simple" });
     expect(res.snippets[1]).toEqual({ trigger: ":hi", replace: "greeting" });
     expect(res.snippets[2]).toEqual({ trigger: ":hey", replace: "greeting" });
+    expect(res.importedMatches[1].originalMatchIndex).toBe(1);
+    expect(res.importedMatches[1].originalSnippet).toEqual({ triggers: [":hi", ":hey"], replace: "greeting" });
   });
 
   it("should import include_file snippets and warn about unsupported stuff", () => {
@@ -196,6 +198,45 @@ matches:
     });
 
     expect(updated).toContain("replace: |-\n      line one\n      line two");
+  });
+
+  it("should replace an existing snippet by match index", () => {
+    const yaml = `
+matches:
+  - trigger: :hello
+    replace: world
+  - triggers:
+      - :bye
+      - :goodbye
+    replace: old
+`;
+
+    const updated = replaceSnippetInYamlContent(yaml, 1, {
+      triggers: [":bye", ":later"],
+      replace: "new\nvalue",
+      description: "updated",
+    });
+
+    expect(updated).toContain("trigger: :hello");
+    expect(updated).toContain("- :later");
+    expect(updated).toContain("description: updated");
+    expect(updated).toContain("replace: |-\n      new\n      value");
+    expect(updated).not.toContain(":goodbye");
+  });
+
+  it("should delete an existing snippet by match index", () => {
+    const yaml = `
+matches:
+  - trigger: :hello
+    replace: world
+  - trigger: :bye
+    replace: goodbye
+`;
+
+    const updated = deleteSnippetFromYamlContent(yaml, 0);
+
+    expect(updated).not.toContain(":hello");
+    expect(updated).toContain("trigger: :bye");
   });
 });
 
