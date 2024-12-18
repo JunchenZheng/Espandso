@@ -12,12 +12,14 @@ import {
   FileText,
   Folder,
   FolderOpen,
+  Pencil,
   Loader2,
   Plus,
   RefreshCw,
   Save,
   Settings,
   SquareArrowOutUpRight,
+  Trash2,
   Upload,
   XCircle,
 } from "lucide-react";
@@ -44,8 +46,8 @@ import {
   getIncludeFileCandidates,
   resolveAndExecuteIncludeFileCommand,
 } from "./logic/resolveIncludeFile";
-import { getSnippetTriggers, normalizeTriggerLines } from "./logic/snippetUtils";
-import { appendSnippetToYamlContent } from "./logic/yamlEditor";
+import { buildTriggerInput, getSnippetTriggers, normalizeTriggerLines } from "./logic/snippetUtils";
+import { appendSnippetToYamlContent, deleteSnippetFromYamlContent, replaceSnippetInYamlContent } from "./logic/yamlEditor";
 import { EspansoConfigFile, EspansoPathSource, scanEspansoConfigFiles } from "./logic/espansoPaths";
 import { restartEspanso, InstallResult } from "./tauri/espansoRuntime";
 import { cn } from "./lib/utils";
@@ -79,8 +81,15 @@ interface SnippetDetailData {
   snippet: Snippet;
   file: string;
   index: number;
+  match: ImportedMatch;
   sourceResourcePath?: string;
   sourceBaseDir?: string;
+}
+
+interface SnippetEditTarget {
+  preview: EspansoConfigPreview;
+  match: ImportedMatch;
+  displayIndex: number;
 }
 
 function App() {
@@ -95,6 +104,7 @@ function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [detailSnippet, setDetailSnippet] = useState<SnippetDetailData | null>(null);
   const [isAddSnippetOpen, setIsAddSnippetOpen] = useState<boolean>(false);
+  const [snippetEditTarget, setSnippetEditTarget] = useState<SnippetEditTarget | null>(null);
   const [triggerMode, setTriggerMode] = useState<"single" | "multiple">("single");
   const [editTrigger, setEditTrigger] = useState<string>("");
   const [editTriggersText, setEditTriggersText] = useState<string>("");
@@ -286,7 +296,28 @@ function App() {
       alert("Select a YAML config before adding a snippet.");
       return;
     }
+    setSnippetEditTarget(null);
     resetSnippetForm();
+    setIsAddSnippetOpen(true);
+  }
+
+  function openEditSnippetDialog(target: SnippetEditTarget) {
+    const editableSnippet = target.match.originalSnippet || target.match.snippet;
+    if (editableSnippet.include_file) {
+      alert("External file snippets can be deleted, but only inline text snippets can be edited here.");
+      return;
+    }
+
+    const triggerInput = buildTriggerInput(editableSnippet);
+    setSnippetEditTarget(target);
+    setTriggerMode(triggerInput.mode);
+    setEditTrigger(triggerInput.single);
+    setEditTriggersText(triggerInput.multiline);
+    setEditReplace(editableSnippet.replace || "");
+    setEditDescription(editableSnippet.description || "");
+    setAddErrors([]);
+    setAddWarnings([]);
+    setDetailSnippet(null);
     setIsAddSnippetOpen(true);
   }
 
@@ -326,9 +357,14 @@ function App() {
       }
 
       const snippet = buildFormSnippet();
+      const snippetsForValidation = snippetEditTarget
+        ? snippetEditTarget.preview.importedMatches
+          .filter((match) => match.originalMatchIndex !== snippetEditTarget.match.originalMatchIndex)
+          .map((match) => match.snippet)
+        : selectedEspansoPreview.snippets;
       const result = await validate({
         version: 1,
-        snippets: [...selectedEspansoPreview.snippets, snippet],
+        snippets: [...snippetsForValidation, snippet],
       });
 
       if (!active) return;
@@ -340,10 +376,11 @@ function App() {
     return () => {
       active = false;
     };
-  }, [triggerMode, editTrigger, editTriggersText, editReplace, editDescription, isAddSnippetOpen, selectedEspansoPreview]);
+  }, [triggerMode, editTrigger, editTriggersText, editReplace, editDescription, isAddSnippetOpen, selectedEspansoPreview, snippetEditTarget]);
 
   async function saveSnippetToYaml() {
-    if (!selectedEspansoPreview || isSavingSnippet) return;
+    const targetPreview = snippetEditTarget?.preview || selectedEspansoPreview;
+    if (!targetPreview || isSavingSnippet) return;
     if (addErrors.length > 0) {
       alert("Please fix validation errors before saving.");
       return;
@@ -352,15 +389,18 @@ function App() {
     setIsSavingSnippet(true);
     try {
       const snippet = buildFormSnippet();
-      const content = await readTextFile(selectedEspansoPreview.config.path);
-      const updatedContent = appendSnippetToYamlContent(content, snippet);
-      await writeTextFile(selectedEspansoPreview.config.path, updatedContent);
+      const content = await readTextFile(targetPreview.config.path);
+      const updatedContent = snippetEditTarget
+        ? replaceSnippetInYamlContent(content, snippetEditTarget.match.originalMatchIndex, snippet)
+        : appendSnippetToYamlContent(content, snippet);
+      await writeTextFile(targetPreview.config.path, updatedContent);
       const restartResult = await restartEspanso();
       setConsoleResult(restartResult);
       setIsAddSnippetOpen(false);
       resetSnippetForm();
+      setSnippetEditTarget(null);
       await scanDefaultEspansoConfigDir();
-      setSelectedEspansoConfigPath(selectedEspansoPreview.config.path);
+      setSelectedEspansoConfigPath(targetPreview.config.path);
     } catch (e: any) {
       alert(`Failed to save snippet: ${e?.message || e}`);
     } finally {
@@ -368,8 +408,28 @@ function App() {
     }
   }
 
-  function showSnippetDetail(snippet: Snippet, file: string, index: number, source?: Pick<SnippetDetailData, "sourceResourcePath" | "sourceBaseDir">) {
-    setDetailSnippet({ snippet, file, index, ...source });
+  function showSnippetDetail(match: ImportedMatch, file: string, index: number, source?: Pick<SnippetDetailData, "sourceResourcePath" | "sourceBaseDir">) {
+    setDetailSnippet({ snippet: match.snippet, file, index, match, ...source });
+  }
+
+  async function deleteSnippetFromYaml(target: SnippetEditTarget) {
+    const triggers = getSnippetTriggers(target.match.originalSnippet || target.match.snippet);
+    const displayTrigger = triggers.length > 0 ? triggers.join(", ") : `Snippet ${target.displayIndex + 1}`;
+    const confirmed = window.confirm(`Delete ${displayTrigger} from ${target.preview.config.relativePath}?`);
+    if (!confirmed) return;
+
+    try {
+      const content = await readTextFile(target.preview.config.path);
+      const updatedContent = deleteSnippetFromYamlContent(content, target.match.originalMatchIndex);
+      await writeTextFile(target.preview.config.path, updatedContent);
+      const restartResult = await restartEspanso();
+      setConsoleResult(restartResult);
+      setDetailSnippet(null);
+      await scanDefaultEspansoConfigDir();
+      setSelectedEspansoConfigPath(target.preview.config.path);
+    } catch (e: any) {
+      alert(`Failed to delete snippet: ${e?.message || e}`);
+    }
   }
 
   return (
@@ -438,7 +498,7 @@ function App() {
                         <EspansoConfigDetail
                           preview={selectedEspansoPreview}
                           onViewSnippet={(match, index) =>
-                            showSnippetDetail(match.snippet, selectedEspansoPreview.config.relativePath, index, {
+                            showSnippetDetail(match, selectedEspansoPreview.config.relativePath, index, {
                               sourceResourcePath: match.resourcePath,
                               sourceBaseDir: getContainingDirectory(selectedEspansoPreview.config.path),
                             })
@@ -478,13 +538,16 @@ function App() {
 
       <Dialog open={isAddSnippetOpen} onOpenChange={(open) => {
         setIsAddSnippetOpen(open);
-        if (!open) resetSnippetForm();
+        if (!open) {
+          resetSnippetForm();
+          setSnippetEditTarget(null);
+        }
       }}>
         <DialogContent className="max-h-[calc(100vh-2rem)] max-w-2xl overflow-hidden">
           <DialogHeader>
-            <DialogTitle>Add Static Text Snippet</DialogTitle>
+            <DialogTitle>{snippetEditTarget ? "Edit Static Text Snippet" : "Add Static Text Snippet"}</DialogTitle>
             <DialogDescription className="break-all">
-              {selectedEspansoPreview?.config.relativePath || "Select a YAML file"}
+              {snippetEditTarget?.preview.config.relativePath || selectedEspansoPreview?.config.relativePath || "Select a YAML file"}
             </DialogDescription>
           </DialogHeader>
 
@@ -632,7 +695,7 @@ function App() {
             </Button>
             <Button onClick={saveSnippetToYaml} disabled={isSavingSnippet}>
               {isSavingSnippet ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              Save to YAML
+              {snippetEditTarget ? "Update YAML" : "Save to YAML"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -640,7 +703,21 @@ function App() {
 
       <Dialog open={detailSnippet !== null} onOpenChange={(open) => !open && setDetailSnippet(null)}>
         <DialogContent className="max-h-[calc(100vh-2rem)] max-w-3xl overflow-hidden">
-          {detailSnippet && <SnippetDetail detail={detailSnippet} />}
+          {detailSnippet && selectedEspansoPreview && (
+            <SnippetDetail
+              detail={detailSnippet}
+              onEdit={() => openEditSnippetDialog({
+                preview: selectedEspansoPreview,
+                match: detailSnippet.match,
+                displayIndex: detailSnippet.index,
+              })}
+              onDelete={() => deleteSnippetFromYaml({
+                preview: selectedEspansoPreview,
+                match: detailSnippet.match,
+                displayIndex: detailSnippet.index,
+              })}
+            />
+          )}
         </DialogContent>
       </Dialog>
 
@@ -935,7 +1012,7 @@ function EspansoConfigDetail({ preview, onViewSnippet }: EspansoConfigDetailProp
                   <button
                     key={`${triggers.join("-")}-${index}`}
                     className="grid h-9 w-full grid-cols-[minmax(8rem,1.1fr)_3rem_minmax(6rem,0.65fr)_minmax(12rem,2fr)_2.25rem] items-center px-3 text-left text-sm transition-colors hover:bg-secondary/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                    onClick={() => onViewSnippet(preview.importedMatches[index] || { snippet }, index)}
+                    onClick={() => onViewSnippet(preview.importedMatches[index] || { snippet, originalMatchIndex: index }, index)}
                     title={`View details for ${displayTrigger}`}
                   >
                     <div className="min-w-0 pr-3">
@@ -978,9 +1055,11 @@ function EspansoConfigDetail({ preview, onViewSnippet }: EspansoConfigDetailProp
 
 interface SnippetDetailProps {
   detail: SnippetDetailData;
+  onEdit: () => void;
+  onDelete: () => void;
 }
 
-function SnippetDetail({ detail }: SnippetDetailProps) {
+function SnippetDetail({ detail, onEdit, onDelete }: SnippetDetailProps) {
   const { snippet, file, index, sourceResourcePath, sourceBaseDir } = detail;
   const isExternalFile = Boolean(snippet.include_file);
   const content = isExternalFile ? snippet.include_file || "" : snippet.replace || "";
@@ -1120,6 +1199,22 @@ function SnippetDetail({ detail }: SnippetDetailProps) {
       </div>
 
       <DialogFooter>
+        <Button
+          variant="destructive"
+          onClick={onDelete}
+        >
+          <Trash2 className="h-4 w-4" />
+          Delete
+        </Button>
+        <Button
+          variant="outline"
+          onClick={onEdit}
+          disabled={isExternalFile}
+          title={isExternalFile ? "External file snippets cannot be edited here" : "Edit snippet"}
+        >
+          <Pencil className="h-4 w-4" />
+          Edit
+        </Button>
         <Button
           variant="outline"
           onClick={() => copyToClipboard(isExternalFile ? dynamicContent ?? content : content)}
