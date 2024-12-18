@@ -3,6 +3,8 @@ import { Snippet } from "./types";
 
 export interface ImportedMatch {
   snippet: Snippet;
+  originalSnippet?: Snippet;
+  originalMatchIndex: number;
   resourcePath?: string; // Path of the resource file to be copied
   resourceName?: string; // New filename of the resource file
 }
@@ -55,7 +57,8 @@ function onlyCatVarTypes(varsBlock: any[]): boolean {
 
 export function parseYamlMatch(
   match: any,
-  fileName: string
+  fileName: string,
+  originalMatchIndex = -1
 ): { matches: ImportedMatch[]; warnings: string[] } {
   const warnings: string[] = [];
   let triggers: string[] = [];
@@ -100,6 +103,13 @@ export function parseYamlMatch(
     const originalName = parts[parts.length - 1];
     const resourceFilename = getResourceFilename(originalName);
 
+    const originalSnippet: Snippet = triggers.length > 1
+      ? { triggers, include_file: resourceFilename }
+      : { trigger: triggers[0], include_file: resourceFilename };
+    if (match.description) {
+      originalSnippet.description = match.description;
+    }
+
     const matches: ImportedMatch[] = triggers.map((trigger) => {
       const snippet: Snippet = {
         trigger,
@@ -110,6 +120,8 @@ export function parseYamlMatch(
       }
       return {
         snippet,
+        originalSnippet,
+        originalMatchIndex,
         resourcePath: catPath,
         resourceName: resourceFilename,
       };
@@ -126,6 +138,13 @@ export function parseYamlMatch(
     };
   }
 
+  const originalSnippet: Snippet = triggers.length > 1
+    ? { triggers, replace: String(replace) }
+    : { trigger: triggers[0], replace: String(replace) };
+  if (match.description) {
+    originalSnippet.description = match.description;
+  }
+
   const matches: ImportedMatch[] = triggers.map((trigger) => {
     const snippet: Snippet = {
       trigger,
@@ -134,7 +153,7 @@ export function parseYamlMatch(
     if (match.description) {
       snippet.description = match.description;
     }
-    return { snippet };
+    return { snippet, originalSnippet, originalMatchIndex };
   });
 
   return { matches, warnings };
@@ -167,8 +186,9 @@ export function importYamlContent(
     };
   }
 
-  for (const match of data.matches) {
-    const { matches, warnings: matchWarnings } = parseYamlMatch(match, fileName);
+  for (let index = 0; index < data.matches.length; index++) {
+    const match = data.matches[index];
+    const { matches, warnings: matchWarnings } = parseYamlMatch(match, fileName, index);
     warnings.push(...matchWarnings);
     for (const m of matches) {
       importedMatches.push(m);
