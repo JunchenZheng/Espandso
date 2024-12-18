@@ -135,3 +135,16 @@ Rules:
 - Select the appropriate change-log template for the kind of work completed. If no project-specific template exists yet, use a concise documentation/change summary format with sections for Summary, Files Changed, Validation, and Follow-up.
 - After completing each task, provide a suggested Conventional Commit message at the end of the final response. Do not create the commit automatically unless the user explicitly asks for it.
 - Conventional Commit suggestions MUST use a type prefix followed by an OPTIONAL `!`, a REQUIRED colon and space, and a short subject: `type: subject` or `type!: subject`. Although Conventional Commits allows an OPTIONAL scope, this project intentionally does not use scopes, so commit suggestions MUST NOT include parentheses such as `feat(ui): ...`.
+- Conventional Commit prefixes MUST be restricted to the following allowed types:
+  - **Core Features & Fixes**:
+    - `feat`: New features or capabilities (e.g., `feat: add multi-vendor LLM fallback mechanism`)
+    - `fix`: Bug fixes or error resolution (e.g., `fix: resolve database connection timeout issue`)
+  - **Code Maintenance & Optimization**:
+    - `refactor`: Code refactoring without changing behavior or fixing bugs (e.g., `refactor: optimize prompt formatting logic`)
+    - `perf`: Performance or response speed improvements (e.g., `perf: cache frequent recommendation responses`)
+    - `style`: Code formatting changes (spaces, semicolons, formatting) without logical impact (e.g., `style: format codebase with black autoformatter`)
+  - **Engineering & Project Configuration**:
+    - `docs`: Documentation updates or additions (e.g., `docs: update installation and setup commands`)
+    - `test`: Adding or modifying tests (e.g., `test: add unit tests for recommendation endpoint`)
+    - `chore`: Build process, dependency updates, or auxiliary tool adjustments (e.g., `chore: bump Django to latest patch version`)
+    - `ci`: CI/CD automation and deployment configurations (e.g., `ci: update deployment configuration for production`)
