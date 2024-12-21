@@ -6,6 +6,7 @@
   "permissions": [
     "core:default",
     "opener:default",
+    "opener:allow-open-path",
     "fs:allow-copy-file",
     "fs:allow-exists",
     "fs:allow-mkdir",
