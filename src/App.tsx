@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import { listen } from "@tauri-apps/api/event";
+import { openPath } from "@tauri-apps/plugin-opener";
 import {
   AlertTriangle,
   ChevronDown,
@@ -412,6 +413,14 @@ function App() {
     }
   }
 
+  async function openYamlFileInDefaultApp(path: string) {
+    try {
+      await openPath(path);
+    } catch (e: any) {
+      alert(`Failed to open YAML file: ${e?.message || e}`);
+    }
+  }
+
   return (
     <div className="app-shell">
       {isDragging && (
@@ -467,6 +476,7 @@ function App() {
                               activePath={selectedEspansoPreview?.config.path || selectedEspansoConfigPath}
                               activeAncestorPaths={activeEspansoAncestorPaths}
                               onSelect={setSelectedEspansoConfigPath}
+                              onOpenFile={openYamlFileInDefaultApp}
                             />
                           ))}
                         </div>
@@ -849,6 +859,7 @@ interface EspansoConfigTreeNodeProps {
   activePath: string;
   activeAncestorPaths: Set<string>;
   onSelect: (path: string) => void;
+  onOpenFile: (path: string) => void;
 }
 
 const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
@@ -856,6 +867,7 @@ const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
   activePath,
   activeAncestorPaths,
   onSelect,
+  onOpenFile,
 }: EspansoConfigTreeNodeProps) {
   const containsActive = activeAncestorPaths.has(node.path);
   const [isOpen, setIsOpen] = useState<boolean>(containsActive);
@@ -891,6 +903,7 @@ const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
                 activePath={activePath}
                 activeAncestorPaths={activeAncestorPaths}
                 onSelect={onSelect}
+                onOpenFile={onOpenFile}
               />
             ))}
           </div>
@@ -902,20 +915,36 @@ const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
   const isActive = node.preview?.config.path === activePath;
 
   return (
-    <button
+    <div
       className={cn(
-        "flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-accent",
+        "group flex w-full items-center rounded-md transition-colors hover:bg-accent",
         isActive && "bg-primary text-primary-foreground hover:bg-primary/90",
       )}
-      onClick={() => node.preview && onSelect(node.preview.config.path)}
     >
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-background/80 text-primary">
-        <FileText className="h-5 w-5" />
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-semibold">{node.name.replace(/\.ya?ml$/i, "")}</div>
-      </div>
-    </button>
+      <button
+        className="flex min-w-0 flex-1 items-center gap-3 rounded-l-md px-3 py-2 text-left"
+        onClick={() => node.preview && onSelect(node.preview.config.path)}
+      >
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-background/80 text-primary">
+          <FileText className="h-5 w-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm font-semibold">{node.name.replace(/\.ya?ml$/i, "")}</div>
+        </div>
+      </button>
+      {node.preview && (
+        <button
+          className={cn(
+            "mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-md opacity-70 transition hover:bg-background/80 hover:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+            isActive && "hover:bg-primary-foreground/20",
+          )}
+          title={`Open ${node.name} in default app`}
+          onClick={() => onOpenFile(node.preview!.config.path)}
+        >
+          <SquareArrowOutUpRight className="h-4 w-4" />
+        </button>
+      )}
+    </div>
   );
 });
 
