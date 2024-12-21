@@ -1,18 +1,14 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { readTextFile, writeTextFile, exists } from "@tauri-apps/plugin-fs";
+import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import { listen } from "@tauri-apps/api/event";
 import {
   AlertTriangle,
-  Check,
   ChevronDown,
   ChevronRight,
-  Copy,
   FileSearch,
   FileText,
   Folder,
   FolderOpen,
-  Pencil,
   Loader2,
   Plus,
   RefreshCw,
@@ -42,10 +38,6 @@ import { Textarea } from "./components/ui/textarea";
 import { Snippet, ValidationError } from "./logic/types";
 import { validate } from "./logic/validate";
 import { importYamlContent, ImportedMatch } from "./logic/importYaml";
-import {
-  getIncludeFileCandidates,
-  resolveAndExecuteIncludeFileCommand,
-} from "./logic/resolveIncludeFile";
 import { buildTriggerInput, getSnippetTriggers, normalizeTriggerLines } from "./logic/snippetUtils";
 import { appendSnippetToYamlContent, deleteSnippetFromYamlContent, replaceSnippetInYamlContent } from "./logic/yamlEditor";
 import { EspansoConfigFile, EspansoPathSource, scanEspansoConfigFiles } from "./logic/espansoPaths";
@@ -77,15 +69,6 @@ interface EspansoConfigPreviewTreeNode {
   children?: EspansoConfigPreviewTreeNode[];
 }
 
-interface SnippetDetailData {
-  snippet: Snippet;
-  file: string;
-  index: number;
-  match: ImportedMatch;
-  sourceResourcePath?: string;
-  sourceBaseDir?: string;
-}
-
 interface SnippetEditTarget {
   preview: EspansoConfigPreview;
   match: ImportedMatch;
@@ -102,7 +85,6 @@ function App() {
   const [isScanningEspanso, setIsScanningEspanso] = useState<boolean>(false);
   const [espansoScanMessage, setEspansoScanMessage] = useState<string>("");
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
-  const [detailSnippet, setDetailSnippet] = useState<SnippetDetailData | null>(null);
   const [isAddSnippetOpen, setIsAddSnippetOpen] = useState<boolean>(false);
   const [snippetEditTarget, setSnippetEditTarget] = useState<SnippetEditTarget | null>(null);
   const [triggerMode, setTriggerMode] = useState<"single" | "multiple">("single");
@@ -280,6 +262,8 @@ function App() {
     () => getEspansoConfigAncestorPaths(selectedEspansoPreview?.config.relativePath || ""),
     [selectedEspansoPreview],
   );
+  const snippetBeingEdited = snippetEditTarget?.match.originalSnippet || snippetEditTarget?.match.snippet || null;
+  const isExternalSnippetEdit = Boolean(snippetBeingEdited?.include_file);
 
   function resetSnippetForm() {
     setTriggerMode("single");
@@ -303,11 +287,6 @@ function App() {
 
   function openEditSnippetDialog(target: SnippetEditTarget) {
     const editableSnippet = target.match.originalSnippet || target.match.snippet;
-    if (editableSnippet.include_file) {
-      alert("External file snippets can be deleted, but only inline text snippets can be edited here.");
-      return;
-    }
-
     const triggerInput = buildTriggerInput(editableSnippet);
     setSnippetEditTarget(target);
     setTriggerMode(triggerInput.mode);
@@ -317,7 +296,6 @@ function App() {
     setEditDescription(editableSnippet.description || "");
     setAddErrors([]);
     setAddWarnings([]);
-    setDetailSnippet(null);
     setIsAddSnippetOpen(true);
   }
 
@@ -343,7 +321,7 @@ function App() {
     let active = true;
 
     async function validateSnippetForm() {
-      if (!isAddSnippetOpen || !selectedEspansoPreview) {
+      if (!isAddSnippetOpen || !selectedEspansoPreview || isExternalSnippetEdit) {
         setAddErrors([]);
         setAddWarnings([]);
         return;
@@ -376,11 +354,15 @@ function App() {
     return () => {
       active = false;
     };
-  }, [triggerMode, editTrigger, editTriggersText, editReplace, editDescription, isAddSnippetOpen, selectedEspansoPreview, snippetEditTarget]);
+  }, [triggerMode, editTrigger, editTriggersText, editReplace, editDescription, isAddSnippetOpen, selectedEspansoPreview, snippetEditTarget, isExternalSnippetEdit]);
 
   async function saveSnippetToYaml() {
     const targetPreview = snippetEditTarget?.preview || selectedEspansoPreview;
     if (!targetPreview || isSavingSnippet) return;
+    if (isExternalSnippetEdit) {
+      alert("External file snippets can be deleted, but only inline text snippets can be edited here.");
+      return;
+    }
     if (addErrors.length > 0) {
       alert("Please fix validation errors before saving.");
       return;
@@ -408,10 +390,6 @@ function App() {
     }
   }
 
-  function showSnippetDetail(match: ImportedMatch, file: string, index: number, source?: Pick<SnippetDetailData, "sourceResourcePath" | "sourceBaseDir">) {
-    setDetailSnippet({ snippet: match.snippet, file, index, match, ...source });
-  }
-
   async function deleteSnippetFromYaml(target: SnippetEditTarget) {
     const triggers = getSnippetTriggers(target.match.originalSnippet || target.match.snippet);
     const displayTrigger = triggers.length > 0 ? triggers.join(", ") : `Snippet ${target.displayIndex + 1}`;
@@ -424,7 +402,9 @@ function App() {
       await writeTextFile(target.preview.config.path, updatedContent);
       const restartResult = await restartEspanso();
       setConsoleResult(restartResult);
-      setDetailSnippet(null);
+      setIsAddSnippetOpen(false);
+      resetSnippetForm();
+      setSnippetEditTarget(null);
       await scanDefaultEspansoConfigDir();
       setSelectedEspansoConfigPath(target.preview.config.path);
     } catch (e: any) {
@@ -498,9 +478,10 @@ function App() {
                         <EspansoConfigDetail
                           preview={selectedEspansoPreview}
                           onViewSnippet={(match, index) =>
-                            showSnippetDetail(match, selectedEspansoPreview.config.relativePath, index, {
-                              sourceResourcePath: match.resourcePath,
-                              sourceBaseDir: getContainingDirectory(selectedEspansoPreview.config.path),
+                            openEditSnippetDialog({
+                              preview: selectedEspansoPreview,
+                              match,
+                              displayIndex: index,
                             })
                           }
                         />
@@ -543,11 +524,19 @@ function App() {
           setSnippetEditTarget(null);
         }
       }}>
-        <DialogContent className="max-h-[calc(100vh-2rem)] max-w-2xl overflow-hidden">
+        <DialogContent
+          className={cn(
+            "overflow-hidden",
+            snippetEditTarget
+              ? "h-[50vh] max-h-[calc(100vh-2rem)] w-[50vw] min-w-[min(42rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)]"
+              : "max-h-[calc(100vh-2rem)] max-w-2xl",
+          )}
+        >
           <DialogHeader>
-            <DialogTitle>{snippetEditTarget ? "Edit Static Text Snippet" : "Add Static Text Snippet"}</DialogTitle>
+            <DialogTitle>{snippetEditTarget ? "Edit Snippet" : "Add Static Text Snippet"}</DialogTitle>
             <DialogDescription className="break-all">
               {snippetEditTarget?.preview.config.relativePath || selectedEspansoPreview?.config.relativePath || "Select a YAML file"}
+              {snippetEditTarget ? ` · Snippet #${snippetEditTarget.displayIndex + 1}` : ""}
             </DialogDescription>
           </DialogHeader>
 
@@ -667,16 +656,31 @@ function App() {
               )}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="replace">Replace Content</Label>
-              <Textarea
-                id="replace"
-                className="mono-field min-h-48 resize-y"
-                placeholder="What to expand trigger into..."
-                value={editReplace}
-                onChange={(e) => setEditReplace(e.target.value)}
-              />
-            </div>
+            {isExternalSnippetEdit ? (
+              <div className="space-y-2">
+                <Label htmlFor="include-file">Include File</Label>
+                <Input
+                  id="include-file"
+                  className="mono-field"
+                  value={snippetBeingEdited?.include_file || ""}
+                  readOnly
+                />
+                <p className="text-xs text-muted-foreground">
+                  External file snippets can be deleted here. Inline editing is only available for static text snippets.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label htmlFor="replace">Replace Content</Label>
+                <Textarea
+                  id="replace"
+                  className="mono-field min-h-48 resize-y"
+                  placeholder="What to expand trigger into..."
+                  value={editReplace}
+                  onChange={(e) => setEditReplace(e.target.value)}
+                />
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="description">Description</Label>
@@ -689,35 +693,26 @@ function App() {
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddSnippetOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={saveSnippetToYaml} disabled={isSavingSnippet}>
-              {isSavingSnippet ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              {snippetEditTarget ? "Update YAML" : "Save to YAML"}
-            </Button>
+          <DialogFooter className={cn(snippetEditTarget && "sm:justify-between")}>
+            {snippetEditTarget && (
+              <Button
+                variant="destructive"
+                onClick={() => deleteSnippetFromYaml(snippetEditTarget)}
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete
+              </Button>
+            )}
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button variant="outline" onClick={() => setIsAddSnippetOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={saveSnippetToYaml} disabled={isSavingSnippet || isExternalSnippetEdit}>
+                {isSavingSnippet ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                {snippetEditTarget ? "Update YAML" : "Save to YAML"}
+              </Button>
+            </div>
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={detailSnippet !== null} onOpenChange={(open) => !open && setDetailSnippet(null)}>
-        <DialogContent className="max-h-[calc(100vh-2rem)] max-w-3xl overflow-hidden">
-          {detailSnippet && selectedEspansoPreview && (
-            <SnippetDetail
-              detail={detailSnippet}
-              onEdit={() => openEditSnippetDialog({
-                preview: selectedEspansoPreview,
-                match: detailSnippet.match,
-                displayIndex: detailSnippet.index,
-              })}
-              onDelete={() => deleteSnippetFromYaml({
-                preview: selectedEspansoPreview,
-                match: detailSnippet.match,
-                displayIndex: detailSnippet.index,
-              })}
-            />
-          )}
         </DialogContent>
       </Dialog>
 
@@ -778,12 +773,6 @@ function App() {
       </Dialog>
     </div>
   );
-}
-
-function getContainingDirectory(filePath: string): string {
-  const parts = filePath.split(/[/\\]/);
-  parts.pop();
-  return parts.join("/");
 }
 
 function getEspansoConfigAncestorPaths(relativePath: string): Set<string> {
@@ -1050,180 +1039,6 @@ function EspansoConfigDetail({ preview, onViewSnippet }: EspansoConfigDetailProp
         )}
       </div>
     </>
-  );
-}
-
-interface SnippetDetailProps {
-  detail: SnippetDetailData;
-  onEdit: () => void;
-  onDelete: () => void;
-}
-
-function SnippetDetail({ detail, onEdit, onDelete }: SnippetDetailProps) {
-  const { snippet, file, index, sourceResourcePath, sourceBaseDir } = detail;
-  const isExternalFile = Boolean(snippet.include_file);
-  const content = isExternalFile ? snippet.include_file || "" : snippet.replace || "";
-  const triggers = getSnippetTriggers(snippet);
-  const displayTrigger = triggers.length > 0 ? triggers.join(", ") : "Untitled trigger";
-
-  const [dynamicContent, setDynamicContent] = useState<string | null>(null);
-  const [resolvedPath, setResolvedPath] = useState<string | null>(null);
-  const [executedCmd, setExecutedCmd] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-
-  const loadIncludeFileContent = useCallback(async () => {
-    if (!isExternalFile || !snippet.include_file) return;
-
-    setLoading(true);
-    setError(null);
-    setDynamicContent(null);
-    setResolvedPath(null);
-    setExecutedCmd(null);
-    try {
-      const res = await resolveAndExecuteIncludeFileCommand(
-        {
-          includeFile: sourceResourcePath || snippet.include_file,
-          baseDir: sourceBaseDir,
-          currentYamlFile: file,
-        },
-        exists,
-        async (cmd: string) => {
-          return await invoke<string>("execute_shell_cmd", { cmd });
-        },
-        readTextFile
-      );
-
-      setResolvedPath(res.resolvedPath || null);
-      setExecutedCmd(res.command || null);
-
-      if (res.found && res.content !== undefined) {
-        setDynamicContent(res.content);
-      } else {
-        setError(res.error || "Command execution returned empty output or failed");
-      }
-    } catch (err: any) {
-      setError(err?.message || "Failed to execute shell command");
-    } finally {
-      setLoading(false);
-    }
-  }, [isExternalFile, snippet.include_file, sourceResourcePath, sourceBaseDir, file]);
-
-  useEffect(() => {
-    loadIncludeFileContent();
-  }, [loadIncludeFileContent]);
-
-  const copyToClipboard = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // ignore
-    }
-  };
-
-  return (
-    <div className="flex min-h-0 flex-col gap-4">
-      <DialogHeader className="pr-8">
-        <DialogTitle className="mono-field break-all text-primary">{displayTrigger}</DialogTitle>
-        <DialogDescription className="break-all">
-          {file} · Snippet #{index + 1}
-        </DialogDescription>
-      </DialogHeader>
-
-      <div className="min-h-0 space-y-4 overflow-auto pr-1">
-        {snippet.description && (
-          <div className="space-y-1">
-            <Label>Description</Label>
-            <p className="rounded-md border bg-secondary/30 p-3 text-sm text-foreground">{snippet.description}</p>
-          </div>
-        )}
-
-        <div className="space-y-1">
-          <Label>{isExternalFile ? "Include File Path" : "Replacement"}</Label>
-          <div className="rounded-md border bg-secondary/30">
-            <div className="flex items-center justify-between border-b px-3 py-2 text-xs text-muted-foreground">
-              <div className="flex items-center gap-2">
-                {isExternalFile ? <FileText className="h-4 w-4 text-primary" /> : <SquareArrowOutUpRight className="h-4 w-4" />}
-                <span>{isExternalFile ? "Configured resource file" : "Inline text content"}</span>
-              </div>
-              {isExternalFile && resolvedPath && (
-                <span className="mono-field max-w-[320px] truncate text-[11px] text-muted-foreground/80" title={resolvedPath}>
-                  {resolvedPath}
-                </span>
-              )}
-            </div>
-            <pre className="mono-field max-h-[16vh] overflow-auto whitespace-pre-wrap break-words p-3 text-sm leading-relaxed text-foreground">
-              {isExternalFile
-                ? loading
-                  ? "Loading dynamic content..."
-                  : error
-                    ? content
-                    : dynamicContent ?? content
-                : content}
-            </pre>
-          </div>
-        </div>
-
-        {isExternalFile && (
-          <div className="space-y-2 rounded-md border bg-secondary/20 p-3 text-xs text-muted-foreground">
-            <div className="font-medium text-foreground">Dynamic resource resolution</div>
-            {loading && <div>Executing file read command...</div>}
-            {executedCmd && <div className="mono-field break-all">Command: {executedCmd}</div>}
-            {error && <div className="text-destructive">{error}</div>}
-            {!loading && !error && dynamicContent !== null && (
-              <div className="text-emerald-700">Loaded dynamic content from resource file.</div>
-            )}
-            {getIncludeFileCandidates({
-              includeFile: sourceResourcePath || snippet.include_file || "",
-              baseDir: sourceBaseDir,
-              currentYamlFile: file,
-            }).length > 0 && (
-              <div>
-                <div className="mb-1 font-medium text-foreground">Candidates</div>
-                <ul className="space-y-1">
-                  {getIncludeFileCandidates({
-                    includeFile: sourceResourcePath || snippet.include_file || "",
-                    baseDir: sourceBaseDir,
-                    currentYamlFile: file,
-                  }).map((candidate) => (
-                    <li key={candidate} className="mono-field break-all">{candidate}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      <DialogFooter>
-        <Button
-          variant="destructive"
-          onClick={onDelete}
-        >
-          <Trash2 className="h-4 w-4" />
-          Delete
-        </Button>
-        <Button
-          variant="outline"
-          onClick={onEdit}
-          disabled={isExternalFile}
-          title={isExternalFile ? "External file snippets cannot be edited here" : "Edit snippet"}
-        >
-          <Pencil className="h-4 w-4" />
-          Edit
-        </Button>
-        <Button
-          variant="outline"
-          onClick={() => copyToClipboard(isExternalFile ? dynamicContent ?? content : content)}
-        >
-          {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-          {copied ? "Copied" : "Copy"}
-        </Button>
-      </DialogFooter>
-    </div>
   );
 }
 
