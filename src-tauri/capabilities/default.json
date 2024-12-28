@@ -6,6 +6,15 @@
   "permissions": [
     "core:default",
     "opener:default",
+    {
+      "identifier": "opener:allow-open-path",
+      "allow": [
+        { "path": "$HOME/Library/Application Support/espanso/match/**" },
+        { "path": "$HOME/AppData/Roaming/espanso/match/**" },
+        { "path": "$CONFIG/espanso/match/**" },
+        { "path": "$DATA/espanso/match/**" }
+      ]
+    },
     "fs:allow-copy-file",
     "fs:allow-exists",
     "fs:allow-mkdir",
