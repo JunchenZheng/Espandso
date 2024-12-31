@@ -10,7 +10,27 @@ export function snippetToYamlMatch(snippet: Snippet): Record<string, any> {
     match.trigger = snippet.trigger;
   }
 
-  match.replace = snippet.replace || "";
+  if (snippet.include_file) {
+    match.replace = "{{output}}";
+    match.vars = [
+      {
+        name: "path",
+        type: "echo",
+        params: {
+          echo: snippet.include_file,
+        },
+      },
+      {
+        name: "output",
+        type: "shell",
+        params: {
+          cmd: 'cat "{{path}}"',
+        },
+      },
+    ];
+  } else {
+    match.replace = snippet.replace || "";
+  }
 
   if (snippet.description) {
     match.description = snippet.description;

@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import { listen } from "@tauri-apps/api/event";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { openPath } from "@tauri-apps/plugin-opener";
 import {
   AlertTriangle,
@@ -76,6 +77,8 @@ interface SnippetEditTarget {
   displayIndex: number;
 }
 
+type AddSnippetKind = "text" | "file";
+
 function App() {
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [espansoMatchDir, setEspansoMatchDir] = useState<string>("");
@@ -88,8 +91,10 @@ function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isAddSnippetOpen, setIsAddSnippetOpen] = useState<boolean>(false);
   const [snippetEditTarget, setSnippetEditTarget] = useState<SnippetEditTarget | null>(null);
+  const [addSnippetKind, setAddSnippetKind] = useState<AddSnippetKind>("text");
   const [editTriggersText, setEditTriggersText] = useState<string>("");
   const [editReplace, setEditReplace] = useState<string>("");
+  const [editIncludeFile, setEditIncludeFile] = useState<string>("");
   const [editDescription, setEditDescription] = useState<string>("");
   const [addErrors, setAddErrors] = useState<ValidationError[]>([]);
   const [addWarnings, setAddWarnings] = useState<string[]>([]);
@@ -163,6 +168,12 @@ function App() {
   }, [scanDefaultEspansoConfigDir]);
 
   async function addDroppedYamlPreview(path: string) {
+    if (isAddSnippetOpen && addSnippetKind === "file" && !snippetEditTarget) {
+      setEditIncludeFile(path);
+      setIsDragging(false);
+      return;
+    }
+
     const lowerPath = path.toLowerCase();
     if (!lowerPath.endsWith(".yml") && !lowerPath.endsWith(".yaml")) {
       alert("Please drop an Espanso YAML file.");
@@ -219,7 +230,7 @@ function App() {
       active = false;
       unlisteners.forEach((unlisten) => unlisten());
     };
-  }, [buildEspansoConfigPreviews, espansoConfigs]);
+  }, [addSnippetKind, buildEspansoConfigPreviews, espansoConfigs, isAddSnippetOpen, snippetEditTarget]);
 
   const espansoPreviewList = useMemo(
     () => espansoConfigPreviews.length > 0
@@ -263,10 +274,18 @@ function App() {
   );
   const snippetBeingEdited = snippetEditTarget?.match.originalSnippet || snippetEditTarget?.match.snippet || null;
   const isExternalSnippetEdit = Boolean(snippetBeingEdited?.include_file);
+  const activeSnippetKind: AddSnippetKind = snippetEditTarget
+    ? isExternalSnippetEdit ? "file" : "text"
+    : addSnippetKind;
+  const snippetDialogTitle = snippetEditTarget
+    ? `Edit ${activeSnippetKind === "file" ? "File" : "Text"} Snippet`
+    : `Add ${activeSnippetKind === "file" ? "File" : "Text"} Snippet`;
 
   function resetSnippetForm() {
+    setAddSnippetKind("text");
     setEditTriggersText("");
     setEditReplace("");
+    setEditIncludeFile("");
     setEditDescription("");
     setAddErrors([]);
     setAddWarnings([]);
@@ -286,8 +305,10 @@ function App() {
     const editableSnippet = target.match.originalSnippet || target.match.snippet;
     const triggerInput = buildTriggerInput(editableSnippet);
     setSnippetEditTarget(target);
+    setAddSnippetKind(editableSnippet.include_file ? "file" : "text");
     setEditTriggersText(triggerInput.multiline);
     setEditReplace(editableSnippet.replace || "");
+    setEditIncludeFile(editableSnippet.include_file || "");
     setEditDescription(editableSnippet.description || "");
     setAddErrors([]);
     setAddWarnings([]);
@@ -302,8 +323,13 @@ function App() {
 
     const snippet: Snippet = {
       ...triggerFields,
-      replace: editReplace,
     };
+
+    if (activeSnippetKind === "file") {
+      snippet.include_file = editIncludeFile.trim();
+    } else {
+      snippet.replace = editReplace;
+    }
 
     if (editDescription.trim()) {
       snippet.description = editDescription.trim();
@@ -322,7 +348,7 @@ function App() {
         return;
       }
 
-      const hasAnyInput = editTriggersText.trim() || editReplace.trim() || editDescription.trim();
+      const hasAnyInput = editTriggersText.trim() || editReplace.trim() || editIncludeFile.trim() || editDescription.trim();
       if (!hasAnyInput) {
         setAddErrors([]);
         setAddWarnings([]);
@@ -349,7 +375,20 @@ function App() {
     return () => {
       active = false;
     };
-  }, [editTriggersText, editReplace, editDescription, isAddSnippetOpen, selectedEspansoPreview, snippetEditTarget, isExternalSnippetEdit]);
+  }, [activeSnippetKind, editTriggersText, editReplace, editIncludeFile, editDescription, isAddSnippetOpen, selectedEspansoPreview, snippetEditTarget, isExternalSnippetEdit]);
+
+  async function chooseSnippetFile() {
+    const selected = await openDialog({
+      multiple: false,
+      directory: false,
+    });
+
+    if (typeof selected === "string") {
+      setEditIncludeFile(selected);
+    } else if (Array.isArray(selected) && typeof selected[0] === "string") {
+      setEditIncludeFile(selected[0]);
+    }
+  }
 
   async function saveSnippetToYaml() {
     const targetPreview = snippetEditTarget?.preview || selectedEspansoPreview;
@@ -421,8 +460,14 @@ function App() {
         <div className="drag-overlay">
           <div className="drag-zone">
             <Upload className="mb-5 h-12 w-12" />
-            <div className="text-xl font-semibold">Drop YAML file here</div>
-            <div className="mt-2 text-sm text-muted-foreground">Dropped YAML files are previewed and edited directly.</div>
+            <div className="text-xl font-semibold">
+              {isAddSnippetOpen && addSnippetKind === "file" && !snippetEditTarget ? "Drop file here" : "Drop YAML file here"}
+            </div>
+            <div className="mt-2 text-sm text-muted-foreground">
+              {isAddSnippetOpen && addSnippetKind === "file" && !snippetEditTarget
+                ? "Dropped files are used as the snippet source."
+                : "Dropped YAML files are previewed and edited directly."}
+            </div>
           </div>
         </div>
       )}
@@ -537,7 +582,7 @@ function App() {
           )}
         >
           <DialogHeader>
-            <DialogTitle>{snippetEditTarget ? "Edit Snippet" : "Add Static Text Snippet"}</DialogTitle>
+            <DialogTitle>{snippetDialogTitle}</DialogTitle>
             <DialogDescription className="break-all">
               {snippetEditTarget?.preview.config.relativePath || selectedEspansoPreview?.config.relativePath || "Select a YAML file"}
               {snippetEditTarget ? ` · Snippet #${snippetEditTarget.displayIndex + 1}` : ""}
@@ -612,6 +657,27 @@ function App() {
               </div>
             </div>
 
+            <div className="grid grid-cols-2 rounded-md border bg-secondary/60 p-1">
+              <Button
+                type="button"
+                variant={activeSnippetKind === "text" ? "secondary" : "ghost"}
+                className="h-8"
+                disabled={Boolean(snippetEditTarget)}
+                onClick={() => setAddSnippetKind("text")}
+              >
+                Text
+              </Button>
+              <Button
+                type="button"
+                variant={activeSnippetKind === "file" ? "secondary" : "ghost"}
+                className="h-8"
+                disabled={Boolean(snippetEditTarget)}
+                onClick={() => setAddSnippetKind("file")}
+              >
+                File
+              </Button>
+            </div>
+
             {isExternalSnippetEdit ? (
               <div className="space-y-2">
                 <Label htmlFor="include-file">Include File</Label>
@@ -624,6 +690,37 @@ function App() {
                 <p className="text-xs text-muted-foreground">
                   External file snippets can be deleted here. Inline editing is only available for static text snippets.
                 </p>
+              </div>
+            ) : activeSnippetKind === "file" ? (
+              <div className="space-y-3">
+                <Label htmlFor="include-file">File</Label>
+                <div
+                  className="flex min-h-40 flex-col items-center justify-center gap-3 rounded-md border border-dashed bg-secondary/30 p-5 text-center"
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    const droppedFile = event.dataTransfer.files[0];
+                    const droppedPath = droppedFile ? (droppedFile as File & { path?: string }).path : "";
+                    if (droppedPath) {
+                      setEditIncludeFile(droppedPath);
+                    }
+                  }}
+                >
+                  <Upload className="h-8 w-8 text-muted-foreground" />
+                  <div className="w-full space-y-2">
+                    <Input
+                      id="include-file"
+                      className="mono-field"
+                      placeholder="Choose or drop a file path..."
+                      value={editIncludeFile}
+                      onChange={(e) => setEditIncludeFile(e.target.value)}
+                    />
+                    <Button type="button" variant="outline" onClick={chooseSnippetFile}>
+                      <FileSearch className="h-4 w-4" />
+                      Choose File
+                    </Button>
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="space-y-2">
