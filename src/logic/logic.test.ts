@@ -200,6 +200,22 @@ matches:
     expect(updated).toContain("replace: |-\n      line one\n      line two");
   });
 
+  it("should append a file snippet using Espanso shell vars", () => {
+    const updated = appendSnippetToYamlContent("matches: []\n", {
+      trigger: ":file",
+      include_file: "/Users/test/snippets/note.md",
+      description: "external note",
+    });
+
+    expect(updated).toContain("trigger: :file");
+    expect(updated).toContain('replace: "{{output}}"');
+    expect(updated).toContain("name: path");
+    expect(updated).toContain("echo: /Users/test/snippets/note.md");
+    expect(updated).toContain("name: output");
+    expect(updated).toContain('cmd: cat "{{path}}"');
+    expect(updated).toContain("description: external note");
+  });
+
   it("should replace an existing snippet by match index", () => {
     const yaml = `
 matches:
