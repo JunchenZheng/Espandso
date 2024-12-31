@@ -88,8 +88,6 @@ function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isAddSnippetOpen, setIsAddSnippetOpen] = useState<boolean>(false);
   const [snippetEditTarget, setSnippetEditTarget] = useState<SnippetEditTarget | null>(null);
-  const [triggerMode, setTriggerMode] = useState<"single" | "multiple">("single");
-  const [editTrigger, setEditTrigger] = useState<string>("");
   const [editTriggersText, setEditTriggersText] = useState<string>("");
   const [editReplace, setEditReplace] = useState<string>("");
   const [editDescription, setEditDescription] = useState<string>("");
@@ -267,8 +265,6 @@ function App() {
   const isExternalSnippetEdit = Boolean(snippetBeingEdited?.include_file);
 
   function resetSnippetForm() {
-    setTriggerMode("single");
-    setEditTrigger("");
     setEditTriggersText("");
     setEditReplace("");
     setEditDescription("");
@@ -290,8 +286,6 @@ function App() {
     const editableSnippet = target.match.originalSnippet || target.match.snippet;
     const triggerInput = buildTriggerInput(editableSnippet);
     setSnippetEditTarget(target);
-    setTriggerMode(triggerInput.mode);
-    setEditTrigger(triggerInput.single);
     setEditTriggersText(triggerInput.multiline);
     setEditReplace(editableSnippet.replace || "");
     setEditDescription(editableSnippet.description || "");
@@ -301,10 +295,10 @@ function App() {
   }
 
   function buildFormSnippet(): Snippet {
-    const triggerFields =
-      triggerMode === "multiple"
-        ? { triggers: normalizeTriggerLines(editTriggersText) }
-        : { trigger: editTrigger.trim() };
+    const normalizedTriggers = normalizeTriggerLines(editTriggersText);
+    const triggerFields = normalizedTriggers.length > 1
+      ? { triggers: normalizedTriggers }
+      : { trigger: normalizedTriggers[0] || "" };
 
     const snippet: Snippet = {
       ...triggerFields,
@@ -328,7 +322,7 @@ function App() {
         return;
       }
 
-      const hasAnyInput = editTrigger.trim() || editTriggersText.trim() || editReplace.trim() || editDescription.trim();
+      const hasAnyInput = editTriggersText.trim() || editReplace.trim() || editDescription.trim();
       if (!hasAnyInput) {
         setAddErrors([]);
         setAddWarnings([]);
@@ -355,7 +349,7 @@ function App() {
     return () => {
       active = false;
     };
-  }, [triggerMode, editTrigger, editTriggersText, editReplace, editDescription, isAddSnippetOpen, selectedEspansoPreview, snippetEditTarget, isExternalSnippetEdit]);
+  }, [editTriggersText, editReplace, editDescription, isAddSnippetOpen, selectedEspansoPreview, snippetEditTarget, isExternalSnippetEdit]);
 
   async function saveSnippetToYaml() {
     const targetPreview = snippetEditTarget?.preview || selectedEspansoPreview;
@@ -576,94 +570,46 @@ function App() {
             )}
 
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="trigger">Trigger</Label>
-                <div className="flex items-center space-x-1 rounded-md bg-muted p-1 text-xs">
-                  <button
-                    type="button"
-                    className={cn(
-                      "rounded px-2.5 py-1 font-medium transition-colors",
-                      triggerMode === "single"
-                        ? "bg-background text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground",
+              <Label htmlFor="trigger-0">Trigger</Label>
+              <div className="space-y-2">
+                {(editTriggersText ? editTriggersText.split("\n") : [""]).map((line, idx, lines) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <Input
+                      id={idx === 0 ? "trigger-0" : undefined}
+                      className="mono-field flex-1"
+                      placeholder={`e.g. ${idx === 0 ? ":hello" : idx === 1 ? ":hi" : ":hey"}`}
+                      value={line}
+                      onChange={(e) => {
+                        const newLines = [...lines];
+                        newLines[idx] = e.target.value;
+                        setEditTriggersText(newLines.join("\n"));
+                      }}
+                    />
+                    {lines.length > 1 && (
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive"
+                        title="Remove trigger"
+                        onClick={() => setEditTriggersText(lines.filter((_, i) => i !== idx).join("\n"))}
+                      >
+                        <XCircle className="h-4 w-4" />
+                      </Button>
                     )}
-                    onClick={() => {
-                      if (!editTrigger && editTriggersText) {
-                        setEditTrigger(editTriggersText.split("\n")[0] || "");
-                      }
-                      setTriggerMode("single");
-                    }}
-                  >
-                    Single Trigger
-                  </button>
-                  <button
-                    type="button"
-                    className={cn(
-                      "rounded px-2.5 py-1 font-medium transition-colors",
-                      triggerMode === "multiple"
-                        ? "bg-background text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground",
-                    )}
-                    onClick={() => {
-                      if (!editTriggersText && editTrigger) {
-                        setEditTriggersText(editTrigger);
-                      }
-                      setTriggerMode("multiple");
-                    }}
-                  >
-                    Multiple Triggers
-                  </button>
-                </div>
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="w-full border-dashed text-xs"
+                  onClick={() => setEditTriggersText([...(editTriggersText ? editTriggersText.split("\n") : [""]), ""].join("\n"))}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Add Trigger Alias
+                </Button>
               </div>
-
-              {triggerMode === "single" ? (
-                <Input
-                  id="trigger"
-                  className="mono-field"
-                  placeholder="e.g. :hello"
-                  value={editTrigger}
-                  onChange={(e) => setEditTrigger(e.target.value)}
-                />
-              ) : (
-                <div className="space-y-2">
-                  {(editTriggersText ? editTriggersText.split("\n") : [""]).map((line, idx, lines) => (
-                    <div key={idx} className="flex items-center gap-2">
-                      <Input
-                        className="mono-field flex-1"
-                        placeholder={`e.g. ${idx === 0 ? ":hello" : idx === 1 ? ":hi" : ":hey"}`}
-                        value={line}
-                        onChange={(e) => {
-                          const newLines = [...lines];
-                          newLines[idx] = e.target.value;
-                          setEditTriggersText(newLines.join("\n"));
-                        }}
-                      />
-                      {lines.length > 1 && (
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          className="h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive"
-                          title="Remove trigger"
-                          onClick={() => setEditTriggersText(lines.filter((_, i) => i !== idx).join("\n"))}
-                        >
-                          <XCircle className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="w-full border-dashed text-xs"
-                    onClick={() => setEditTriggersText([...(editTriggersText ? editTriggersText.split("\n") : [""]), ""].join("\n"))}
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    Add Trigger Alias
-                  </Button>
-                </div>
-              )}
             </div>
 
             {isExternalSnippetEdit ? (
