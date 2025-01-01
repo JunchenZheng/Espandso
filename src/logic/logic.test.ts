@@ -216,6 +216,38 @@ matches:
     expect(updated).toContain("description: external note");
   });
 
+  it("should replace an existing snippet with a file snippet by match index", () => {
+    const yaml = `
+matches:
+  - trigger: :hello
+    replace: world
+  - trigger: :plan
+    replace: "{{output}}"
+    vars:
+      - name: path
+        type: echo
+        params:
+          echo: old-plan.md
+      - name: output
+        type: shell
+        params:
+          cmd: cat "{{path}}"
+`;
+
+    const updated = replaceSnippetInYamlContent(yaml, 1, {
+      trigger: ":new-plan",
+      include_file: "/Users/test/snippets/new-plan.md",
+      description: "updated external plan",
+    });
+
+    expect(updated).toContain("trigger: :hello");
+    expect(updated).toContain("trigger: :new-plan");
+    expect(updated).toContain("echo: /Users/test/snippets/new-plan.md");
+    expect(updated).toContain('cmd: cat "{{path}}"');
+    expect(updated).toContain("description: updated external plan");
+    expect(updated).not.toContain("old-plan.md");
+  });
+
   it("should replace an existing snippet by match index", () => {
     const yaml = `
 matches:
