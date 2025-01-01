@@ -168,7 +168,7 @@ function App() {
   }, [scanDefaultEspansoConfigDir]);
 
   async function addDroppedYamlPreview(path: string) {
-    if (isAddSnippetOpen && addSnippetKind === "file" && !snippetEditTarget) {
+    if (isAddSnippetOpen && addSnippetKind === "file") {
       setEditIncludeFile(path);
       setIsDragging(false);
       return;
@@ -272,11 +272,7 @@ function App() {
     () => getEspansoConfigAncestorPaths(selectedEspansoPreview?.config.relativePath || ""),
     [selectedEspansoPreview],
   );
-  const snippetBeingEdited = snippetEditTarget?.match.originalSnippet || snippetEditTarget?.match.snippet || null;
-  const isExternalSnippetEdit = Boolean(snippetBeingEdited?.include_file);
-  const activeSnippetKind: AddSnippetKind = snippetEditTarget
-    ? isExternalSnippetEdit ? "file" : "text"
-    : addSnippetKind;
+  const activeSnippetKind: AddSnippetKind = addSnippetKind;
   const snippetDialogTitle = snippetEditTarget
     ? `Edit ${activeSnippetKind === "file" ? "File" : "Text"} Snippet`
     : `Add ${activeSnippetKind === "file" ? "File" : "Text"} Snippet`;
@@ -308,7 +304,7 @@ function App() {
     setAddSnippetKind(editableSnippet.include_file ? "file" : "text");
     setEditTriggersText(triggerInput.multiline);
     setEditReplace(editableSnippet.replace || "");
-    setEditIncludeFile(editableSnippet.include_file || "");
+    setEditIncludeFile(target.match.resourcePath || editableSnippet.include_file || "");
     setEditDescription(editableSnippet.description || "");
     setAddErrors([]);
     setAddWarnings([]);
@@ -342,7 +338,7 @@ function App() {
     let active = true;
 
     async function validateSnippetForm() {
-      if (!isAddSnippetOpen || !selectedEspansoPreview || isExternalSnippetEdit) {
+      if (!isAddSnippetOpen || !selectedEspansoPreview) {
         setAddErrors([]);
         setAddWarnings([]);
         return;
@@ -375,7 +371,7 @@ function App() {
     return () => {
       active = false;
     };
-  }, [activeSnippetKind, editTriggersText, editReplace, editIncludeFile, editDescription, isAddSnippetOpen, selectedEspansoPreview, snippetEditTarget, isExternalSnippetEdit]);
+  }, [activeSnippetKind, editTriggersText, editReplace, editIncludeFile, editDescription, isAddSnippetOpen, selectedEspansoPreview, snippetEditTarget]);
 
   async function chooseSnippetFile() {
     const selected = await openDialog({
@@ -393,10 +389,6 @@ function App() {
   async function saveSnippetToYaml() {
     const targetPreview = snippetEditTarget?.preview || selectedEspansoPreview;
     if (!targetPreview || isSavingSnippet) return;
-    if (isExternalSnippetEdit) {
-      alert("External file snippets can be deleted, but only inline text snippets can be edited here.");
-      return;
-    }
     if (addErrors.length > 0) {
       alert("Please fix validation errors before saving.");
       return;
@@ -461,10 +453,10 @@ function App() {
           <div className="drag-zone">
             <Upload className="mb-5 h-12 w-12" />
             <div className="text-xl font-semibold">
-              {isAddSnippetOpen && addSnippetKind === "file" && !snippetEditTarget ? "Drop file here" : "Drop YAML file here"}
+              {isAddSnippetOpen && addSnippetKind === "file" ? "Drop file here" : "Drop YAML file here"}
             </div>
             <div className="mt-2 text-sm text-muted-foreground">
-              {isAddSnippetOpen && addSnippetKind === "file" && !snippetEditTarget
+              {isAddSnippetOpen && addSnippetKind === "file"
                 ? "Dropped files are used as the snippet source."
                 : "Dropped YAML files are previewed and edited directly."}
             </div>
@@ -662,7 +654,6 @@ function App() {
                 type="button"
                 variant={activeSnippetKind === "text" ? "secondary" : "ghost"}
                 className="h-8"
-                disabled={Boolean(snippetEditTarget)}
                 onClick={() => setAddSnippetKind("text")}
               >
                 Text
@@ -671,27 +662,13 @@ function App() {
                 type="button"
                 variant={activeSnippetKind === "file" ? "secondary" : "ghost"}
                 className="h-8"
-                disabled={Boolean(snippetEditTarget)}
                 onClick={() => setAddSnippetKind("file")}
               >
                 File
               </Button>
             </div>
 
-            {isExternalSnippetEdit ? (
-              <div className="space-y-2">
-                <Label htmlFor="include-file">Include File</Label>
-                <Input
-                  id="include-file"
-                  className="mono-field"
-                  value={snippetBeingEdited?.include_file || ""}
-                  readOnly
-                />
-                <p className="text-xs text-muted-foreground">
-                  External file snippets can be deleted here. Inline editing is only available for static text snippets.
-                </p>
-              </div>
-            ) : activeSnippetKind === "file" ? (
+            {activeSnippetKind === "file" ? (
               <div className="space-y-3">
                 <Label htmlFor="include-file">File</Label>
                 <div
@@ -760,7 +737,7 @@ function App() {
               <Button variant="outline" onClick={() => setIsAddSnippetOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={saveSnippetToYaml} disabled={isSavingSnippet || isExternalSnippetEdit}>
+              <Button onClick={saveSnippetToYaml} disabled={isSavingSnippet}>
                 {isSavingSnippet ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                 {snippetEditTarget ? "Update YAML" : "Save to YAML"}
               </Button>
