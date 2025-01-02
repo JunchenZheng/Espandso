@@ -43,7 +43,6 @@ import { importYamlContent, ImportedMatch } from "./logic/importYaml";
 import { buildTriggerInput, getSnippetTriggers, normalizeTriggerLines } from "./logic/snippetUtils";
 import { appendSnippetToYamlContent, deleteSnippetFromYamlContent, replaceSnippetInYamlContent } from "./logic/yamlEditor";
 import { EspansoConfigFile, EspansoPathSource, scanEspansoConfigFiles } from "./logic/espansoPaths";
-import { restartEspanso, InstallResult } from "./tauri/espansoRuntime";
 import { cn } from "./lib/utils";
 
 interface DragDropPayload {
@@ -99,7 +98,6 @@ function App() {
   const [addErrors, setAddErrors] = useState<ValidationError[]>([]);
   const [addWarnings, setAddWarnings] = useState<string[]>([]);
   const [isSavingSnippet, setIsSavingSnippet] = useState<boolean>(false);
-  const [consoleResult, setConsoleResult] = useState<InstallResult | null>(null);
 
   const buildEspansoConfigPreviews = useCallback(async (configs: EspansoConfigFile[]): Promise<EspansoConfigPreview[]> => {
     const previews: EspansoConfigPreview[] = [];
@@ -402,8 +400,8 @@ function App() {
         ? replaceSnippetInYamlContent(content, snippetEditTarget.match.originalMatchIndex, snippet)
         : appendSnippetToYamlContent(content, snippet);
       await writeTextFile(targetPreview.config.path, updatedContent);
-      const restartResult = await restartEspanso();
-      setConsoleResult(restartResult);
+      // Espanso has its own hot-reload path for match files. Keep restart disabled
+      // while testing which edits actually require the more expensive CLI restart.
       setIsAddSnippetOpen(false);
       resetSnippetForm();
       setSnippetEditTarget(null);
@@ -426,8 +424,8 @@ function App() {
       const content = await readTextFile(target.preview.config.path);
       const updatedContent = deleteSnippetFromYamlContent(content, target.match.originalMatchIndex);
       await writeTextFile(target.preview.config.path, updatedContent);
-      const restartResult = await restartEspanso();
-      setConsoleResult(restartResult);
+      // Espanso has its own hot-reload path for match files. Keep restart disabled
+      // while testing which edits actually require the more expensive CLI restart.
       setIsAddSnippetOpen(false);
       resetSnippetForm();
       setSnippetEditTarget(null);
@@ -784,23 +782,6 @@ function App() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={consoleResult !== null} onOpenChange={(open) => !open && setConsoleResult(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{consoleResult?.success ? "Espanso restarted" : "Espanso restart issue"}</DialogTitle>
-            <DialogDescription>{consoleResult?.message}</DialogDescription>
-          </DialogHeader>
-          {(consoleResult?.stdout || consoleResult?.stderr) && (
-            <pre className="mono-field max-h-64 overflow-auto rounded-md border bg-secondary/40 p-3 text-xs">
-              {consoleResult.stdout}
-              {consoleResult.stderr}
-            </pre>
-          )}
-          <DialogFooter>
-            <Button onClick={() => setConsoleResult(null)}>Done</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
