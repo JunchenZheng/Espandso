@@ -465,7 +465,17 @@ function App() {
       <main className="flex h-full w-full overflow-hidden bg-[linear-gradient(180deg,hsl(var(--background))_0%,hsl(var(--secondary))_100%)] p-4">
         <Card className="flex h-full w-full flex-col p-4">
           <CardContent className="flex min-h-0 flex-1 flex-col p-0">
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={scanDefaultEspansoConfigDir}
+                disabled={isScanningEspanso}
+                aria-label="Refresh YAML configs"
+                title="Refresh YAML configs"
+              >
+                <RefreshCw className={cn("h-4 w-4", isScanningEspanso && "animate-spin")} />
+                Refresh
+              </Button>
               <Button variant="outline" onClick={() => setIsSettingsOpen(true)}>
                 <Settings />
                 Settings
@@ -484,10 +494,23 @@ function App() {
                         <span className="text-amber-700">{espansoPreviewTotals.warnings} warnings</span>
                       )}
                     </div>
-                    <Button size="sm" onClick={openAddSnippetDialog} disabled={!selectedEspansoPreview}>
-                      <Plus className="h-4 w-4" />
-                      Add Snippet
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={scanDefaultEspansoConfigDir}
+                        disabled={isScanningEspanso}
+                        aria-label="Refresh YAML configs"
+                        title="Refresh YAML configs"
+                      >
+                        <RefreshCw className={cn("h-4 w-4", isScanningEspanso && "animate-spin")} />
+                        Refresh
+                      </Button>
+                      <Button size="sm" onClick={openAddSnippetDialog} disabled={!selectedEspansoPreview}>
+                        <Plus className="h-4 w-4" />
+                        Add Snippet
+                      </Button>
+                    </div>
                   </div>
 
                   <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden rounded-md border bg-background md:grid-cols-[18rem_1fr]">
