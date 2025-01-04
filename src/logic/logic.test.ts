@@ -45,6 +45,7 @@ describe("validate", () => {
         { trigger: ":hello", replace: "world", description: "simple" },
         { triggers: [":hi", ":hey"], replace: "world 2" },
         { trigger: ":file", include_file: "test.txt" },
+        { trigger: ":form", form: "Hello [[name]]", form_fields: { name: { default: "Ada" } } },
       ],
     };
 
@@ -60,11 +61,13 @@ describe("validate", () => {
         { trigger: "", replace: "world" }, // empty trigger
         { trigger: ":dup", replace: "1" },
         { trigger: ":dup", replace: "2" }, // duplicate trigger
-        { trigger: ":both", replace: "yes", include_file: "test.txt" }, // both replace & include
+        { trigger: ":both", replace: "yes", include_file: "test.txt" }, // multiple content kinds
         { trigger: ":none" }, // neither replace nor include
         { trigger: "no-colon", replace: "valid custom trigger style" },
         { trigger: ":conflict", triggers: [":conflict2"], replace: "both" }, // both trigger and triggers
         { triggers: [":t1", ":t1"], replace: "dup in triggers" }, // duplicate inside triggers
+        { trigger: ":empty-form", form: "" }, // empty form
+        { trigger: ":fields", replace: "x", form_fields: { value: { multiline: true } } }, // fields without form
       ],
     };
 
@@ -76,10 +79,12 @@ describe("validate", () => {
     expect(messages).toContain("root 'version' must be an integer");
     expect(messages).toContain("snippet #0: 'trigger' must be a non-empty string");
     expect(messages).toContain("snippet #2: duplicate trigger ':dup' (first at #1)");
-    expect(messages).toContain("snippet #3: cannot have both 'replace' and 'include_file'");
-    expect(messages).toContain("snippet #4: must have either 'replace' or 'include_file'");
+    expect(messages).toContain("snippet #3: cannot combine 'replace', 'include_file', and 'form'");
+    expect(messages).toContain("snippet #4: must have either 'replace', 'include_file', or 'form'");
     expect(messages).toContain("snippet #6: cannot have both 'trigger' and 'triggers'");
     expect(messages).toContain("snippet #7: duplicate trigger ':t1' (first at #7)");
+    expect(messages).toContain("snippet #8: 'form' must be a non-empty string");
+    expect(messages).toContain("snippet #9: 'form_fields' can only be used with 'form'");
   });
 
   it("should check include_file existence", async () => {
@@ -146,6 +151,30 @@ matches:
     expect(res.snippets).toHaveLength(1);
     expect(res.snippets[0]).toEqual({ trigger: ":inc", include_file: "resource_data.json" });
     expect(res.warnings).toContain("[test.yml] Snippet for :unsupported has unsupported var type(s) [date], skipping");
+  });
+
+  it("should import form snippets with fields", () => {
+    const yaml = `
+matches:
+  - trigger: :greet
+    form: |
+      Hey [[name]],
+      [[message]]
+    form_fields:
+      message:
+        multiline: true
+    description: greeting form
+`;
+
+    const res = importYamlContent(yaml, "forms.yml");
+
+    expect(res.snippets).toHaveLength(1);
+    expect(res.snippets[0]).toEqual({
+      trigger: ":greet",
+      form: "Hey [[name]],\n[[message]]\n",
+      form_fields: { message: { multiline: true } },
+      description: "greeting form",
+    });
   });
 });
 
@@ -214,6 +243,32 @@ matches:
     expect(updated).toContain("name: output");
     expect(updated).toContain('cmd: cat "{{path}}"');
     expect(updated).toContain("description: external note");
+  });
+
+  it("should append a form snippet with field controls", () => {
+    const updated = appendSnippetToYamlContent("matches: []\n", {
+      trigger: ":greet",
+      form: "Hey [[name]],\n[[message]]",
+      form_fields: {
+        message: {
+          multiline: true,
+        },
+        fruit: {
+          type: "choice",
+          values: ["Apples", "Bananas"],
+        },
+      },
+      description: "greeting form",
+    });
+
+    expect(updated).toContain("trigger: :greet");
+    expect(updated).toContain("form: |-\n      Hey [[name]],\n      [[message]]");
+    expect(updated).toContain("form_fields:");
+    expect(updated).toContain("message:");
+    expect(updated).toContain("multiline: true");
+    expect(updated).toContain("type: choice");
+    expect(updated).toContain("- Apples");
+    expect(updated).toContain("description: greeting form");
   });
 
   it("should replace an existing snippet with a file snippet by match index", () => {
