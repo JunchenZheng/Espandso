@@ -28,6 +28,11 @@ export function snippetToYamlMatch(snippet: Snippet): Record<string, any> {
         },
       },
     ];
+  } else if (snippet.form !== undefined) {
+    match.form = snippet.form;
+    if (snippet.form_fields && Object.keys(snippet.form_fields).length > 0) {
+      match.form_fields = snippet.form_fields;
+    }
   } else {
     match.replace = snippet.replace || "";
   }
