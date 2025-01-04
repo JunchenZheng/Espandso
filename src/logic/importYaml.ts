@@ -55,6 +55,10 @@ function onlyCatVarTypes(varsBlock: any[]): boolean {
   return varsBlock.every((v) => allowed.has(v?.type || ""));
 }
 
+function isPlainObject(value: any): value is Record<string, any> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
 export function parseYamlMatch(
   match: any,
   fileName: string,
@@ -125,6 +129,31 @@ export function parseYamlMatch(
         resourcePath: catPath,
         resourceName: resourceFilename,
       };
+    });
+
+    return { matches, warnings };
+  }
+
+  const form = match.form;
+  if (form !== undefined && form !== null) {
+    const sharedFields = isPlainObject(match.form_fields) ? { form_fields: match.form_fields } : {};
+    const originalSnippet: Snippet = triggers.length > 1
+      ? { triggers, form: String(form), ...sharedFields }
+      : { trigger: triggers[0], form: String(form), ...sharedFields };
+    if (match.description) {
+      originalSnippet.description = match.description;
+    }
+
+    const matches: ImportedMatch[] = triggers.map((trigger) => {
+      const snippet: Snippet = {
+        trigger,
+        form: String(form),
+        ...sharedFields,
+      };
+      if (match.description) {
+        snippet.description = match.description;
+      }
+      return { snippet, originalSnippet, originalMatchIndex };
     });
 
     return { matches, warnings };

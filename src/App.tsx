@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import YAML from "yaml";
 import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import { listen } from "@tauri-apps/api/event";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
@@ -55,6 +56,7 @@ interface EspansoConfigPreview {
   snippetCount: number;
   inlineCount: number;
   resourceCount: number;
+  formCount: number;
   warningCount: number;
   snippets: Snippet[];
   importedMatches: ImportedMatch[];
@@ -76,7 +78,24 @@ interface SnippetEditTarget {
   displayIndex: number;
 }
 
-type AddSnippetKind = "text" | "file";
+type AddSnippetKind = "text" | "file" | "form";
+
+function snippetKindLabel(kind: AddSnippetKind): string {
+  if (kind === "file") return "File";
+  if (kind === "form") return "Form";
+  return "Text";
+}
+
+function parseFormFieldsYaml(input: string): Record<string, any> | undefined {
+  if (!input.trim()) return undefined;
+
+  const parsed = YAML.parse(input);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("form_fields must be a YAML mapping.");
+  }
+
+  return parsed;
+}
 
 function App() {
   const [isDragging, setIsDragging] = useState<boolean>(false);
@@ -94,6 +113,8 @@ function App() {
   const [editTriggersText, setEditTriggersText] = useState<string>("");
   const [editReplace, setEditReplace] = useState<string>("");
   const [editIncludeFile, setEditIncludeFile] = useState<string>("");
+  const [editForm, setEditForm] = useState<string>("");
+  const [editFormFields, setEditFormFields] = useState<string>("");
   const [editDescription, setEditDescription] = useState<string>("");
   const [addErrors, setAddErrors] = useState<ValidationError[]>([]);
   const [addWarnings, setAddWarnings] = useState<string[]>([]);
@@ -108,12 +129,14 @@ function App() {
         const result = importYamlContent(content, config.name);
         const inlineCount = result.snippets.filter((snippet) => snippet.replace !== undefined).length;
         const resourceCount = result.snippets.filter((snippet) => snippet.include_file).length;
+        const formCount = result.snippets.filter((snippet) => snippet.form !== undefined).length;
 
         previews.push({
           config,
           snippetCount: result.snippets.length,
           inlineCount,
           resourceCount,
+          formCount,
           warningCount: result.warnings.length,
           snippets: result.snippets,
           importedMatches: result.importedMatches,
@@ -124,6 +147,7 @@ function App() {
           snippetCount: 0,
           inlineCount: 0,
           resourceCount: 0,
+          formCount: 0,
           warningCount: 1,
           snippets: [],
           importedMatches: [],
@@ -238,6 +262,7 @@ function App() {
         snippetCount: 0,
         inlineCount: 0,
         resourceCount: 0,
+        formCount: 0,
         warningCount: 0,
         snippets: [],
         importedMatches: [],
@@ -250,9 +275,10 @@ function App() {
         snippets: total.snippets + preview.snippetCount,
         inline: total.inline + preview.inlineCount,
         resources: total.resources + preview.resourceCount,
+        forms: total.forms + preview.formCount,
         warnings: total.warnings + preview.warningCount,
       }),
-      { snippets: 0, inline: 0, resources: 0, warnings: 0 },
+      { snippets: 0, inline: 0, resources: 0, forms: 0, warnings: 0 },
     ),
     [espansoPreviewList],
   );
@@ -272,14 +298,16 @@ function App() {
   );
   const activeSnippetKind: AddSnippetKind = addSnippetKind;
   const snippetDialogTitle = snippetEditTarget
-    ? `Edit ${activeSnippetKind === "file" ? "File" : "Text"} Snippet`
-    : `Add ${activeSnippetKind === "file" ? "File" : "Text"} Snippet`;
+    ? `Edit ${snippetKindLabel(activeSnippetKind)} Snippet`
+    : `Add ${snippetKindLabel(activeSnippetKind)} Snippet`;
 
   function resetSnippetForm() {
     setAddSnippetKind("text");
     setEditTriggersText("");
     setEditReplace("");
     setEditIncludeFile("");
+    setEditForm("");
+    setEditFormFields("");
     setEditDescription("");
     setAddErrors([]);
     setAddWarnings([]);
@@ -299,10 +327,12 @@ function App() {
     const editableSnippet = target.match.originalSnippet || target.match.snippet;
     const triggerInput = buildTriggerInput(editableSnippet);
     setSnippetEditTarget(target);
-    setAddSnippetKind(editableSnippet.include_file ? "file" : "text");
+    setAddSnippetKind(editableSnippet.include_file ? "file" : editableSnippet.form !== undefined ? "form" : "text");
     setEditTriggersText(triggerInput.multiline);
     setEditReplace(editableSnippet.replace || "");
     setEditIncludeFile(target.match.resourcePath || editableSnippet.include_file || "");
+    setEditForm(editableSnippet.form || "");
+    setEditFormFields(editableSnippet.form_fields ? YAML.stringify(editableSnippet.form_fields).trimEnd() : "");
     setEditDescription(editableSnippet.description || "");
     setAddErrors([]);
     setAddWarnings([]);
@@ -321,6 +351,12 @@ function App() {
 
     if (activeSnippetKind === "file") {
       snippet.include_file = editIncludeFile.trim();
+    } else if (activeSnippetKind === "form") {
+      snippet.form = editForm;
+      const formFields = parseFormFieldsYaml(editFormFields);
+      if (formFields) {
+        snippet.form_fields = formFields;
+      }
     } else {
       snippet.replace = editReplace;
     }
@@ -342,14 +378,27 @@ function App() {
         return;
       }
 
-      const hasAnyInput = editTriggersText.trim() || editReplace.trim() || editIncludeFile.trim() || editDescription.trim();
+      const hasAnyInput = editTriggersText.trim()
+        || editReplace.trim()
+        || editIncludeFile.trim()
+        || editForm.trim()
+        || editFormFields.trim()
+        || editDescription.trim();
       if (!hasAnyInput) {
         setAddErrors([]);
         setAddWarnings([]);
         return;
       }
 
-      const snippet = buildFormSnippet();
+      let snippet: Snippet;
+      try {
+        snippet = buildFormSnippet();
+      } catch (e: any) {
+        if (!active) return;
+        setAddErrors([{ message: e?.message || String(e) }]);
+        setAddWarnings([]);
+        return;
+      }
       const snippetsForValidation = snippetEditTarget
         ? snippetEditTarget.preview.importedMatches
           .filter((match) => match.originalMatchIndex !== snippetEditTarget.match.originalMatchIndex)
@@ -369,7 +418,7 @@ function App() {
     return () => {
       active = false;
     };
-  }, [activeSnippetKind, editTriggersText, editReplace, editIncludeFile, editDescription, isAddSnippetOpen, selectedEspansoPreview, snippetEditTarget]);
+  }, [activeSnippetKind, editTriggersText, editReplace, editIncludeFile, editForm, editFormFields, editDescription, isAddSnippetOpen, selectedEspansoPreview, snippetEditTarget]);
 
   async function chooseSnippetFile() {
     const selected = await openDialog({
@@ -490,6 +539,7 @@ function App() {
                       <span className="text-muted-foreground">{espansoPreviewTotals.snippets} readable snippets</span>
                       <span className="text-muted-foreground">{espansoPreviewTotals.inline} inline</span>
                       <span className="text-muted-foreground">{espansoPreviewTotals.resources} external files</span>
+                      <span className="text-muted-foreground">{espansoPreviewTotals.forms} forms</span>
                       {espansoPreviewTotals.warnings > 0 && (
                         <span className="text-amber-700">{espansoPreviewTotals.warnings} warnings</span>
                       )}
@@ -670,7 +720,7 @@ function App() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 rounded-md border bg-secondary/60 p-1">
+            <div className="grid grid-cols-3 rounded-md border bg-secondary/60 p-1">
               <Button
                 type="button"
                 variant={activeSnippetKind === "text" ? "secondary" : "ghost"}
@@ -686,6 +736,14 @@ function App() {
                 onClick={() => setAddSnippetKind("file")}
               >
                 File
+              </Button>
+              <Button
+                type="button"
+                variant={activeSnippetKind === "form" ? "secondary" : "ghost"}
+                className="h-8"
+                onClick={() => setAddSnippetKind("form")}
+              >
+                Form
               </Button>
             </div>
 
@@ -718,6 +776,29 @@ function App() {
                       Choose File
                     </Button>
                   </div>
+                </div>
+              </div>
+            ) : activeSnippetKind === "form" ? (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="form">Form Layout</Label>
+                  <Textarea
+                    id="form"
+                    className="mono-field min-h-44 resize-y"
+                    placeholder={"Hey [[name]],\n[[message]]"}
+                    value={editForm}
+                    onChange={(e) => setEditForm(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="form-fields">Form Fields</Label>
+                  <Textarea
+                    id="form-fields"
+                    className="mono-field min-h-32 resize-y"
+                    placeholder={"message:\n  multiline: true\nfruit:\n  type: choice\n  values:\n    - Apples\n    - Bananas"}
+                    value={editFormFields}
+                    onChange={(e) => setEditFormFields(e.target.value)}
+                  />
                 </div>
               </div>
             ) : (
@@ -1049,6 +1130,12 @@ function EspansoConfigDetail({ preview, onViewSnippet }: EspansoConfigDetailProp
                 const index = startIndex + offset;
                 const triggers = getSnippetTriggers(snippet);
                 const displayTrigger = triggers.length > 0 ? triggers.join(", ") : `Snippet ${index + 1}`;
+                const snippetKind = snippet.include_file ? "file" : snippet.form !== undefined ? "form" : "text";
+                const snippetPreview = snippet.include_file
+                  ? `include: ${snippet.include_file}`
+                  : snippet.form !== undefined
+                    ? snippet.form || "Empty form"
+                    : snippet.replace || "Empty replacement";
 
                 return (
                   <button
@@ -1066,14 +1153,16 @@ function EspansoConfigDetail({ preview, onViewSnippet }: EspansoConfigDetailProp
                       <span
                         className={cn(
                           "h-4 w-4 rounded",
-                          snippet.include_file ? "bg-primary/70" : "bg-muted-foreground/35",
+                          snippetKind === "file" && "bg-primary/70",
+                          snippetKind === "form" && "bg-emerald-500/70",
+                          snippetKind === "text" && "bg-muted-foreground/35",
                         )}
-                        title={snippet.include_file ? "External file snippet" : "Inline replacement snippet"}
+                        title={snippetKind === "file" ? "External file snippet" : snippetKind === "form" ? "Form snippet" : "Inline replacement snippet"}
                       />
                     </div>
                     <div className="mono-field min-w-0 truncate pr-3 text-sm">{displayTrigger}</div>
                     <div className="min-w-0 truncate text-muted-foreground">
-                      {snippet.include_file ? `include: ${snippet.include_file}` : snippet.replace || "Empty replacement"}
+                      {snippetPreview}
                     </div>
                     <div className="flex justify-end text-muted-foreground">
                       <SquareArrowOutUpRight className="h-4 w-4" />
