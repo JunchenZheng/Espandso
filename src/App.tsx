@@ -1,5 +1,4 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import YAML from "yaml";
 import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import { listen } from "@tauri-apps/api/event";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
@@ -79,6 +78,14 @@ interface SnippetEditTarget {
 }
 
 type AddSnippetKind = "text" | "file" | "form";
+type FormFieldControl = "text" | "multiline" | "choice" | "list";
+
+interface FormFieldConfig {
+  id: string;
+  control: FormFieldControl;
+  defaultValue: string;
+  valuesText: string;
+}
 
 function snippetKindLabel(kind: AddSnippetKind): string {
   if (kind === "file") return "File";
@@ -86,15 +93,93 @@ function snippetKindLabel(kind: AddSnippetKind): string {
   return "Text";
 }
 
-function parseFormFieldsYaml(input: string): Record<string, any> | undefined {
-  if (!input.trim()) return undefined;
+function createDefaultFormFieldConfig(id: string): FormFieldConfig {
+  return {
+    id,
+    control: "text",
+    defaultValue: "",
+    valuesText: "",
+  };
+}
 
-  const parsed = YAML.parse(input);
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error("form_fields must be a YAML mapping.");
+function extractFormFieldNames(form: string): string[] {
+  const names: string[] = [];
+  const seen = new Set<string>();
+  const fieldPattern = /\[\[([^\][\n]+)\]\]/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = fieldPattern.exec(form)) !== null) {
+    const name = match[1].trim();
+    if (name && !seen.has(name)) {
+      seen.add(name);
+      names.push(name);
+    }
   }
 
-  return parsed;
+  return names;
+}
+
+function normalizeFormFieldConfigs(fieldNames: string[], current: FormFieldConfig[]): FormFieldConfig[] {
+  return fieldNames.map((name) => current.find((field) => field.id === name) || createDefaultFormFieldConfig(name));
+}
+
+function areFormFieldConfigsEqual(a: FormFieldConfig[], b: FormFieldConfig[]): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((field, index) => {
+    const other = b[index];
+    return field.id === other.id
+      && field.control === other.control
+      && field.defaultValue === other.defaultValue
+      && field.valuesText === other.valuesText;
+  });
+}
+
+function formFieldsToConfigs(formFields: Record<string, any> | undefined): FormFieldConfig[] {
+  if (!formFields) return [];
+
+  return Object.entries(formFields).map(([id, value]) => {
+    const field = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    const rawType = field.type === "choice" || field.type === "list" ? field.type : "";
+    const control: FormFieldControl = field.multiline === true ? "multiline" : rawType || "text";
+    const values = field.values;
+
+    return {
+      id,
+      control,
+      defaultValue: field.default !== undefined && field.default !== null ? String(field.default) : "",
+      valuesText: Array.isArray(values) ? values.map((item) => String(item)).join("\n") : values ? String(values) : "",
+    };
+  });
+}
+
+function configsToFormFields(configs: FormFieldConfig[]): Record<string, any> | undefined {
+  const formFields: Record<string, any> = {};
+
+  for (const config of configs) {
+    const field: Record<string, any> = {};
+    if (config.control === "multiline") {
+      field.multiline = true;
+    } else if (config.control === "choice" || config.control === "list") {
+      field.type = config.control;
+      const values = config.valuesText
+        .split("\n")
+        .map((value) => value.trim())
+        .filter(Boolean);
+      if (values.length > 0) {
+        field.values = values;
+      }
+    }
+
+    if (config.defaultValue.trim()) {
+      field.default = config.defaultValue.trim();
+    }
+
+    if (Object.keys(field).length > 0) {
+      formFields[config.id] = field;
+    }
+  }
+
+  return Object.keys(formFields).length > 0 ? formFields : undefined;
 }
 
 function App() {
@@ -114,7 +199,7 @@ function App() {
   const [editReplace, setEditReplace] = useState<string>("");
   const [editIncludeFile, setEditIncludeFile] = useState<string>("");
   const [editForm, setEditForm] = useState<string>("");
-  const [editFormFields, setEditFormFields] = useState<string>("");
+  const [editFormFieldConfigs, setEditFormFieldConfigs] = useState<FormFieldConfig[]>([]);
   const [editDescription, setEditDescription] = useState<string>("");
   const [addErrors, setAddErrors] = useState<ValidationError[]>([]);
   const [addWarnings, setAddWarnings] = useState<string[]>([]);
@@ -297,9 +382,18 @@ function App() {
     [selectedEspansoPreview],
   );
   const activeSnippetKind: AddSnippetKind = addSnippetKind;
+  const detectedFormFieldNames = useMemo(() => extractFormFieldNames(editForm), [editForm]);
+  const detectedFormFieldKey = detectedFormFieldNames.join("\n");
   const snippetDialogTitle = snippetEditTarget
     ? `Edit ${snippetKindLabel(activeSnippetKind)} Snippet`
     : `Add ${snippetKindLabel(activeSnippetKind)} Snippet`;
+
+  useEffect(() => {
+    setEditFormFieldConfigs((current) => {
+      const normalized = normalizeFormFieldConfigs(detectedFormFieldNames, current);
+      return areFormFieldConfigsEqual(current, normalized) ? current : normalized;
+    });
+  }, [detectedFormFieldKey]);
 
   function resetSnippetForm() {
     setAddSnippetKind("text");
@@ -307,7 +401,7 @@ function App() {
     setEditReplace("");
     setEditIncludeFile("");
     setEditForm("");
-    setEditFormFields("");
+    setEditFormFieldConfigs([]);
     setEditDescription("");
     setAddErrors([]);
     setAddWarnings([]);
@@ -332,7 +426,7 @@ function App() {
     setEditReplace(editableSnippet.replace || "");
     setEditIncludeFile(target.match.resourcePath || editableSnippet.include_file || "");
     setEditForm(editableSnippet.form || "");
-    setEditFormFields(editableSnippet.form_fields ? YAML.stringify(editableSnippet.form_fields).trimEnd() : "");
+    setEditFormFieldConfigs(formFieldsToConfigs(editableSnippet.form_fields));
     setEditDescription(editableSnippet.description || "");
     setAddErrors([]);
     setAddWarnings([]);
@@ -353,7 +447,7 @@ function App() {
       snippet.include_file = editIncludeFile.trim();
     } else if (activeSnippetKind === "form") {
       snippet.form = editForm;
-      const formFields = parseFormFieldsYaml(editFormFields);
+      const formFields = configsToFormFields(editFormFieldConfigs);
       if (formFields) {
         snippet.form_fields = formFields;
       }
@@ -366,6 +460,12 @@ function App() {
     }
 
     return snippet;
+  }
+
+  function updateFormFieldConfig(id: string, patch: Partial<FormFieldConfig>) {
+    setEditFormFieldConfigs((current) => current.map((field) => (
+      field.id === id ? { ...field, ...patch } : field
+    )));
   }
 
   useEffect(() => {
@@ -382,7 +482,7 @@ function App() {
         || editReplace.trim()
         || editIncludeFile.trim()
         || editForm.trim()
-        || editFormFields.trim()
+        || editFormFieldConfigs.some((field) => field.defaultValue.trim() || field.valuesText.trim() || field.control !== "text")
         || editDescription.trim();
       if (!hasAnyInput) {
         setAddErrors([]);
@@ -418,7 +518,7 @@ function App() {
     return () => {
       active = false;
     };
-  }, [activeSnippetKind, editTriggersText, editReplace, editIncludeFile, editForm, editFormFields, editDescription, isAddSnippetOpen, selectedEspansoPreview, snippetEditTarget]);
+  }, [activeSnippetKind, editTriggersText, editReplace, editIncludeFile, editForm, editFormFieldConfigs, editDescription, isAddSnippetOpen, selectedEspansoPreview, snippetEditTarget]);
 
   async function chooseSnippetFile() {
     const selected = await openDialog({
@@ -790,16 +890,53 @@ function App() {
                     onChange={(e) => setEditForm(e.target.value)}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="form-fields">Form Fields</Label>
-                  <Textarea
-                    id="form-fields"
-                    className="mono-field min-h-32 resize-y"
-                    placeholder={"message:\n  multiline: true\nfruit:\n  type: choice\n  values:\n    - Apples\n    - Bananas"}
-                    value={editFormFields}
-                    onChange={(e) => setEditFormFields(e.target.value)}
-                  />
-                </div>
+                {editFormFieldConfigs.length > 0 && (
+                  <div className="space-y-3">
+                    <Label>Fields</Label>
+                    {editFormFieldConfigs.map((field, fieldIndex) => (
+                      <div key={field.id} className="space-y-3 rounded-md border bg-secondary/25 p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="mono-field min-w-0 truncate text-sm font-semibold">[[{field.id}]]</div>
+                          <div className="grid grid-cols-4 rounded-md border bg-background p-1">
+                            {(["text", "multiline", "choice", "list"] as FormFieldControl[]).map((control) => (
+                              <Button
+                                key={control}
+                                type="button"
+                                variant={field.control === control ? "secondary" : "ghost"}
+                                className="h-7 px-2 text-xs capitalize"
+                                onClick={() => updateFormFieldConfig(field.id, { control })}
+                              >
+                                {control}
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="space-y-2">
+                            <Label htmlFor={`form-field-default-${fieldIndex}`}>Default</Label>
+                            <Input
+                              id={`form-field-default-${fieldIndex}`}
+                              value={field.defaultValue}
+                              onChange={(event) => updateFormFieldConfig(field.id, { defaultValue: event.target.value })}
+                            />
+                          </div>
+                          {(field.control === "choice" || field.control === "list") && (
+                            <div className="space-y-2">
+                              <Label htmlFor={`form-field-values-${fieldIndex}`}>Values</Label>
+                              <Textarea
+                                id={`form-field-values-${fieldIndex}`}
+                                className="mono-field min-h-24 resize-y"
+                                placeholder={"First choice\nSecond choice"}
+                                value={field.valuesText}
+                                onChange={(event) => updateFormFieldConfig(field.id, { valuesText: event.target.value })}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="space-y-2">
