@@ -79,6 +79,8 @@ interface SnippetEditTarget {
 
 type AddSnippetKind = "text" | "file" | "form";
 type FormFieldControl = "text" | "multiline" | "choice" | "list";
+type FormFieldCategory = "text" | "choice" | "list";
+type TextFieldMode = "single" | "multiline";
 
 interface FormFieldConfig {
   id: string;
@@ -132,6 +134,15 @@ function areFormFieldConfigsEqual(a: FormFieldConfig[], b: FormFieldConfig[]): b
       && field.defaultValue === other.defaultValue
       && field.valuesText === other.valuesText;
   });
+}
+
+function getFormFieldCategory(field: FormFieldConfig): FormFieldCategory {
+  if (field.control === "choice" || field.control === "list") return field.control;
+  return "text";
+}
+
+function getTextFieldMode(field: FormFieldConfig): TextFieldMode {
+  return field.control === "multiline" ? "multiline" : "single";
 }
 
 function formFieldsToConfigs(formFields: Record<string, any> | undefined): FormFieldConfig[] {
@@ -897,30 +908,90 @@ function App() {
                       <div key={field.id} className="space-y-3 rounded-md border bg-secondary/25 p-3">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <div className="mono-field min-w-0 truncate text-sm font-semibold">[[{field.id}]]</div>
-                          <div className="grid grid-cols-4 rounded-md border bg-background p-1">
-                            {(["text", "multiline", "choice", "list"] as FormFieldControl[]).map((control) => (
-                              <Button
-                                key={control}
-                                type="button"
-                                variant={field.control === control ? "secondary" : "ghost"}
-                                className="h-7 px-2 text-xs capitalize"
-                                onClick={() => updateFormFieldConfig(field.id, { control })}
-                              >
-                                {control}
-                              </Button>
-                            ))}
-                          </div>
                         </div>
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          <div className="space-y-2">
-                            <Label htmlFor={`form-field-default-${fieldIndex}`}>Default</Label>
-                            <Input
-                              id={`form-field-default-${fieldIndex}`}
-                              value={field.defaultValue}
-                              onChange={(event) => updateFormFieldConfig(field.id, { defaultValue: event.target.value })}
-                            />
+                        <div className="grid gap-2 sm:grid-cols-3">
+                          {([
+                            ["text", "Text Fields"],
+                            ["choice", "Choice Box"],
+                            ["list", "List Box"],
+                          ] as const).map(([category, label]) => (
+                            <label
+                              key={category}
+                              className={cn(
+                                "flex min-h-9 items-center gap-2 rounded-md border bg-background px-3 text-sm",
+                                getFormFieldCategory(field) === category && "border-primary bg-primary/10",
+                                category !== "text" && "cursor-not-allowed opacity-50",
+                              )}
+                            >
+                              <input
+                                type="radio"
+                                name={`form-field-category-${fieldIndex}`}
+                                className="h-4 w-4 accent-primary"
+                                checked={getFormFieldCategory(field) === category}
+                                disabled={category !== "text"}
+                                onChange={() => updateFormFieldConfig(field.id, { control: category })}
+                              />
+                              <span>{label}</span>
+                            </label>
+                          ))}
+                        </div>
+                        {getFormFieldCategory(field) === "text" && (
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div className="space-y-2">
+                              <Label>Text Field Shape</Label>
+                              <div className="grid grid-cols-2 gap-2">
+                                {([
+                                  ["single", "Single-line"],
+                                  ["multiline", "Multiline"],
+                                ] as const).map(([mode, label]) => (
+                                  <label
+                                    key={mode}
+                                    className={cn(
+                                      "flex min-h-9 items-center gap-2 rounded-md border bg-background px-3 text-sm",
+                                      getTextFieldMode(field) === mode && "border-primary bg-primary/10",
+                                    )}
+                                  >
+                                    <input
+                                      type="radio"
+                                      name={`form-text-mode-${fieldIndex}`}
+                                      className="h-4 w-4 accent-primary"
+                                      checked={getTextFieldMode(field) === mode}
+                                      onChange={() => updateFormFieldConfig(field.id, { control: mode === "multiline" ? "multiline" : "text" })}
+                                    />
+                                    <span>{label}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor={`form-field-default-${fieldIndex}`}>Default</Label>
+                              {field.control === "multiline" ? (
+                                <Textarea
+                                  id={`form-field-default-${fieldIndex}`}
+                                  className="mono-field min-h-24 resize-y"
+                                  value={field.defaultValue}
+                                  onChange={(event) => updateFormFieldConfig(field.id, { defaultValue: event.target.value })}
+                                />
+                              ) : (
+                                <Input
+                                  id={`form-field-default-${fieldIndex}`}
+                                  value={field.defaultValue}
+                                  onChange={(event) => updateFormFieldConfig(field.id, { defaultValue: event.target.value })}
+                                />
+                              )}
+                            </div>
                           </div>
-                          {(field.control === "choice" || field.control === "list") && (
+                        )}
+                        {(field.control === "choice" || field.control === "list") && (
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div className="space-y-2">
+                              <Label htmlFor={`form-field-default-${fieldIndex}`}>Default</Label>
+                              <Input
+                                id={`form-field-default-${fieldIndex}`}
+                                value={field.defaultValue}
+                                onChange={(event) => updateFormFieldConfig(field.id, { defaultValue: event.target.value })}
+                              />
+                            </div>
                             <div className="space-y-2">
                               <Label htmlFor={`form-field-values-${fieldIndex}`}>Values</Label>
                               <Textarea
@@ -931,8 +1002,8 @@ function App() {
                                 onChange={(event) => updateFormFieldConfig(field.id, { valuesText: event.target.value })}
                               />
                             </div>
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
