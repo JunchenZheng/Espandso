@@ -82,6 +82,14 @@ type FormFieldControl = "text" | "multiline" | "choice" | "list";
 type FormFieldCategory = "text" | "choice" | "list";
 type TextFieldMode = "single" | "multiline";
 
+interface FormSelectionMenuState {
+  x: number;
+  y: number;
+  start: number;
+  end: number;
+  text: string;
+}
+
 interface FormFieldConfig {
   id: string;
   control: FormFieldControl;
@@ -119,6 +127,29 @@ function extractFormFieldNames(form: string): string[] {
   }
 
   return names;
+}
+
+function getSelectedFormFieldId(selection: string): string {
+  const trimmed = selection.trim();
+  const placeholderMatch = trimmed.match(/^\[\[([^\][\n]+)\]\]$/);
+  const rawName = placeholderMatch ? placeholderMatch[1] : trimmed;
+  return rawName
+    .trim()
+    .replace(/^\[\[|\]\]$/g, "")
+    .replace(/\s+/g, "_")
+    .replace(/[\[\]{}]/g, "")
+    .trim();
+}
+
+function buildUniqueFormFieldId(baseId: string, fieldNames: string[]): string {
+  const fallback = baseId || "field";
+  if (!fieldNames.includes(fallback)) return fallback;
+
+  let suffix = 2;
+  while (fieldNames.includes(`${fallback}_${suffix}`)) {
+    suffix += 1;
+  }
+  return `${fallback}_${suffix}`;
 }
 
 function normalizeFormFieldConfigs(fieldNames: string[], current: FormFieldConfig[]): FormFieldConfig[] {
@@ -211,10 +242,12 @@ function App() {
   const [editIncludeFile, setEditIncludeFile] = useState<string>("");
   const [editForm, setEditForm] = useState<string>("");
   const [editFormFieldConfigs, setEditFormFieldConfigs] = useState<FormFieldConfig[]>([]);
+  const [formSelectionMenu, setFormSelectionMenu] = useState<FormSelectionMenuState | null>(null);
   const [editDescription, setEditDescription] = useState<string>("");
   const [addErrors, setAddErrors] = useState<ValidationError[]>([]);
   const [addWarnings, setAddWarnings] = useState<string[]>([]);
   const [isSavingSnippet, setIsSavingSnippet] = useState<boolean>(false);
+  const formTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const buildEspansoConfigPreviews = useCallback(async (configs: EspansoConfigFile[]): Promise<EspansoConfigPreview[]> => {
     const previews: EspansoConfigPreview[] = [];
@@ -413,6 +446,7 @@ function App() {
     setEditIncludeFile("");
     setEditForm("");
     setEditFormFieldConfigs([]);
+    setFormSelectionMenu(null);
     setEditDescription("");
     setAddErrors([]);
     setAddWarnings([]);
@@ -438,6 +472,7 @@ function App() {
     setEditIncludeFile(target.match.resourcePath || editableSnippet.include_file || "");
     setEditForm(editableSnippet.form || "");
     setEditFormFieldConfigs(formFieldsToConfigs(editableSnippet.form_fields));
+    setFormSelectionMenu(null);
     setEditDescription(editableSnippet.description || "");
     setAddErrors([]);
     setAddWarnings([]);
@@ -477,6 +512,41 @@ function App() {
     setEditFormFieldConfigs((current) => current.map((field) => (
       field.id === id ? { ...field, ...patch } : field
     )));
+  }
+
+  function configureSelectedFormField(control: FormFieldControl) {
+    if (!formSelectionMenu) return;
+
+    const selectedText = formSelectionMenu.text;
+    const selectedFieldId = getSelectedFormFieldId(selectedText);
+    const isExistingPlaceholder = /^\s*\[\[[^\][\n]+\]\]\s*$/.test(selectedText);
+    const existingFieldNames = extractFormFieldNames(editForm);
+    const fieldId = isExistingPlaceholder
+      ? selectedFieldId
+      : buildUniqueFormFieldId(selectedFieldId, existingFieldNames);
+    const placeholder = `[[${fieldId}]]`;
+    const nextForm = isExistingPlaceholder
+      ? editForm
+      : `${editForm.slice(0, formSelectionMenu.start)}${placeholder}${editForm.slice(formSelectionMenu.end)}`;
+
+    setEditForm(nextForm);
+    setEditFormFieldConfigs((current) => {
+      const next = normalizeFormFieldConfigs(extractFormFieldNames(nextForm), current);
+      const existing = next.find((field) => field.id === fieldId);
+      if (existing) {
+        return next.map((field) => (field.id === fieldId ? { ...field, control } : field));
+      }
+      return [...next, { ...createDefaultFormFieldConfig(fieldId), control }];
+    });
+    setFormSelectionMenu(null);
+
+    requestAnimationFrame(() => {
+      const textarea = formTextareaRef.current;
+      if (!textarea) return;
+      const cursor = isExistingPlaceholder ? formSelectionMenu.end : formSelectionMenu.start + placeholder.length;
+      textarea.focus();
+      textarea.setSelectionRange(cursor, cursor);
+    });
   }
 
   useEffect(() => {
@@ -895,11 +965,59 @@ function App() {
                   <Label htmlFor="form">Form Layout</Label>
                   <Textarea
                     id="form"
+                    ref={formTextareaRef}
                     className="mono-field min-h-44 resize-y"
-                    placeholder={"Hey [[name]],\n[[message]]"}
+                    placeholder={"=== Ticket ===\nTitle: title\nCategory: category\n\nDescription:\ndescription"}
                     value={editForm}
-                    onChange={(e) => setEditForm(e.target.value)}
+                    onChange={(e) => {
+                      setEditForm(e.target.value);
+                      setFormSelectionMenu(null);
+                    }}
+                    onKeyDown={() => setFormSelectionMenu(null)}
+                    onScroll={() => setFormSelectionMenu(null)}
+                    onContextMenu={(event) => {
+                      const textarea = event.currentTarget;
+                      const start = textarea.selectionStart;
+                      const end = textarea.selectionEnd;
+                      const selectedText = editForm.slice(start, end);
+                      if (!selectedText.trim()) {
+                        setFormSelectionMenu(null);
+                        return;
+                      }
+
+                      event.preventDefault();
+                      setFormSelectionMenu({
+                        x: event.clientX,
+                        y: event.clientY,
+                        start,
+                        end,
+                        text: selectedText,
+                      });
+                    }}
                   />
+                  {formSelectionMenu && (
+                    <div
+                      className="fixed z-50 w-52 overflow-hidden rounded-md border bg-popover p-1 shadow-lg"
+                      style={{ left: formSelectionMenu.x, top: formSelectionMenu.y }}
+                      onMouseDown={(event) => event.preventDefault()}
+                    >
+                      {([
+                        ["text", "Single-line Text"],
+                        ["multiline", "Multiline Text"],
+                        ["choice", "Choice Box"],
+                        ["list", "List Box"],
+                      ] as const).map(([control, label]) => (
+                        <button
+                          key={control}
+                          type="button"
+                          className="block w-full rounded-sm px-3 py-2 text-left text-sm hover:bg-secondary"
+                          onClick={() => configureSelectedFormField(control)}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 {editFormFieldConfigs.length > 0 && (
                   <div className="space-y-3">
@@ -920,7 +1038,6 @@ function App() {
                               className={cn(
                                 "flex min-h-9 items-center gap-2 rounded-md border bg-background px-3 text-sm",
                                 getFormFieldCategory(field) === category && "border-primary bg-primary/10",
-                                category !== "text" && "cursor-not-allowed opacity-50",
                               )}
                             >
                               <input
@@ -928,7 +1045,6 @@ function App() {
                                 name={`form-field-category-${fieldIndex}`}
                                 className="h-4 w-4 accent-primary"
                                 checked={getFormFieldCategory(field) === category}
-                                disabled={category !== "text"}
                                 onChange={() => updateFormFieldConfig(field.id, { control: category })}
                               />
                               <span>{label}</span>
