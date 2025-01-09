@@ -247,6 +247,7 @@ function App() {
   const [addErrors, setAddErrors] = useState<ValidationError[]>([]);
   const [addWarnings, setAddWarnings] = useState<string[]>([]);
   const [isSavingSnippet, setIsSavingSnippet] = useState<boolean>(false);
+  const formEditorRef = useRef<HTMLDivElement | null>(null);
   const formTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const buildEspansoConfigPreviews = useCallback(async (configs: EspansoConfigFile[]): Promise<EspansoConfigPreview[]> => {
@@ -514,6 +515,26 @@ function App() {
     )));
   }
 
+  function openFormSelectionMenu(textarea: HTMLTextAreaElement, x: number, y: number) {
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = textarea.value.slice(start, end);
+
+    if (!selectedText.trim()) {
+      setFormSelectionMenu(null);
+      return false;
+    }
+
+    setFormSelectionMenu({
+      x,
+      y,
+      start,
+      end,
+      text: selectedText,
+    });
+    return true;
+  }
+
   function configureSelectedFormField(control: FormFieldControl) {
     if (!formSelectionMenu) return;
 
@@ -548,6 +569,44 @@ function App() {
       textarea.setSelectionRange(cursor, cursor);
     });
   }
+
+  useEffect(() => {
+    if (!isAddSnippetOpen || activeSnippetKind !== "form") return;
+
+    const editor = formEditorRef.current;
+    const textarea = formTextareaRef.current;
+    if (!editor || !textarea) return;
+    const editorEl = editor;
+    const textareaEl = textarea;
+
+    function handleNativeContextMenu(event: MouseEvent) {
+      if (!editorEl.contains(event.target as Node)) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      openFormSelectionMenu(textareaEl, event.clientX, event.clientY);
+    }
+
+    function handleNativeSecondaryPointer(event: MouseEvent | PointerEvent) {
+      if (event.button !== 2 || !editorEl.contains(event.target as Node)) return;
+
+      const opened = openFormSelectionMenu(textareaEl, event.clientX, event.clientY);
+      if (opened) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    }
+
+    editorEl.addEventListener("contextmenu", handleNativeContextMenu, true);
+    editorEl.addEventListener("mousedown", handleNativeSecondaryPointer, true);
+    editorEl.addEventListener("pointerdown", handleNativeSecondaryPointer, true);
+
+    return () => {
+      editorEl.removeEventListener("contextmenu", handleNativeContextMenu, true);
+      editorEl.removeEventListener("mousedown", handleNativeSecondaryPointer, true);
+      editorEl.removeEventListener("pointerdown", handleNativeSecondaryPointer, true);
+    };
+  }, [activeSnippetKind, isAddSnippetOpen]);
 
   useEffect(() => {
     let active = true;
@@ -961,7 +1020,7 @@ function App() {
               </div>
             ) : activeSnippetKind === "form" ? (
               <div className="space-y-4">
-                <div className="space-y-2">
+                <div ref={formEditorRef} className="space-y-2">
                   <Label htmlFor="form">Form Layout</Label>
                   <Textarea
                     id="form"
@@ -973,26 +1032,33 @@ function App() {
                       setEditForm(e.target.value);
                       setFormSelectionMenu(null);
                     }}
-                    onKeyDown={() => setFormSelectionMenu(null)}
+                    onKeyDown={(event) => {
+                      if (event.key !== "Shift" && event.key !== "ArrowLeft" && event.key !== "ArrowRight" && event.key !== "ArrowUp" && event.key !== "ArrowDown") {
+                        setFormSelectionMenu(null);
+                      }
+                    }}
+                    onKeyUp={(event) => {
+                      const textarea = event.currentTarget;
+                      if (textarea.selectionStart === textarea.selectionEnd) return;
+                      const rect = textarea.getBoundingClientRect();
+                      openFormSelectionMenu(textarea, rect.left + rect.width / 2, rect.top + 44);
+                    }}
+                    onMouseUp={(event) => {
+                      if (event.button !== 0) return;
+                      openFormSelectionMenu(event.currentTarget, event.clientX, event.clientY);
+                    }}
+                    onPointerDown={(event) => {
+                      if (event.button !== 2) return;
+                      const opened = openFormSelectionMenu(event.currentTarget, event.clientX, event.clientY);
+                      if (opened) {
+                        event.preventDefault();
+                      }
+                    }}
                     onScroll={() => setFormSelectionMenu(null)}
                     onContextMenu={(event) => {
                       const textarea = event.currentTarget;
-                      const start = textarea.selectionStart;
-                      const end = textarea.selectionEnd;
-                      const selectedText = editForm.slice(start, end);
-                      if (!selectedText.trim()) {
-                        setFormSelectionMenu(null);
-                        return;
-                      }
-
-                      event.preventDefault();
-                      setFormSelectionMenu({
-                        x: event.clientX,
-                        y: event.clientY,
-                        start,
-                        end,
-                        text: selectedText,
-                      });
+                      const opened = openFormSelectionMenu(textarea, event.clientX, event.clientY);
+                      if (opened) event.preventDefault();
                     }}
                   />
                   {formSelectionMenu && (
