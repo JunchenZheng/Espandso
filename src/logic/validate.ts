@@ -41,6 +41,8 @@ export async function validate(
     const triggers = snippet.triggers;
     const replace = snippet.replace;
     const includeFile = snippet.include_file;
+    const form = snippet.form;
+    const formFields = snippet.form_fields;
     const description = snippet.description;
 
     const hasTrigger = trigger !== undefined && trigger !== null;
@@ -78,19 +80,21 @@ export async function validate(
       }
     }
 
-    // Replace vs Include File validation
+    // Replacement kind validation
     const hasReplace = replace !== undefined && replace !== null;
     const hasInclude = includeFile !== undefined && includeFile !== null;
+    const hasForm = form !== undefined && form !== null;
+    const replacementKindCount = [hasReplace, hasInclude, hasForm].filter(Boolean).length;
 
-    if (!hasReplace && !hasInclude) {
-      errors.push({ message: `snippet #${i}: must have either 'replace' or 'include_file'` });
-    } else if (hasReplace && hasInclude) {
-      errors.push({ message: `snippet #${i}: cannot have both 'replace' and 'include_file'` });
+    if (replacementKindCount === 0) {
+      errors.push({ message: `snippet #${i}: must have either 'replace', 'include_file', or 'form'` });
+    } else if (replacementKindCount > 1) {
+      errors.push({ message: `snippet #${i}: cannot combine 'replace', 'include_file', and 'form'` });
     } else if (hasReplace) {
       if (typeof replace !== "string" || !replace) {
         errors.push({ message: `snippet #${i}: 'replace' must be a non-empty string` });
       }
-    } else {
+    } else if (hasInclude) {
       if (typeof includeFile !== "string" || !includeFile) {
         errors.push({ message: `snippet #${i}: 'include_file' must be a non-empty string` });
       } else if (options?.snippetsDir && options?.checkFileExists) {
@@ -102,6 +106,16 @@ export async function validate(
             message: `snippet #${i}: include_file '${includeFile}' not found`,
           });
         }
+      }
+    } else if (typeof form !== "string" || !form) {
+      errors.push({ message: `snippet #${i}: 'form' must be a non-empty string` });
+    }
+
+    if (formFields !== undefined && formFields !== null) {
+      if (!hasForm) {
+        errors.push({ message: `snippet #${i}: 'form_fields' can only be used with 'form'` });
+      } else if (typeof formFields !== "object" || Array.isArray(formFields)) {
+        errors.push({ message: `snippet #${i}: 'form_fields' must be an object` });
       }
     }
 
