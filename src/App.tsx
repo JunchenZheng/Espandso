@@ -17,6 +17,7 @@ import {
   Loader2,
   Plus,
   RefreshCw,
+  RotateCcw,
   Save,
   Settings,
   SquareArrowOutUpRight,
@@ -152,6 +153,10 @@ function buildUniqueFormFieldId(baseId: string, fieldNames: string[]): string {
     suffix += 1;
   }
   return `${fallback}_${suffix}`;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function normalizeFormFieldConfigs(fieldNames: string[], current: FormFieldConfig[]): FormFieldConfig[] {
@@ -516,6 +521,19 @@ function App() {
     )));
   }
 
+  function undoFormField(fieldId: string) {
+    const placeholderPattern = new RegExp(`\\[\\[\\s*${escapeRegExp(fieldId)}\\s*\\]\\]`, "g");
+    const nextForm = editForm.replace(placeholderPattern, fieldId);
+
+    setEditForm(nextForm);
+    setEditFormFieldConfigs((current) => current.filter((field) => field.id !== fieldId));
+    setFormSelection(null);
+
+    requestAnimationFrame(() => {
+      formTextareaRef.current?.focus();
+    });
+  }
+
   function captureFormSelection(textarea: HTMLTextAreaElement) {
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
@@ -839,10 +857,10 @@ function App() {
       }}>
         <DialogContent
           className={cn(
-            "overflow-hidden",
+            "grid max-h-[calc(100vh-2rem)] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden",
             snippetEditTarget
-              ? "h-[50vh] max-h-[calc(100vh-2rem)] w-[50vw] min-w-[min(42rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)]"
-              : "max-h-[calc(100vh-2rem)] max-w-2xl",
+              ? "h-[min(50rem,calc(100vh-2rem))] w-[50vw] min-w-[min(42rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)]"
+              : "h-[min(50rem,calc(100vh-2rem))] max-w-2xl",
           )}
         >
           <DialogHeader>
@@ -1046,6 +1064,16 @@ function App() {
                       <div key={field.id} className="space-y-3 rounded-md border bg-secondary/25 p-3">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <div className="mono-field min-w-0 truncate text-sm font-semibold">[[{field.id}]]</div>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-8 shrink-0 text-xs"
+                            onClick={() => undoFormField(field.id)}
+                          >
+                            <RotateCcw className="h-3.5 w-3.5" />
+                            Undo
+                          </Button>
                         </div>
                         <div className="grid gap-2 sm:grid-cols-3">
                           {([
