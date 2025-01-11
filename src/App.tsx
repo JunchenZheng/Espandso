@@ -1,22 +1,28 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import { listen } from "@tauri-apps/api/event";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { openPath } from "@tauri-apps/plugin-opener";
 import {
   AlertTriangle,
+  AlignLeft,
   ChevronDown,
   ChevronRight,
   FileSearch,
   FileText,
   Folder,
   FolderOpen,
+  List,
+  ListChecks,
   Loader2,
   Plus,
   RefreshCw,
+  RotateCcw,
   Save,
   Settings,
   SquareArrowOutUpRight,
   Trash2,
+  Type,
   Upload,
   XCircle,
 } from "lucide-react";
@@ -42,7 +48,6 @@ import { importYamlContent, ImportedMatch } from "./logic/importYaml";
 import { buildTriggerInput, getSnippetTriggers, normalizeTriggerLines } from "./logic/snippetUtils";
 import { appendSnippetToYamlContent, deleteSnippetFromYamlContent, replaceSnippetInYamlContent } from "./logic/yamlEditor";
 import { EspansoConfigFile, EspansoPathSource, scanEspansoConfigFiles } from "./logic/espansoPaths";
-import { restartEspanso, InstallResult } from "./tauri/espansoRuntime";
 import { cn } from "./lib/utils";
 
 interface DragDropPayload {
@@ -55,6 +60,7 @@ interface EspansoConfigPreview {
   snippetCount: number;
   inlineCount: number;
   resourceCount: number;
+  formCount: number;
   warningCount: number;
   snippets: Snippet[];
   importedMatches: ImportedMatch[];
@@ -76,6 +82,155 @@ interface SnippetEditTarget {
   displayIndex: number;
 }
 
+type AddSnippetKind = "text" | "file" | "form";
+type FormFieldControl = "text" | "multiline" | "choice" | "list";
+type FormFieldCategory = "text" | "choice" | "list";
+type TextFieldMode = "single" | "multiline";
+
+interface FormSelectionState {
+  start: number;
+  end: number;
+  text: string;
+}
+
+interface FormFieldConfig {
+  id: string;
+  control: FormFieldControl;
+  defaultValue: string;
+  valuesText: string;
+}
+
+function snippetKindLabel(kind: AddSnippetKind): string {
+  if (kind === "file") return "File";
+  if (kind === "form") return "Form";
+  return "Text";
+}
+
+function createDefaultFormFieldConfig(id: string): FormFieldConfig {
+  return {
+    id,
+    control: "text",
+    defaultValue: "",
+    valuesText: "",
+  };
+}
+
+function extractFormFieldNames(form: string): string[] {
+  const names: string[] = [];
+  const seen = new Set<string>();
+  const fieldPattern = /\[\[([^\][\n]+)\]\]/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = fieldPattern.exec(form)) !== null) {
+    const name = match[1].trim();
+    if (name && !seen.has(name)) {
+      seen.add(name);
+      names.push(name);
+    }
+  }
+
+  return names;
+}
+
+function getSelectedFormFieldId(selection: string): string {
+  const trimmed = selection.trim();
+  const placeholderMatch = trimmed.match(/^\[\[([^\][\n]+)\]\]$/);
+  const rawName = placeholderMatch ? placeholderMatch[1] : trimmed;
+  return rawName
+    .trim()
+    .replace(/^\[\[|\]\]$/g, "")
+    .replace(/\s+/g, "_")
+    .replace(/[\[\]{}]/g, "")
+    .trim();
+}
+
+function buildUniqueFormFieldId(baseId: string, fieldNames: string[]): string {
+  const fallback = baseId || "field";
+  if (!fieldNames.includes(fallback)) return fallback;
+
+  let suffix = 2;
+  while (fieldNames.includes(`${fallback}_${suffix}`)) {
+    suffix += 1;
+  }
+  return `${fallback}_${suffix}`;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function normalizeFormFieldConfigs(fieldNames: string[], current: FormFieldConfig[]): FormFieldConfig[] {
+  return fieldNames.map((name) => current.find((field) => field.id === name) || createDefaultFormFieldConfig(name));
+}
+
+function areFormFieldConfigsEqual(a: FormFieldConfig[], b: FormFieldConfig[]): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((field, index) => {
+    const other = b[index];
+    return field.id === other.id
+      && field.control === other.control
+      && field.defaultValue === other.defaultValue
+      && field.valuesText === other.valuesText;
+  });
+}
+
+function getFormFieldCategory(field: FormFieldConfig): FormFieldCategory {
+  if (field.control === "choice" || field.control === "list") return field.control;
+  return "text";
+}
+
+function getTextFieldMode(field: FormFieldConfig): TextFieldMode {
+  return field.control === "multiline" ? "multiline" : "single";
+}
+
+function formFieldsToConfigs(formFields: Record<string, any> | undefined): FormFieldConfig[] {
+  if (!formFields) return [];
+
+  return Object.entries(formFields).map(([id, value]) => {
+    const field = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    const rawType = field.type === "choice" || field.type === "list" ? field.type : "";
+    const control: FormFieldControl = field.multiline === true ? "multiline" : rawType || "text";
+    const values = field.values;
+
+    return {
+      id,
+      control,
+      defaultValue: field.default !== undefined && field.default !== null ? String(field.default) : "",
+      valuesText: Array.isArray(values) ? values.map((item) => String(item)).join("\n") : values ? String(values) : "",
+    };
+  });
+}
+
+function configsToFormFields(configs: FormFieldConfig[]): Record<string, any> | undefined {
+  const formFields: Record<string, any> = {};
+
+  for (const config of configs) {
+    const field: Record<string, any> = {};
+    if (config.control === "multiline") {
+      field.multiline = true;
+    } else if (config.control === "choice" || config.control === "list") {
+      field.type = config.control;
+      const values = config.valuesText
+        .split("\n")
+        .map((value) => value.trim())
+        .filter(Boolean);
+      if (values.length > 0) {
+        field.values = values;
+      }
+    }
+
+    if (config.defaultValue.trim()) {
+      field.default = config.defaultValue.trim();
+    }
+
+    if (Object.keys(field).length > 0) {
+      formFields[config.id] = field;
+    }
+  }
+
+  return Object.keys(formFields).length > 0 ? formFields : undefined;
+}
+
 function App() {
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [espansoMatchDir, setEspansoMatchDir] = useState<string>("");
@@ -88,13 +243,18 @@ function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isAddSnippetOpen, setIsAddSnippetOpen] = useState<boolean>(false);
   const [snippetEditTarget, setSnippetEditTarget] = useState<SnippetEditTarget | null>(null);
+  const [addSnippetKind, setAddSnippetKind] = useState<AddSnippetKind>("text");
   const [editTriggersText, setEditTriggersText] = useState<string>("");
   const [editReplace, setEditReplace] = useState<string>("");
+  const [editIncludeFile, setEditIncludeFile] = useState<string>("");
+  const [editForm, setEditForm] = useState<string>("");
+  const [editFormFieldConfigs, setEditFormFieldConfigs] = useState<FormFieldConfig[]>([]);
+  const [formSelection, setFormSelection] = useState<FormSelectionState | null>(null);
   const [editDescription, setEditDescription] = useState<string>("");
   const [addErrors, setAddErrors] = useState<ValidationError[]>([]);
   const [addWarnings, setAddWarnings] = useState<string[]>([]);
   const [isSavingSnippet, setIsSavingSnippet] = useState<boolean>(false);
-  const [consoleResult, setConsoleResult] = useState<InstallResult | null>(null);
+  const formTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const buildEspansoConfigPreviews = useCallback(async (configs: EspansoConfigFile[]): Promise<EspansoConfigPreview[]> => {
     const previews: EspansoConfigPreview[] = [];
@@ -105,12 +265,14 @@ function App() {
         const result = importYamlContent(content, config.name);
         const inlineCount = result.snippets.filter((snippet) => snippet.replace !== undefined).length;
         const resourceCount = result.snippets.filter((snippet) => snippet.include_file).length;
+        const formCount = result.snippets.filter((snippet) => snippet.form !== undefined).length;
 
         previews.push({
           config,
           snippetCount: result.snippets.length,
           inlineCount,
           resourceCount,
+          formCount,
           warningCount: result.warnings.length,
           snippets: result.snippets,
           importedMatches: result.importedMatches,
@@ -121,6 +283,7 @@ function App() {
           snippetCount: 0,
           inlineCount: 0,
           resourceCount: 0,
+          formCount: 0,
           warningCount: 1,
           snippets: [],
           importedMatches: [],
@@ -163,6 +326,12 @@ function App() {
   }, [scanDefaultEspansoConfigDir]);
 
   async function addDroppedYamlPreview(path: string) {
+    if (isAddSnippetOpen && addSnippetKind === "file") {
+      setEditIncludeFile(path);
+      setIsDragging(false);
+      return;
+    }
+
     const lowerPath = path.toLowerCase();
     if (!lowerPath.endsWith(".yml") && !lowerPath.endsWith(".yaml")) {
       alert("Please drop an Espanso YAML file.");
@@ -219,7 +388,7 @@ function App() {
       active = false;
       unlisteners.forEach((unlisten) => unlisten());
     };
-  }, [buildEspansoConfigPreviews, espansoConfigs]);
+  }, [addSnippetKind, buildEspansoConfigPreviews, espansoConfigs, isAddSnippetOpen, snippetEditTarget]);
 
   const espansoPreviewList = useMemo(
     () => espansoConfigPreviews.length > 0
@@ -229,6 +398,7 @@ function App() {
         snippetCount: 0,
         inlineCount: 0,
         resourceCount: 0,
+        formCount: 0,
         warningCount: 0,
         snippets: [],
         importedMatches: [],
@@ -241,9 +411,10 @@ function App() {
         snippets: total.snippets + preview.snippetCount,
         inline: total.inline + preview.inlineCount,
         resources: total.resources + preview.resourceCount,
+        forms: total.forms + preview.formCount,
         warnings: total.warnings + preview.warningCount,
       }),
-      { snippets: 0, inline: 0, resources: 0, warnings: 0 },
+      { snippets: 0, inline: 0, resources: 0, forms: 0, warnings: 0 },
     ),
     [espansoPreviewList],
   );
@@ -261,12 +432,28 @@ function App() {
     () => getEspansoConfigAncestorPaths(selectedEspansoPreview?.config.relativePath || ""),
     [selectedEspansoPreview],
   );
-  const snippetBeingEdited = snippetEditTarget?.match.originalSnippet || snippetEditTarget?.match.snippet || null;
-  const isExternalSnippetEdit = Boolean(snippetBeingEdited?.include_file);
+  const activeSnippetKind: AddSnippetKind = addSnippetKind;
+  const detectedFormFieldNames = useMemo(() => extractFormFieldNames(editForm), [editForm]);
+  const detectedFormFieldKey = detectedFormFieldNames.join("\n");
+  const snippetDialogTitle = snippetEditTarget
+    ? `Edit ${snippetKindLabel(activeSnippetKind)} Snippet`
+    : `Add ${snippetKindLabel(activeSnippetKind)} Snippet`;
+
+  useEffect(() => {
+    setEditFormFieldConfigs((current) => {
+      const normalized = normalizeFormFieldConfigs(detectedFormFieldNames, current);
+      return areFormFieldConfigsEqual(current, normalized) ? current : normalized;
+    });
+  }, [detectedFormFieldKey]);
 
   function resetSnippetForm() {
+    setAddSnippetKind("text");
     setEditTriggersText("");
     setEditReplace("");
+    setEditIncludeFile("");
+    setEditForm("");
+    setEditFormFieldConfigs([]);
+    setFormSelection(null);
     setEditDescription("");
     setAddErrors([]);
     setAddWarnings([]);
@@ -286,8 +473,13 @@ function App() {
     const editableSnippet = target.match.originalSnippet || target.match.snippet;
     const triggerInput = buildTriggerInput(editableSnippet);
     setSnippetEditTarget(target);
+    setAddSnippetKind(editableSnippet.include_file ? "file" : editableSnippet.form !== undefined ? "form" : "text");
     setEditTriggersText(triggerInput.multiline);
     setEditReplace(editableSnippet.replace || "");
+    setEditIncludeFile(target.match.resourcePath || editableSnippet.include_file || "");
+    setEditForm(editableSnippet.form || "");
+    setEditFormFieldConfigs(formFieldsToConfigs(editableSnippet.form_fields));
+    setFormSelection(null);
     setEditDescription(editableSnippet.description || "");
     setAddErrors([]);
     setAddWarnings([]);
@@ -302,8 +494,19 @@ function App() {
 
     const snippet: Snippet = {
       ...triggerFields,
-      replace: editReplace,
     };
+
+    if (activeSnippetKind === "file") {
+      snippet.include_file = editIncludeFile.trim();
+    } else if (activeSnippetKind === "form") {
+      snippet.form = editForm;
+      const formFields = configsToFormFields(editFormFieldConfigs);
+      if (formFields) {
+        snippet.form_fields = formFields;
+      }
+    } else {
+      snippet.replace = editReplace;
+    }
 
     if (editDescription.trim()) {
       snippet.description = editDescription.trim();
@@ -312,24 +515,109 @@ function App() {
     return snippet;
   }
 
+  function updateFormFieldConfig(id: string, patch: Partial<FormFieldConfig>) {
+    setEditFormFieldConfigs((current) => current.map((field) => (
+      field.id === id ? { ...field, ...patch } : field
+    )));
+  }
+
+  function undoFormField(fieldId: string) {
+    const placeholderPattern = new RegExp(`\\[\\[\\s*${escapeRegExp(fieldId)}\\s*\\]\\]`, "g");
+    const nextForm = editForm.replace(placeholderPattern, fieldId);
+
+    setEditForm(nextForm);
+    setEditFormFieldConfigs((current) => current.filter((field) => field.id !== fieldId));
+    setFormSelection(null);
+
+    requestAnimationFrame(() => {
+      formTextareaRef.current?.focus();
+    });
+  }
+
+  function captureFormSelection(textarea: HTMLTextAreaElement) {
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = textarea.value.slice(start, end);
+
+    if (!selectedText.trim()) {
+      setFormSelection(null);
+      return false;
+    }
+
+    setFormSelection({
+      start,
+      end,
+      text: selectedText,
+    });
+    return true;
+  }
+
+  function configureSelectedFormField(control: FormFieldControl) {
+    if (!formSelection) return;
+
+    const selectedText = formSelection.text;
+    const selectedFieldId = getSelectedFormFieldId(selectedText);
+    const isExistingPlaceholder = /^\s*\[\[[^\][\n]+\]\]\s*$/.test(selectedText);
+    const existingFieldNames = extractFormFieldNames(editForm);
+    const fieldId = isExistingPlaceholder
+      ? selectedFieldId
+      : buildUniqueFormFieldId(selectedFieldId, existingFieldNames);
+    const placeholder = `[[${fieldId}]]`;
+    const nextForm = isExistingPlaceholder
+      ? editForm
+      : `${editForm.slice(0, formSelection.start)}${placeholder}${editForm.slice(formSelection.end)}`;
+
+    setEditForm(nextForm);
+    setEditFormFieldConfigs((current) => {
+      const next = normalizeFormFieldConfigs(extractFormFieldNames(nextForm), current);
+      const existing = next.find((field) => field.id === fieldId);
+      if (existing) {
+        return next.map((field) => (field.id === fieldId ? { ...field, control } : field));
+      }
+      return [...next, { ...createDefaultFormFieldConfig(fieldId), control }];
+    });
+    setFormSelection(null);
+
+    requestAnimationFrame(() => {
+      const textarea = formTextareaRef.current;
+      if (!textarea) return;
+      const cursor = isExistingPlaceholder ? formSelection.end : formSelection.start + placeholder.length;
+      textarea.focus();
+      textarea.setSelectionRange(cursor, cursor);
+    });
+  }
+
   useEffect(() => {
     let active = true;
 
     async function validateSnippetForm() {
-      if (!isAddSnippetOpen || !selectedEspansoPreview || isExternalSnippetEdit) {
+      if (!isAddSnippetOpen || !selectedEspansoPreview) {
         setAddErrors([]);
         setAddWarnings([]);
         return;
       }
 
-      const hasAnyInput = editTriggersText.trim() || editReplace.trim() || editDescription.trim();
+      const hasAnyInput = editTriggersText.trim()
+        || editReplace.trim()
+        || editIncludeFile.trim()
+        || editForm.trim()
+        || editFormFieldConfigs.some((field) => field.defaultValue.trim() || field.valuesText.trim() || field.control !== "text")
+        || editDescription.trim();
       if (!hasAnyInput) {
         setAddErrors([]);
         setAddWarnings([]);
         return;
       }
 
-      const snippet = buildFormSnippet();
+      let snippet: Snippet;
+      try {
+        snippet = buildFormSnippet();
+      } catch (e: any) {
+        if (!active) return;
+        setAddErrors([{ message: e?.message || String(e) }]);
+        setAddWarnings([]);
+        return;
+      }
       const snippetsForValidation = snippetEditTarget
         ? snippetEditTarget.preview.importedMatches
           .filter((match) => match.originalMatchIndex !== snippetEditTarget.match.originalMatchIndex)
@@ -349,15 +637,24 @@ function App() {
     return () => {
       active = false;
     };
-  }, [editTriggersText, editReplace, editDescription, isAddSnippetOpen, selectedEspansoPreview, snippetEditTarget, isExternalSnippetEdit]);
+  }, [activeSnippetKind, editTriggersText, editReplace, editIncludeFile, editForm, editFormFieldConfigs, editDescription, isAddSnippetOpen, selectedEspansoPreview, snippetEditTarget]);
+
+  async function chooseSnippetFile() {
+    const selected = await openDialog({
+      multiple: false,
+      directory: false,
+    });
+
+    if (typeof selected === "string") {
+      setEditIncludeFile(selected);
+    } else if (Array.isArray(selected) && typeof selected[0] === "string") {
+      setEditIncludeFile(selected[0]);
+    }
+  }
 
   async function saveSnippetToYaml() {
     const targetPreview = snippetEditTarget?.preview || selectedEspansoPreview;
     if (!targetPreview || isSavingSnippet) return;
-    if (isExternalSnippetEdit) {
-      alert("External file snippets can be deleted, but only inline text snippets can be edited here.");
-      return;
-    }
     if (addErrors.length > 0) {
       alert("Please fix validation errors before saving.");
       return;
@@ -371,8 +668,8 @@ function App() {
         ? replaceSnippetInYamlContent(content, snippetEditTarget.match.originalMatchIndex, snippet)
         : appendSnippetToYamlContent(content, snippet);
       await writeTextFile(targetPreview.config.path, updatedContent);
-      const restartResult = await restartEspanso();
-      setConsoleResult(restartResult);
+      // Espanso has its own hot-reload path for match files. Keep restart disabled
+      // while testing which edits actually require the more expensive CLI restart.
       setIsAddSnippetOpen(false);
       resetSnippetForm();
       setSnippetEditTarget(null);
@@ -395,8 +692,8 @@ function App() {
       const content = await readTextFile(target.preview.config.path);
       const updatedContent = deleteSnippetFromYamlContent(content, target.match.originalMatchIndex);
       await writeTextFile(target.preview.config.path, updatedContent);
-      const restartResult = await restartEspanso();
-      setConsoleResult(restartResult);
+      // Espanso has its own hot-reload path for match files. Keep restart disabled
+      // while testing which edits actually require the more expensive CLI restart.
       setIsAddSnippetOpen(false);
       resetSnippetForm();
       setSnippetEditTarget(null);
@@ -421,8 +718,14 @@ function App() {
         <div className="drag-overlay">
           <div className="drag-zone">
             <Upload className="mb-5 h-12 w-12" />
-            <div className="text-xl font-semibold">Drop YAML file here</div>
-            <div className="mt-2 text-sm text-muted-foreground">Dropped YAML files are previewed and edited directly.</div>
+            <div className="text-xl font-semibold">
+              {isAddSnippetOpen && addSnippetKind === "file" ? "Drop file here" : "Drop YAML file here"}
+            </div>
+            <div className="mt-2 text-sm text-muted-foreground">
+              {isAddSnippetOpen && addSnippetKind === "file"
+                ? "Dropped files are used as the snippet source."
+                : "Dropped YAML files are previewed and edited directly."}
+            </div>
           </div>
         </div>
       )}
@@ -430,7 +733,17 @@ function App() {
       <main className="flex h-full w-full overflow-hidden bg-[linear-gradient(180deg,hsl(var(--background))_0%,hsl(var(--secondary))_100%)] p-4">
         <Card className="flex h-full w-full flex-col p-4">
           <CardContent className="flex min-h-0 flex-1 flex-col p-0">
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={scanDefaultEspansoConfigDir}
+                disabled={isScanningEspanso}
+                aria-label="Refresh YAML configs"
+                title="Refresh YAML configs"
+              >
+                <RefreshCw className={cn("h-4 w-4", isScanningEspanso && "animate-spin")} />
+                Refresh
+              </Button>
               <Button variant="outline" onClick={() => setIsSettingsOpen(true)}>
                 <Settings />
                 Settings
@@ -445,14 +758,28 @@ function App() {
                       <span className="text-muted-foreground">{espansoPreviewTotals.snippets} readable snippets</span>
                       <span className="text-muted-foreground">{espansoPreviewTotals.inline} inline</span>
                       <span className="text-muted-foreground">{espansoPreviewTotals.resources} external files</span>
+                      <span className="text-muted-foreground">{espansoPreviewTotals.forms} forms</span>
                       {espansoPreviewTotals.warnings > 0 && (
                         <span className="text-amber-700">{espansoPreviewTotals.warnings} warnings</span>
                       )}
                     </div>
-                    <Button size="sm" onClick={openAddSnippetDialog} disabled={!selectedEspansoPreview}>
-                      <Plus className="h-4 w-4" />
-                      Add Snippet
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={scanDefaultEspansoConfigDir}
+                        disabled={isScanningEspanso}
+                        aria-label="Refresh YAML configs"
+                        title="Refresh YAML configs"
+                      >
+                        <RefreshCw className={cn("h-4 w-4", isScanningEspanso && "animate-spin")} />
+                        Refresh
+                      </Button>
+                      <Button size="sm" onClick={openAddSnippetDialog} disabled={!selectedEspansoPreview}>
+                        <Plus className="h-4 w-4" />
+                        Add Snippet
+                      </Button>
+                    </div>
                   </div>
 
                   <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden rounded-md border bg-background md:grid-cols-[18rem_1fr]">
@@ -530,14 +857,14 @@ function App() {
       }}>
         <DialogContent
           className={cn(
-            "overflow-hidden",
+            "grid max-h-[calc(100vh-2rem)] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden",
             snippetEditTarget
-              ? "h-[50vh] max-h-[calc(100vh-2rem)] w-[50vw] min-w-[min(42rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)]"
-              : "max-h-[calc(100vh-2rem)] max-w-2xl",
+              ? "h-[min(50rem,calc(100vh-2rem))] w-[50vw] min-w-[min(42rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)]"
+              : "h-[min(50rem,calc(100vh-2rem))] max-w-2xl",
           )}
         >
           <DialogHeader>
-            <DialogTitle>{snippetEditTarget ? "Edit Snippet" : "Add Static Text Snippet"}</DialogTitle>
+            <DialogTitle>{snippetDialogTitle}</DialogTitle>
             <DialogDescription className="break-all">
               {snippetEditTarget?.preview.config.relativePath || selectedEspansoPreview?.config.relativePath || "Select a YAML file"}
               {snippetEditTarget ? ` · Snippet #${snippetEditTarget.displayIndex + 1}` : ""}
@@ -612,18 +939,239 @@ function App() {
               </div>
             </div>
 
-            {isExternalSnippetEdit ? (
-              <div className="space-y-2">
-                <Label htmlFor="include-file">Include File</Label>
-                <Input
-                  id="include-file"
-                  className="mono-field"
-                  value={snippetBeingEdited?.include_file || ""}
-                  readOnly
-                />
-                <p className="text-xs text-muted-foreground">
-                  External file snippets can be deleted here. Inline editing is only available for static text snippets.
-                </p>
+            <div className="grid grid-cols-3 rounded-md border bg-secondary/60 p-1">
+              <Button
+                type="button"
+                variant={activeSnippetKind === "text" ? "secondary" : "ghost"}
+                className="h-8"
+                onClick={() => setAddSnippetKind("text")}
+              >
+                Text
+              </Button>
+              <Button
+                type="button"
+                variant={activeSnippetKind === "file" ? "secondary" : "ghost"}
+                className="h-8"
+                onClick={() => setAddSnippetKind("file")}
+              >
+                File
+              </Button>
+              <Button
+                type="button"
+                variant={activeSnippetKind === "form" ? "secondary" : "ghost"}
+                className="h-8"
+                onClick={() => setAddSnippetKind("form")}
+              >
+                Form
+              </Button>
+            </div>
+
+            {activeSnippetKind === "file" ? (
+              <div className="space-y-3">
+                <Label htmlFor="include-file">File</Label>
+                <div
+                  className="flex min-h-40 flex-col items-center justify-center gap-3 rounded-md border border-dashed bg-secondary/30 p-5 text-center"
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    const droppedFile = event.dataTransfer.files[0];
+                    const droppedPath = droppedFile ? (droppedFile as File & { path?: string }).path : "";
+                    if (droppedPath) {
+                      setEditIncludeFile(droppedPath);
+                    }
+                  }}
+                >
+                  <Upload className="h-8 w-8 text-muted-foreground" />
+                  <div className="w-full space-y-2">
+                    <Input
+                      id="include-file"
+                      className="mono-field"
+                      placeholder="Choose or drop a file path..."
+                      value={editIncludeFile}
+                      onChange={(e) => setEditIncludeFile(e.target.value)}
+                    />
+                    <Button type="button" variant="outline" onClick={chooseSnippetFile}>
+                      <FileSearch className="h-4 w-4" />
+                      Choose File
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : activeSnippetKind === "form" ? (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="form">Form Layout</Label>
+                  <Textarea
+                    id="form"
+                    ref={formTextareaRef}
+                    className="mono-field min-h-44 resize-y"
+                    placeholder={"=== Ticket ===\nTitle: title\nCategory: category\n\nDescription:\ndescription"}
+                    value={editForm}
+                    onChange={(e) => {
+                      setEditForm(e.target.value);
+                      setFormSelection(null);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key !== "Shift" && event.key !== "ArrowLeft" && event.key !== "ArrowRight" && event.key !== "ArrowUp" && event.key !== "ArrowDown") {
+                        setFormSelection(null);
+                      }
+                    }}
+                    onKeyUp={(event) => captureFormSelection(event.currentTarget)}
+                    onMouseUp={(event) => {
+                      if (event.button !== 0) return;
+                      captureFormSelection(event.currentTarget);
+                    }}
+                    onSelect={(event) => captureFormSelection(event.currentTarget)}
+                    onContextMenu={(event) => {
+                      event.preventDefault();
+                      captureFormSelection(event.currentTarget);
+                    }}
+                  />
+                  <div className="space-y-2 rounded-md border bg-secondary/25 p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <Label>Selected Text Action</Label>
+                      <span className="max-w-full truncate text-xs text-muted-foreground">
+                        {formSelection ? formSelection.text.trim() : "Select text in the form layout"}
+                      </span>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-4">
+                      {([
+                        ["text", "Single-line Text", Type],
+                        ["multiline", "Multiline Text", AlignLeft],
+                        ["choice", "Choice Box", ListChecks],
+                        ["list", "List Box", List],
+                      ] as const).map(([control, label, Icon]) => (
+                        <Button
+                          key={control}
+                          type="button"
+                          variant="outline"
+                          disabled={!formSelection}
+                          className="justify-start"
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => configureSelectedFormField(control)}
+                        >
+                          <Icon className="h-4 w-4" />
+                          {label}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                {editFormFieldConfigs.length > 0 && (
+                  <div className="space-y-3">
+                    <Label>Fields</Label>
+                    {editFormFieldConfigs.map((field, fieldIndex) => (
+                      <div key={field.id} className="space-y-3 rounded-md border bg-secondary/25 p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="mono-field min-w-0 truncate text-sm font-semibold">[[{field.id}]]</div>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-8 shrink-0 text-xs"
+                            onClick={() => undoFormField(field.id)}
+                          >
+                            <RotateCcw className="h-3.5 w-3.5" />
+                            Undo
+                          </Button>
+                        </div>
+                        <div className="grid gap-2 sm:grid-cols-3">
+                          {([
+                            ["text", "Text Fields"],
+                            ["choice", "Choice Box"],
+                            ["list", "List Box"],
+                          ] as const).map(([category, label]) => (
+                            <label
+                              key={category}
+                              className={cn(
+                                "flex min-h-9 items-center gap-2 rounded-md border bg-background px-3 text-sm",
+                                getFormFieldCategory(field) === category && "border-primary bg-primary/10",
+                              )}
+                            >
+                              <input
+                                type="radio"
+                                name={`form-field-category-${fieldIndex}`}
+                                className="h-4 w-4 accent-primary"
+                                checked={getFormFieldCategory(field) === category}
+                                onChange={() => updateFormFieldConfig(field.id, { control: category })}
+                              />
+                              <span>{label}</span>
+                            </label>
+                          ))}
+                        </div>
+                        {getFormFieldCategory(field) === "text" && (
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div className="space-y-2">
+                              <Label>Text Field Shape</Label>
+                              <div className="grid grid-cols-2 gap-2">
+                                {([
+                                  ["single", "Single-line"],
+                                  ["multiline", "Multiline"],
+                                ] as const).map(([mode, label]) => (
+                                  <label
+                                    key={mode}
+                                    className={cn(
+                                      "flex min-h-9 items-center gap-2 rounded-md border bg-background px-3 text-sm",
+                                      getTextFieldMode(field) === mode && "border-primary bg-primary/10",
+                                    )}
+                                  >
+                                    <input
+                                      type="radio"
+                                      name={`form-text-mode-${fieldIndex}`}
+                                      className="h-4 w-4 accent-primary"
+                                      checked={getTextFieldMode(field) === mode}
+                                      onChange={() => updateFormFieldConfig(field.id, { control: mode === "multiline" ? "multiline" : "text" })}
+                                    />
+                                    <span>{label}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor={`form-field-default-${fieldIndex}`}>Default</Label>
+                              {field.control === "multiline" ? (
+                                <Textarea
+                                  id={`form-field-default-${fieldIndex}`}
+                                  className="mono-field min-h-24 resize-y"
+                                  value={field.defaultValue}
+                                  onChange={(event) => updateFormFieldConfig(field.id, { defaultValue: event.target.value })}
+                                />
+                              ) : (
+                                <Input
+                                  id={`form-field-default-${fieldIndex}`}
+                                  value={field.defaultValue}
+                                  onChange={(event) => updateFormFieldConfig(field.id, { defaultValue: event.target.value })}
+                                />
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        {(field.control === "choice" || field.control === "list") && (
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div className="space-y-2">
+                              <Label htmlFor={`form-field-default-${fieldIndex}`}>Default</Label>
+                              <Input
+                                id={`form-field-default-${fieldIndex}`}
+                                value={field.defaultValue}
+                                onChange={(event) => updateFormFieldConfig(field.id, { defaultValue: event.target.value })}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor={`form-field-values-${fieldIndex}`}>Values</Label>
+                              <Textarea
+                                id={`form-field-values-${fieldIndex}`}
+                                className="mono-field min-h-24 resize-y"
+                                placeholder={"First choice\nSecond choice"}
+                                value={field.valuesText}
+                                onChange={(event) => updateFormFieldConfig(field.id, { valuesText: event.target.value })}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="space-y-2">
@@ -663,7 +1211,7 @@ function App() {
               <Button variant="outline" onClick={() => setIsAddSnippetOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={saveSnippetToYaml} disabled={isSavingSnippet || isExternalSnippetEdit}>
+              <Button onClick={saveSnippetToYaml} disabled={isSavingSnippet}>
                 {isSavingSnippet ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                 {snippetEditTarget ? "Update YAML" : "Save to YAML"}
               </Button>
@@ -710,23 +1258,6 @@ function App() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={consoleResult !== null} onOpenChange={(open) => !open && setConsoleResult(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{consoleResult?.success ? "Espanso restarted" : "Espanso restart issue"}</DialogTitle>
-            <DialogDescription>{consoleResult?.message}</DialogDescription>
-          </DialogHeader>
-          {(consoleResult?.stdout || consoleResult?.stderr) && (
-            <pre className="mono-field max-h-64 overflow-auto rounded-md border bg-secondary/40 p-3 text-xs">
-              {consoleResult.stdout}
-              {consoleResult.stderr}
-            </pre>
-          )}
-          <DialogFooter>
-            <Button onClick={() => setConsoleResult(null)}>Done</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
@@ -971,6 +1502,12 @@ function EspansoConfigDetail({ preview, onViewSnippet }: EspansoConfigDetailProp
                 const index = startIndex + offset;
                 const triggers = getSnippetTriggers(snippet);
                 const displayTrigger = triggers.length > 0 ? triggers.join(", ") : `Snippet ${index + 1}`;
+                const snippetKind = snippet.include_file ? "file" : snippet.form !== undefined ? "form" : "text";
+                const snippetPreview = snippet.include_file
+                  ? `include: ${snippet.include_file}`
+                  : snippet.form !== undefined
+                    ? snippet.form || "Empty form"
+                    : snippet.replace || "Empty replacement";
 
                 return (
                   <button
@@ -988,14 +1525,16 @@ function EspansoConfigDetail({ preview, onViewSnippet }: EspansoConfigDetailProp
                       <span
                         className={cn(
                           "h-4 w-4 rounded",
-                          snippet.include_file ? "bg-primary/70" : "bg-muted-foreground/35",
+                          snippetKind === "file" && "bg-primary/70",
+                          snippetKind === "form" && "bg-emerald-500/70",
+                          snippetKind === "text" && "bg-muted-foreground/35",
                         )}
-                        title={snippet.include_file ? "External file snippet" : "Inline replacement snippet"}
+                        title={snippetKind === "file" ? "External file snippet" : snippetKind === "form" ? "Form snippet" : "Inline replacement snippet"}
                       />
                     </div>
                     <div className="mono-field min-w-0 truncate pr-3 text-sm">{displayTrigger}</div>
                     <div className="min-w-0 truncate text-muted-foreground">
-                      {snippet.include_file ? `include: ${snippet.include_file}` : snippet.replace || "Empty replacement"}
+                      {snippetPreview}
                     </div>
                     <div className="flex justify-end text-muted-foreground">
                       <SquareArrowOutUpRight className="h-4 w-4" />
