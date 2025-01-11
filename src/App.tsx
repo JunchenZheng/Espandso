@@ -5,12 +5,15 @@ import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { openPath } from "@tauri-apps/plugin-opener";
 import {
   AlertTriangle,
+  AlignLeft,
   ChevronDown,
   ChevronRight,
   FileSearch,
   FileText,
   Folder,
   FolderOpen,
+  List,
+  ListChecks,
   Loader2,
   Plus,
   RefreshCw,
@@ -18,6 +21,7 @@ import {
   Settings,
   SquareArrowOutUpRight,
   Trash2,
+  Type,
   Upload,
   XCircle,
 } from "lucide-react";
@@ -82,9 +86,7 @@ type FormFieldControl = "text" | "multiline" | "choice" | "list";
 type FormFieldCategory = "text" | "choice" | "list";
 type TextFieldMode = "single" | "multiline";
 
-interface FormSelectionMenuState {
-  x: number;
-  y: number;
+interface FormSelectionState {
   start: number;
   end: number;
   text: string;
@@ -242,12 +244,11 @@ function App() {
   const [editIncludeFile, setEditIncludeFile] = useState<string>("");
   const [editForm, setEditForm] = useState<string>("");
   const [editFormFieldConfigs, setEditFormFieldConfigs] = useState<FormFieldConfig[]>([]);
-  const [formSelectionMenu, setFormSelectionMenu] = useState<FormSelectionMenuState | null>(null);
+  const [formSelection, setFormSelection] = useState<FormSelectionState | null>(null);
   const [editDescription, setEditDescription] = useState<string>("");
   const [addErrors, setAddErrors] = useState<ValidationError[]>([]);
   const [addWarnings, setAddWarnings] = useState<string[]>([]);
   const [isSavingSnippet, setIsSavingSnippet] = useState<boolean>(false);
-  const formEditorRef = useRef<HTMLDivElement | null>(null);
   const formTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const buildEspansoConfigPreviews = useCallback(async (configs: EspansoConfigFile[]): Promise<EspansoConfigPreview[]> => {
@@ -447,7 +448,7 @@ function App() {
     setEditIncludeFile("");
     setEditForm("");
     setEditFormFieldConfigs([]);
-    setFormSelectionMenu(null);
+    setFormSelection(null);
     setEditDescription("");
     setAddErrors([]);
     setAddWarnings([]);
@@ -473,7 +474,7 @@ function App() {
     setEditIncludeFile(target.match.resourcePath || editableSnippet.include_file || "");
     setEditForm(editableSnippet.form || "");
     setEditFormFieldConfigs(formFieldsToConfigs(editableSnippet.form_fields));
-    setFormSelectionMenu(null);
+    setFormSelection(null);
     setEditDescription(editableSnippet.description || "");
     setAddErrors([]);
     setAddWarnings([]);
@@ -515,19 +516,17 @@ function App() {
     )));
   }
 
-  function openFormSelectionMenu(textarea: HTMLTextAreaElement, x: number, y: number) {
+  function captureFormSelection(textarea: HTMLTextAreaElement) {
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
     const selectedText = textarea.value.slice(start, end);
 
     if (!selectedText.trim()) {
-      setFormSelectionMenu(null);
+      setFormSelection(null);
       return false;
     }
 
-    setFormSelectionMenu({
-      x,
-      y,
+    setFormSelection({
       start,
       end,
       text: selectedText,
@@ -536,9 +535,9 @@ function App() {
   }
 
   function configureSelectedFormField(control: FormFieldControl) {
-    if (!formSelectionMenu) return;
+    if (!formSelection) return;
 
-    const selectedText = formSelectionMenu.text;
+    const selectedText = formSelection.text;
     const selectedFieldId = getSelectedFormFieldId(selectedText);
     const isExistingPlaceholder = /^\s*\[\[[^\][\n]+\]\]\s*$/.test(selectedText);
     const existingFieldNames = extractFormFieldNames(editForm);
@@ -548,7 +547,7 @@ function App() {
     const placeholder = `[[${fieldId}]]`;
     const nextForm = isExistingPlaceholder
       ? editForm
-      : `${editForm.slice(0, formSelectionMenu.start)}${placeholder}${editForm.slice(formSelectionMenu.end)}`;
+      : `${editForm.slice(0, formSelection.start)}${placeholder}${editForm.slice(formSelection.end)}`;
 
     setEditForm(nextForm);
     setEditFormFieldConfigs((current) => {
@@ -559,54 +558,16 @@ function App() {
       }
       return [...next, { ...createDefaultFormFieldConfig(fieldId), control }];
     });
-    setFormSelectionMenu(null);
+    setFormSelection(null);
 
     requestAnimationFrame(() => {
       const textarea = formTextareaRef.current;
       if (!textarea) return;
-      const cursor = isExistingPlaceholder ? formSelectionMenu.end : formSelectionMenu.start + placeholder.length;
+      const cursor = isExistingPlaceholder ? formSelection.end : formSelection.start + placeholder.length;
       textarea.focus();
       textarea.setSelectionRange(cursor, cursor);
     });
   }
-
-  useEffect(() => {
-    if (!isAddSnippetOpen || activeSnippetKind !== "form") return;
-
-    const editor = formEditorRef.current;
-    const textarea = formTextareaRef.current;
-    if (!editor || !textarea) return;
-    const editorEl = editor;
-    const textareaEl = textarea;
-
-    function handleNativeContextMenu(event: MouseEvent) {
-      if (!editorEl.contains(event.target as Node)) return;
-
-      event.preventDefault();
-      event.stopPropagation();
-      openFormSelectionMenu(textareaEl, event.clientX, event.clientY);
-    }
-
-    function handleNativeSecondaryPointer(event: MouseEvent | PointerEvent) {
-      if (event.button !== 2 || !editorEl.contains(event.target as Node)) return;
-
-      const opened = openFormSelectionMenu(textareaEl, event.clientX, event.clientY);
-      if (opened) {
-        event.preventDefault();
-        event.stopPropagation();
-      }
-    }
-
-    editorEl.addEventListener("contextmenu", handleNativeContextMenu, true);
-    editorEl.addEventListener("mousedown", handleNativeSecondaryPointer, true);
-    editorEl.addEventListener("pointerdown", handleNativeSecondaryPointer, true);
-
-    return () => {
-      editorEl.removeEventListener("contextmenu", handleNativeContextMenu, true);
-      editorEl.removeEventListener("mousedown", handleNativeSecondaryPointer, true);
-      editorEl.removeEventListener("pointerdown", handleNativeSecondaryPointer, true);
-    };
-  }, [activeSnippetKind, isAddSnippetOpen]);
 
   useEffect(() => {
     let active = true;
@@ -1020,7 +981,7 @@ function App() {
               </div>
             ) : activeSnippetKind === "form" ? (
               <div className="space-y-4">
-                <div ref={formEditorRef} className="space-y-2">
+                <div className="space-y-2">
                   <Label htmlFor="form">Form Layout</Label>
                   <Textarea
                     id="form"
@@ -1030,60 +991,53 @@ function App() {
                     value={editForm}
                     onChange={(e) => {
                       setEditForm(e.target.value);
-                      setFormSelectionMenu(null);
+                      setFormSelection(null);
                     }}
                     onKeyDown={(event) => {
                       if (event.key !== "Shift" && event.key !== "ArrowLeft" && event.key !== "ArrowRight" && event.key !== "ArrowUp" && event.key !== "ArrowDown") {
-                        setFormSelectionMenu(null);
+                        setFormSelection(null);
                       }
                     }}
-                    onKeyUp={(event) => {
-                      const textarea = event.currentTarget;
-                      if (textarea.selectionStart === textarea.selectionEnd) return;
-                      const rect = textarea.getBoundingClientRect();
-                      openFormSelectionMenu(textarea, rect.left + rect.width / 2, rect.top + 44);
-                    }}
+                    onKeyUp={(event) => captureFormSelection(event.currentTarget)}
                     onMouseUp={(event) => {
                       if (event.button !== 0) return;
-                      openFormSelectionMenu(event.currentTarget, event.clientX, event.clientY);
+                      captureFormSelection(event.currentTarget);
                     }}
-                    onPointerDown={(event) => {
-                      if (event.button !== 2) return;
-                      const opened = openFormSelectionMenu(event.currentTarget, event.clientX, event.clientY);
-                      if (opened) {
-                        event.preventDefault();
-                      }
-                    }}
-                    onScroll={() => setFormSelectionMenu(null)}
+                    onSelect={(event) => captureFormSelection(event.currentTarget)}
                     onContextMenu={(event) => {
-                      const textarea = event.currentTarget;
-                      const opened = openFormSelectionMenu(textarea, event.clientX, event.clientY);
-                      if (opened) event.preventDefault();
+                      event.preventDefault();
+                      captureFormSelection(event.currentTarget);
                     }}
                   />
-                  {formSelectionMenu && (
-                    <div
-                      className="fixed z-50 w-52 overflow-hidden rounded-md border bg-popover p-1 shadow-lg"
-                      style={{ left: formSelectionMenu.x, top: formSelectionMenu.y }}
-                      onMouseDown={(event) => event.preventDefault()}
-                    >
+                  <div className="space-y-2 rounded-md border bg-secondary/25 p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <Label>Selected Text Action</Label>
+                      <span className="max-w-full truncate text-xs text-muted-foreground">
+                        {formSelection ? formSelection.text.trim() : "Select text in the form layout"}
+                      </span>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-4">
                       {([
-                        ["text", "Single-line Text"],
-                        ["multiline", "Multiline Text"],
-                        ["choice", "Choice Box"],
-                        ["list", "List Box"],
-                      ] as const).map(([control, label]) => (
-                        <button
+                        ["text", "Single-line Text", Type],
+                        ["multiline", "Multiline Text", AlignLeft],
+                        ["choice", "Choice Box", ListChecks],
+                        ["list", "List Box", List],
+                      ] as const).map(([control, label, Icon]) => (
+                        <Button
                           key={control}
                           type="button"
-                          className="block w-full rounded-sm px-3 py-2 text-left text-sm hover:bg-secondary"
+                          variant="outline"
+                          disabled={!formSelection}
+                          className="justify-start"
+                          onMouseDown={(event) => event.preventDefault()}
                           onClick={() => configureSelectedFormField(control)}
                         >
+                          <Icon className="h-4 w-4" />
                           {label}
-                        </button>
+                        </Button>
                       ))}
                     </div>
-                  )}
+                  </div>
                 </div>
                 {editFormFieldConfigs.length > 0 && (
                   <div className="space-y-3">
