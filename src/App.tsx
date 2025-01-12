@@ -12,6 +12,7 @@ import {
   FileText,
   Folder,
   FolderOpen,
+  Image as ImageIcon,
   List,
   ListChecks,
   Loader2,
@@ -60,6 +61,7 @@ interface EspansoConfigPreview {
   snippetCount: number;
   inlineCount: number;
   resourceCount: number;
+  imageCount: number;
   formCount: number;
   warningCount: number;
   snippets: Snippet[];
@@ -82,7 +84,7 @@ interface SnippetEditTarget {
   displayIndex: number;
 }
 
-type AddSnippetKind = "text" | "file" | "form";
+type AddSnippetKind = "text" | "file" | "image" | "form";
 type FormFieldControl = "text" | "multiline" | "choice" | "list";
 type FormFieldCategory = "text" | "choice" | "list";
 type TextFieldMode = "single" | "multiline";
@@ -102,6 +104,7 @@ interface FormFieldConfig {
 
 function snippetKindLabel(kind: AddSnippetKind): string {
   if (kind === "file") return "File";
+  if (kind === "image") return "Image";
   if (kind === "form") return "Form";
   return "Text";
 }
@@ -247,6 +250,7 @@ function App() {
   const [editTriggersText, setEditTriggersText] = useState<string>("");
   const [editReplace, setEditReplace] = useState<string>("");
   const [editIncludeFile, setEditIncludeFile] = useState<string>("");
+  const [editImagePath, setEditImagePath] = useState<string>("");
   const [editForm, setEditForm] = useState<string>("");
   const [editFormFieldConfigs, setEditFormFieldConfigs] = useState<FormFieldConfig[]>([]);
   const [formSelection, setFormSelection] = useState<FormSelectionState | null>(null);
@@ -265,6 +269,7 @@ function App() {
         const result = importYamlContent(content, config.name);
         const inlineCount = result.snippets.filter((snippet) => snippet.replace !== undefined).length;
         const resourceCount = result.snippets.filter((snippet) => snippet.include_file).length;
+        const imageCount = result.snippets.filter((snippet) => snippet.image_path !== undefined).length;
         const formCount = result.snippets.filter((snippet) => snippet.form !== undefined).length;
 
         previews.push({
@@ -272,6 +277,7 @@ function App() {
           snippetCount: result.snippets.length,
           inlineCount,
           resourceCount,
+          imageCount,
           formCount,
           warningCount: result.warnings.length,
           snippets: result.snippets,
@@ -283,6 +289,7 @@ function App() {
           snippetCount: 0,
           inlineCount: 0,
           resourceCount: 0,
+          imageCount: 0,
           formCount: 0,
           warningCount: 1,
           snippets: [],
@@ -326,10 +333,17 @@ function App() {
   }, [scanDefaultEspansoConfigDir]);
 
   async function addDroppedYamlPreview(path: string) {
-    if (isAddSnippetOpen && addSnippetKind === "file") {
-      setEditIncludeFile(path);
-      setIsDragging(false);
-      return;
+    if (isAddSnippetOpen) {
+      if (addSnippetKind === "file") {
+        setEditIncludeFile(path);
+        setIsDragging(false);
+        return;
+      }
+      if (addSnippetKind === "image") {
+        setEditImagePath(path);
+        setIsDragging(false);
+        return;
+      }
     }
 
     const lowerPath = path.toLowerCase();
@@ -398,6 +412,7 @@ function App() {
         snippetCount: 0,
         inlineCount: 0,
         resourceCount: 0,
+        imageCount: 0,
         formCount: 0,
         warningCount: 0,
         snippets: [],
@@ -411,10 +426,11 @@ function App() {
         snippets: total.snippets + preview.snippetCount,
         inline: total.inline + preview.inlineCount,
         resources: total.resources + preview.resourceCount,
+        images: total.images + preview.imageCount,
         forms: total.forms + preview.formCount,
         warnings: total.warnings + preview.warningCount,
       }),
-      { snippets: 0, inline: 0, resources: 0, forms: 0, warnings: 0 },
+      { snippets: 0, inline: 0, resources: 0, images: 0, forms: 0, warnings: 0 },
     ),
     [espansoPreviewList],
   );
@@ -451,6 +467,7 @@ function App() {
     setEditTriggersText("");
     setEditReplace("");
     setEditIncludeFile("");
+    setEditImagePath("");
     setEditForm("");
     setEditFormFieldConfigs([]);
     setFormSelection(null);
@@ -473,10 +490,19 @@ function App() {
     const editableSnippet = target.match.originalSnippet || target.match.snippet;
     const triggerInput = buildTriggerInput(editableSnippet);
     setSnippetEditTarget(target);
-    setAddSnippetKind(editableSnippet.include_file ? "file" : editableSnippet.form !== undefined ? "form" : "text");
+    setAddSnippetKind(
+      editableSnippet.include_file
+        ? "file"
+        : editableSnippet.image_path !== undefined
+          ? "image"
+          : editableSnippet.form !== undefined
+            ? "form"
+            : "text",
+    );
     setEditTriggersText(triggerInput.multiline);
     setEditReplace(editableSnippet.replace || "");
     setEditIncludeFile(target.match.resourcePath || editableSnippet.include_file || "");
+    setEditImagePath(editableSnippet.image_path || "");
     setEditForm(editableSnippet.form || "");
     setEditFormFieldConfigs(formFieldsToConfigs(editableSnippet.form_fields));
     setFormSelection(null);
@@ -498,6 +524,8 @@ function App() {
 
     if (activeSnippetKind === "file") {
       snippet.include_file = editIncludeFile.trim();
+    } else if (activeSnippetKind === "image") {
+      snippet.image_path = editImagePath.trim();
     } else if (activeSnippetKind === "form") {
       snippet.form = editForm;
       const formFields = configsToFormFields(editFormFieldConfigs);
@@ -600,6 +628,7 @@ function App() {
       const hasAnyInput = editTriggersText.trim()
         || editReplace.trim()
         || editIncludeFile.trim()
+        || editImagePath.trim()
         || editForm.trim()
         || editFormFieldConfigs.some((field) => field.defaultValue.trim() || field.valuesText.trim() || field.control !== "text")
         || editDescription.trim();
@@ -637,7 +666,7 @@ function App() {
     return () => {
       active = false;
     };
-  }, [activeSnippetKind, editTriggersText, editReplace, editIncludeFile, editForm, editFormFieldConfigs, editDescription, isAddSnippetOpen, selectedEspansoPreview, snippetEditTarget]);
+  }, [activeSnippetKind, editTriggersText, editReplace, editIncludeFile, editImagePath, editForm, editFormFieldConfigs, editDescription, isAddSnippetOpen, selectedEspansoPreview, snippetEditTarget]);
 
   async function chooseSnippetFile() {
     const selected = await openDialog({
@@ -649,6 +678,25 @@ function App() {
       setEditIncludeFile(selected);
     } else if (Array.isArray(selected) && typeof selected[0] === "string") {
       setEditIncludeFile(selected[0]);
+    }
+  }
+
+  async function chooseSnippetImageFile() {
+    const selected = await openDialog({
+      multiple: false,
+      directory: false,
+      filters: [
+        {
+          name: "Images",
+          extensions: ["png", "jpg", "jpeg", "gif", "svg", "webp", "bmp"],
+        },
+      ],
+    });
+
+    if (typeof selected === "string") {
+      setEditImagePath(selected);
+    } else if (Array.isArray(selected) && typeof selected[0] === "string") {
+      setEditImagePath(selected[0]);
     }
   }
 
@@ -719,12 +767,18 @@ function App() {
           <div className="drag-zone">
             <Upload className="mb-5 h-12 w-12" />
             <div className="text-xl font-semibold">
-              {isAddSnippetOpen && addSnippetKind === "file" ? "Drop file here" : "Drop YAML file here"}
+              {isAddSnippetOpen && addSnippetKind === "file"
+                ? "Drop file here"
+                : isAddSnippetOpen && addSnippetKind === "image"
+                  ? "Drop image file here"
+                  : "Drop YAML file here"}
             </div>
             <div className="mt-2 text-sm text-muted-foreground">
               {isAddSnippetOpen && addSnippetKind === "file"
                 ? "Dropped files are used as the snippet source."
-                : "Dropped YAML files are previewed and edited directly."}
+                : isAddSnippetOpen && addSnippetKind === "image"
+                  ? "Dropped image files are used as the image match source."
+                  : "Dropped YAML files are previewed and edited directly."}
             </div>
           </div>
         </div>
@@ -758,6 +812,7 @@ function App() {
                       <span className="text-muted-foreground">{espansoPreviewTotals.snippets} readable snippets</span>
                       <span className="text-muted-foreground">{espansoPreviewTotals.inline} inline</span>
                       <span className="text-muted-foreground">{espansoPreviewTotals.resources} external files</span>
+                      <span className="text-muted-foreground">{espansoPreviewTotals.images} images</span>
                       <span className="text-muted-foreground">{espansoPreviewTotals.forms} forms</span>
                       {espansoPreviewTotals.warnings > 0 && (
                         <span className="text-amber-700">{espansoPreviewTotals.warnings} warnings</span>
@@ -939,7 +994,7 @@ function App() {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 rounded-md border bg-secondary/60 p-1">
+            <div className="grid grid-cols-4 rounded-md border bg-secondary/60 p-1">
               <Button
                 type="button"
                 variant={activeSnippetKind === "text" ? "secondary" : "ghost"}
@@ -955,6 +1010,14 @@ function App() {
                 onClick={() => setAddSnippetKind("file")}
               >
                 File
+              </Button>
+              <Button
+                type="button"
+                variant={activeSnippetKind === "image" ? "secondary" : "ghost"}
+                className="h-8"
+                onClick={() => setAddSnippetKind("image")}
+              >
+                Image
               </Button>
               <Button
                 type="button"
@@ -993,6 +1056,37 @@ function App() {
                     <Button type="button" variant="outline" onClick={chooseSnippetFile}>
                       <FileSearch className="h-4 w-4" />
                       Choose File
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : activeSnippetKind === "image" ? (
+              <div className="space-y-3">
+                <Label htmlFor="image-path">Image Path</Label>
+                <div
+                  className="flex min-h-40 flex-col items-center justify-center gap-3 rounded-md border border-dashed bg-secondary/30 p-5 text-center"
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    const droppedFile = event.dataTransfer.files[0];
+                    const droppedPath = droppedFile ? (droppedFile as File & { path?: string }).path : "";
+                    if (droppedPath) {
+                      setEditImagePath(droppedPath);
+                    }
+                  }}
+                >
+                  <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                  <div className="w-full space-y-2">
+                    <Input
+                      id="image-path"
+                      className="mono-field"
+                      placeholder="Choose or drop an image file path..."
+                      value={editImagePath}
+                      onChange={(e) => setEditImagePath(e.target.value)}
+                    />
+                    <Button type="button" variant="outline" onClick={chooseSnippetImageFile}>
+                      <FileSearch className="h-4 w-4" />
+                      Choose Image
                     </Button>
                   </div>
                 </div>
@@ -1502,12 +1596,20 @@ function EspansoConfigDetail({ preview, onViewSnippet }: EspansoConfigDetailProp
                 const index = startIndex + offset;
                 const triggers = getSnippetTriggers(snippet);
                 const displayTrigger = triggers.length > 0 ? triggers.join(", ") : `Snippet ${index + 1}`;
-                const snippetKind = snippet.include_file ? "file" : snippet.form !== undefined ? "form" : "text";
+                const snippetKind = snippet.include_file
+                  ? "file"
+                  : snippet.image_path !== undefined
+                    ? "image"
+                    : snippet.form !== undefined
+                      ? "form"
+                      : "text";
                 const snippetPreview = snippet.include_file
                   ? `include: ${snippet.include_file}`
-                  : snippet.form !== undefined
-                    ? snippet.form || "Empty form"
-                    : snippet.replace || "Empty replacement";
+                  : snippet.image_path !== undefined
+                    ? `image: ${snippet.image_path}`
+                    : snippet.form !== undefined
+                      ? snippet.form || "Empty form"
+                      : snippet.replace || "Empty replacement";
 
                 return (
                   <button
@@ -1526,10 +1628,19 @@ function EspansoConfigDetail({ preview, onViewSnippet }: EspansoConfigDetailProp
                         className={cn(
                           "h-4 w-4 rounded",
                           snippetKind === "file" && "bg-primary/70",
+                          snippetKind === "image" && "bg-purple-500/70",
                           snippetKind === "form" && "bg-emerald-500/70",
                           snippetKind === "text" && "bg-muted-foreground/35",
                         )}
-                        title={snippetKind === "file" ? "External file snippet" : snippetKind === "form" ? "Form snippet" : "Inline replacement snippet"}
+                        title={
+                          snippetKind === "file"
+                            ? "External file snippet"
+                            : snippetKind === "image"
+                              ? "Image match snippet"
+                              : snippetKind === "form"
+                                ? "Form snippet"
+                                : "Inline replacement snippet"
+                        }
                       />
                     </div>
                     <div className="mono-field min-w-0 truncate pr-3 text-sm">{displayTrigger}</div>

@@ -28,6 +28,8 @@ export function snippetToYamlMatch(snippet: Snippet): Record<string, any> {
         },
       },
     ];
+  } else if (snippet.image_path !== undefined) {
+    match.image_path = snippet.image_path;
   } else if (snippet.form !== undefined) {
     match.form = snippet.form;
     if (snippet.form_fields && Object.keys(snippet.form_fields).length > 0) {
