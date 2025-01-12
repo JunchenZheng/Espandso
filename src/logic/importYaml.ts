@@ -134,6 +134,29 @@ export function parseYamlMatch(
     return { matches, warnings };
   }
 
+  const imagePath = match.image_path;
+  if (imagePath !== undefined && imagePath !== null) {
+    const originalSnippet: Snippet = triggers.length > 1
+      ? { triggers, image_path: String(imagePath) }
+      : { trigger: triggers[0], image_path: String(imagePath) };
+    if (match.description) {
+      originalSnippet.description = match.description;
+    }
+
+    const matches: ImportedMatch[] = triggers.map((trigger) => {
+      const snippet: Snippet = {
+        trigger,
+        image_path: String(imagePath),
+      };
+      if (match.description) {
+        snippet.description = match.description;
+      }
+      return { snippet, originalSnippet, originalMatchIndex };
+    });
+
+    return { matches, warnings };
+  }
+
   const form = match.form;
   if (form !== undefined && form !== null) {
     const sharedFields = isPlainObject(match.form_fields) ? { form_fields: match.form_fields } : {};

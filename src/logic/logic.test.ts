@@ -45,6 +45,7 @@ describe("validate", () => {
         { trigger: ":hello", replace: "world", description: "simple" },
         { triggers: [":hi", ":hey"], replace: "world 2" },
         { trigger: ":file", include_file: "test.txt" },
+        { trigger: ":cat", image_path: "/path/to/cat.png" },
         { trigger: ":form", form: "Hello [[name]]", form_fields: { name: { default: "Ada" } } },
       ],
     };
@@ -68,6 +69,7 @@ describe("validate", () => {
         { triggers: [":t1", ":t1"], replace: "dup in triggers" }, // duplicate inside triggers
         { trigger: ":empty-form", form: "" }, // empty form
         { trigger: ":fields", replace: "x", form_fields: { value: { multiline: true } } }, // fields without form
+        { trigger: ":bad-img", image_path: "" }, // empty image_path
       ],
     };
 
@@ -80,11 +82,12 @@ describe("validate", () => {
     expect(messages).toContain("snippet #0: 'trigger' must be a non-empty string");
     expect(messages).toContain("snippet #2: duplicate trigger ':dup' (first at #1)");
     expect(messages).toContain("snippet #3: cannot combine 'replace', 'include_file', and 'form'");
-    expect(messages).toContain("snippet #4: must have either 'replace', 'include_file', or 'form'");
+    expect(messages).toContain("snippet #4: must have either 'replace', 'include_file', 'image_path', or 'form'");
     expect(messages).toContain("snippet #6: cannot have both 'trigger' and 'triggers'");
     expect(messages).toContain("snippet #7: duplicate trigger ':t1' (first at #7)");
     expect(messages).toContain("snippet #8: 'form' must be a non-empty string");
     expect(messages).toContain("snippet #9: 'form_fields' can only be used with 'form'");
+    expect(messages).toContain("snippet #10: 'image_path' must be a non-empty string");
   });
 
   it("should check include_file existence", async () => {
@@ -114,13 +117,17 @@ matches:
       - :hi
       - :hey
     replace: greeting
+  - trigger: :cat
+    image_path: /path/to/cat.png
+    description: cat image
 `;
     const res = importYamlContent(yaml, "base.yml");
     expect(res.warnings).toHaveLength(0);
-    expect(res.snippets).toHaveLength(3);
+    expect(res.snippets).toHaveLength(4);
     expect(res.snippets[0]).toEqual({ trigger: ":hello", replace: "world", description: "simple" });
     expect(res.snippets[1]).toEqual({ trigger: ":hi", replace: "greeting" });
     expect(res.snippets[2]).toEqual({ trigger: ":hey", replace: "greeting" });
+    expect(res.snippets[3]).toEqual({ trigger: ":cat", image_path: "/path/to/cat.png", description: "cat image" });
     expect(res.importedMatches[1].originalMatchIndex).toBe(1);
     expect(res.importedMatches[1].originalSnippet).toEqual({ triggers: [":hi", ":hey"], replace: "greeting" });
   });
@@ -243,6 +250,18 @@ matches:
     expect(updated).toContain("name: output");
     expect(updated).toContain('cmd: cat "{{path}}"');
     expect(updated).toContain("description: external note");
+  });
+
+  it("should append an image snippet with image_path", () => {
+    const updated = appendSnippetToYamlContent("matches: []\n", {
+      trigger: ":cat",
+      image_path: "/path/to/cat.png",
+      description: "cat image snippet",
+    });
+
+    expect(updated).toContain("trigger: :cat");
+    expect(updated).toContain('image_path: /path/to/cat.png');
+    expect(updated).toContain("description: cat image snippet");
   });
 
   it("should append a form snippet with field controls", () => {
