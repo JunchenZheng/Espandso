@@ -344,6 +344,9 @@ function App() {
         setIsDragging(false);
         return;
       }
+      // For "text" or "form" tabs, drop operations are ignored
+      setIsDragging(false);
+      return;
     }
 
     const lowerPath = path.toLowerCase();
@@ -373,6 +376,9 @@ function App() {
     async function setupDragDrop() {
       try {
         const uEnter = await listen<DragDropPayload>("tauri://drag-enter", () => {
+          if (isAddSnippetOpen && (addSnippetKind === "text" || addSnippetKind === "form")) {
+            return;
+          }
           setIsDragging(true);
         });
         if (!active) { uEnter(); return; }
@@ -762,7 +768,7 @@ function App() {
 
   return (
     <div className="app-shell">
-      {isDragging && (
+      {isDragging && (!isAddSnippetOpen || addSnippetKind === "file" || addSnippetKind === "image") && (
         <div className="drag-overlay">
           <div className="drag-zone">
             <Upload className="mb-5 h-12 w-12" />
