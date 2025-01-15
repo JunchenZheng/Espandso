@@ -14,17 +14,10 @@ export function snippetToYamlMatch(snippet: Snippet): Record<string, any> {
     match.replace = "{{output}}";
     match.vars = [
       {
-        name: "path",
-        type: "echo",
-        params: {
-          echo: snippet.include_file,
-        },
-      },
-      {
         name: "output",
         type: "shell",
         params: {
-          cmd: 'cat "{{path}}"',
+          cmd: `cat "${snippet.include_file}"`,
         },
       },
     ];
