@@ -38,14 +38,18 @@ function extractCatPath(varsBlock: any[]): string | null {
     }
   }
 
+  if (shellCmd) {
+    const m = /cat\s+["']?([^"']+)["']?/.exec(shellCmd);
+    if (m) {
+      const pathCandidate = m[1].trim();
+      if (pathCandidate !== "{{path}}" && pathCandidate !== "$path") {
+        return pathCandidate;
+      }
+    }
+  }
+
   if (echoPath) {
     return echoPath;
-  }
-  if (shellCmd) {
-    const m = /cat\s+"([^"]+)"/.exec(shellCmd);
-    if (m) {
-      return m[1];
-    }
   }
   return null;
 }
