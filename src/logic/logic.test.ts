@@ -132,10 +132,10 @@ matches:
     expect(res.importedMatches[1].originalSnippet).toEqual({ triggers: [":hi", ":hey"], replace: "greeting" });
   });
 
-  it("should import include_file snippets and warn about unsupported stuff", () => {
+  it("should import include_file snippets (both single shell var and legacy echo+shell) and warn about unsupported stuff", () => {
     const yaml = `
 matches:
-  - trigger: :inc
+  - trigger: :inc_legacy
     replace: "{{output}}"
     vars:
       - name: path
@@ -146,6 +146,13 @@ matches:
         type: shell
         params:
           cmd: cat "{{path}}"
+  - trigger: :inc_single
+    replace: "{{output}}"
+    vars:
+      - name: output
+        type: shell
+        params:
+          cmd: cat "/path/to/single_resource.json"
   - trigger: :unsupported
     replace: "{{bad}}"
     vars:
@@ -155,8 +162,9 @@ matches:
           format: "%Y"
 `;
     const res = importYamlContent(yaml, "test.yml");
-    expect(res.snippets).toHaveLength(1);
-    expect(res.snippets[0]).toEqual({ trigger: ":inc", include_file: "resource_data.json" });
+    expect(res.snippets).toHaveLength(2);
+    expect(res.snippets[0]).toEqual({ trigger: ":inc_legacy", include_file: "resource_data.json" });
+    expect(res.snippets[1]).toEqual({ trigger: ":inc_single", include_file: "single_resource_data.json" });
     expect(res.warnings).toContain("[test.yml] Snippet for :unsupported has unsupported var type(s) [date], skipping");
   });
 
@@ -245,10 +253,8 @@ matches:
 
     expect(updated).toContain("trigger: :file");
     expect(updated).toContain('replace: "{{output}}"');
-    expect(updated).toContain("name: path");
-    expect(updated).toContain("echo: /Users/test/snippets/note.md");
     expect(updated).toContain("name: output");
-    expect(updated).toContain('cmd: cat "{{path}}"');
+    expect(updated).toContain('cmd: cat "/Users/test/snippets/note.md"');
     expect(updated).toContain("description: external note");
   });
 
@@ -298,14 +304,10 @@ matches:
   - trigger: :plan
     replace: "{{output}}"
     vars:
-      - name: path
-        type: echo
-        params:
-          echo: old-plan.md
       - name: output
         type: shell
         params:
-          cmd: cat "{{path}}"
+          cmd: cat "old-plan.md"
 `;
 
     const updated = replaceSnippetInYamlContent(yaml, 1, {
@@ -316,8 +318,7 @@ matches:
 
     expect(updated).toContain("trigger: :hello");
     expect(updated).toContain("trigger: :new-plan");
-    expect(updated).toContain("echo: /Users/test/snippets/new-plan.md");
-    expect(updated).toContain('cmd: cat "{{path}}"');
+    expect(updated).toContain('cmd: cat "/Users/test/snippets/new-plan.md"');
     expect(updated).toContain("description: updated external plan");
     expect(updated).not.toContain("old-plan.md");
   });
