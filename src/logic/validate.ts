@@ -1,5 +1,5 @@
 import { ValidationError } from "./types";
-import { getSnippetTriggers } from "./snippetUtils";
+import { getSnippetTriggers, isImageFilePath } from "./snippetUtils";
 
 export interface ValidateOptions {
   snippetsDir?: string;
@@ -99,6 +99,8 @@ export async function validate(
     } else if (hasInclude) {
       if (typeof includeFile !== "string" || !includeFile) {
         errors.push({ message: `snippet #${i}: 'include_file' must be a non-empty string` });
+      } else if (isImageFilePath(includeFile)) {
+        errors.push({ message: `snippet #${i}: 'include_file' cannot be an image file ('${includeFile}'). Use 'image_path' for image snippets.` });
       } else if (options?.snippetsDir && options?.checkFileExists) {
         // Resolve absolute or relative path
         // For simplicity, we pass the relative includeFile to checkFileExists helper
