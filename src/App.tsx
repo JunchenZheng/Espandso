@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
+import { readFile, readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import { listen } from "@tauri-apps/api/event";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { openPath } from "@tauri-apps/plugin-opener";
@@ -46,9 +46,10 @@ import { Textarea } from "./components/ui/textarea";
 import { Snippet, ValidationError } from "./logic/types";
 import { validate } from "./logic/validate";
 import { importYamlContent, ImportedMatch } from "./logic/importYaml";
-import { buildTriggerInput, getSnippetTriggers, normalizeTriggerLines } from "./logic/snippetUtils";
+import { buildTriggerInput, getSnippetTriggers, isImageFilePath, normalizeTriggerLines } from "./logic/snippetUtils";
 import { appendSnippetToYamlContent, deleteSnippetFromYamlContent, replaceSnippetInYamlContent } from "./logic/yamlEditor";
 import { EspansoConfigFile, EspansoPathSource, scanEspansoConfigFiles } from "./logic/espansoPaths";
+import { checkIsBinaryFilePath, isBinaryDomFile } from "./logic/fileCheck";
 import { cn } from "./lib/utils";
 
 interface DragDropPayload {
@@ -335,6 +336,17 @@ function App() {
   async function addDroppedYamlPreview(path: string) {
     if (isAddSnippetOpen) {
       if (addSnippetKind === "file") {
+        if (isImageFilePath(path)) {
+          alert("检测到所选文件为图片文件。File Tab 仅用于文本文件，请切换至 [Image Tab] 添加图片 Snippet。");
+          setIsDragging(false);
+          return;
+        }
+        const isBinary = await checkIsBinaryFilePath(path, (p) => readFile(p));
+        if (isBinary) {
+          alert("检测到所选文件为二进制文件。File Tab 仅适用于纯文本文件，无法读取二进制内容。");
+          setIsDragging(false);
+          return;
+        }
         setEditIncludeFile(path);
         setIsDragging(false);
         return;
@@ -680,10 +692,24 @@ function App() {
       directory: false,
     });
 
+    let selectedPath = "";
     if (typeof selected === "string") {
-      setEditIncludeFile(selected);
+      selectedPath = selected;
     } else if (Array.isArray(selected) && typeof selected[0] === "string") {
-      setEditIncludeFile(selected[0]);
+      selectedPath = selected[0];
+    }
+
+    if (selectedPath) {
+      if (isImageFilePath(selectedPath)) {
+        alert("检测到所选文件为图片文件。File Tab 仅用于文本文件，请切换至 [Image Tab] 添加图片 Snippet。");
+        return;
+      }
+      const isBinary = await checkIsBinaryFilePath(selectedPath, (p) => readFile(p));
+      if (isBinary) {
+        alert("检测到所选文件为二进制文件。File Tab 仅适用于纯文本文件，无法读取二进制内容。");
+        return;
+      }
+      setEditIncludeFile(selectedPath);
     }
   }
 
@@ -1041,11 +1067,22 @@ function App() {
                 <div
                   className="flex min-h-40 flex-col items-center justify-center gap-3 rounded-md border border-dashed bg-secondary/30 p-5 text-center"
                   onDragOver={(event) => event.preventDefault()}
-                  onDrop={(event) => {
+                  onDrop={async (event) => {
                     event.preventDefault();
                     const droppedFile = event.dataTransfer.files[0];
-                    const droppedPath = droppedFile ? (droppedFile as File & { path?: string }).path : "";
+                    const droppedPath = droppedFile ? (droppedFile as File & { path?: string }).path || droppedFile.name : "";
+                    if (droppedFile) {
+                      const isBinary = await isBinaryDomFile(droppedFile);
+                      if (isBinary) {
+                        alert("检测到所选文件为二进制文件。File Tab 仅适用于纯文本文件，无法读取二进制内容。");
+                        return;
+                      }
+                    }
                     if (droppedPath) {
+                      if (isImageFilePath(droppedPath)) {
+                        alert("检测到所选文件为图片文件。File Tab 仅用于文本文件，请切换至 [Image Tab] 添加图片 Snippet。");
+                        return;
+                      }
                       setEditIncludeFile(droppedPath);
                     }
                   }}
@@ -1065,6 +1102,11 @@ function App() {
                     </Button>
                   </div>
                 </div>
+                {isImageFilePath(editIncludeFile) && (
+                  <p className="text-xs font-medium text-destructive">
+                    检测到图片文件后缀。File Tab 仅用于文本文件，请切换至 [Image Tab] 添加图片 Snippet。
+                  </p>
+                )}
               </div>
             ) : activeSnippetKind === "image" ? (
               <div className="space-y-3">

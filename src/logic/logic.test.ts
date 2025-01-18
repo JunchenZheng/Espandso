@@ -9,7 +9,8 @@ import {
   resolveAndExecuteIncludeFileCommand,
   resolveExistingIncludeFilePath,
 } from "./resolveIncludeFile";
-import { getSnippetTriggers, normalizeTriggerLines, buildTriggerInput } from "./snippetUtils";
+import { getSnippetTriggers, normalizeTriggerLines, buildTriggerInput, isImageFilePath } from "./snippetUtils";
+import { isBinaryData, checkIsBinaryFilePath } from "./fileCheck";
 
 describe("snippetUtils", () => {
   it("should return triggers for single and multiple trigger snippets", () => {
@@ -34,6 +35,40 @@ describe("snippetUtils", () => {
       single: ":hi",
       multiline: ":hi\n:hello",
     });
+  });
+
+  it("should correctly identify image file paths", () => {
+    expect(isImageFilePath("/path/to/cat.PNG")).toBe(true);
+    expect(isImageFilePath("image.jpg")).toBe(true);
+    expect(isImageFilePath("icon.svg")).toBe(true);
+    expect(isImageFilePath("photo.webp")).toBe(true);
+    expect(isImageFilePath("/path/to/document.pdf")).toBe(false);
+    expect(isImageFilePath("notes.txt")).toBe(false);
+    expect(isImageFilePath("")).toBe(false);
+  });
+});
+
+describe("fileCheck", () => {
+  it("should identify text vs binary buffers", () => {
+    const textBuffer = new TextEncoder().encode("Hello world! This is a standard plain text file.");
+    expect(isBinaryData(textBuffer)).toBe(false);
+
+    const binaryBuffer = new Uint8Array([0x00, 0x01, 0x02, 0x03, 0xff]);
+    expect(isBinaryData(binaryBuffer)).toBe(true);
+
+    const pdfBuffer = new TextEncoder().encode("%PDF-1.5 header content");
+    expect(isBinaryData(pdfBuffer)).toBe(true);
+  });
+
+  it("should check binary file path using mock byte reader", async () => {
+    const mockReader = async (p: string) => {
+      if (p.endsWith(".bin")) return new Uint8Array([0x00, 0x01]);
+      return new TextEncoder().encode("Text file content");
+    };
+
+    expect(await checkIsBinaryFilePath("/tmp/test.txt", mockReader)).toBe(false);
+    expect(await checkIsBinaryFilePath("/tmp/test.bin", mockReader)).toBe(true);
+    expect(await checkIsBinaryFilePath("/tmp/cat.png", mockReader)).toBe(true);
   });
 });
 
@@ -103,6 +138,17 @@ describe("validate", () => {
     });
     expect(errors).toHaveLength(1);
     expect(errors[0].message).toContain("include_file 'missing.txt' not found");
+  });
+
+  it("should reject include_file if it is an image file", async () => {
+    const data = {
+      version: 1,
+      snippets: [{ trigger: ":test", include_file: "picture.png" }],
+    };
+
+    const { errors } = await validate(data);
+    expect(errors).toHaveLength(1);
+    expect(errors[0].message).toContain("'include_file' cannot be an image file");
   });
 });
 
