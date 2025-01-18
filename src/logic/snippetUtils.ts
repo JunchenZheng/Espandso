@@ -51,3 +51,30 @@ export function buildTriggerInput(snippet: Snippet): TriggerInputState {
     multiline: single,
   };
 }
+
+const COMMON_IMAGE_EXTENSIONS = new Set([
+  "png",
+  "jpg",
+  "jpeg",
+  "gif",
+  "webp",
+  "svg",
+  "bmp",
+  "ico",
+  "tiff",
+  "tif",
+  "avif",
+  "heic",
+]);
+
+/**
+ * Checks whether a given file path has a common image extension.
+ */
+export function isImageFilePath(path: string): boolean {
+  if (!path) return false;
+  const cleanPath = path.trim().split(/[?#]/)[0];
+  const parts = cleanPath.split(".");
+  if (parts.length < 2) return false;
+  const ext = parts.pop()?.toLowerCase() || "";
+  return COMMON_IMAGE_EXTENSIONS.has(ext);
+}
