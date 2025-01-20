@@ -235,6 +235,21 @@ function configsToFormFields(configs: FormFieldConfig[]): Record<string, any> | 
   return Object.keys(formFields).length > 0 ? formFields : undefined;
 }
 
+interface AlertDialogState {
+  isOpen: boolean;
+  title: string;
+  description: string;
+  confirmText: string;
+  cancelText?: string;
+  onConfirm?: () => void;
+  onCancel?: () => void;
+}
+
+const MSG_IMAGE_FILE_NOT_ALLOWED =
+  "Selected file is an image. The File tab only supports plain text files. Please switch to the [Image] tab to add an image snippet.";
+const MSG_BINARY_FILE_NOT_ALLOWED =
+  "Selected file is a binary file. The File tab only supports plain text files.";
+
 function App() {
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [espansoMatchDir, setEspansoMatchDir] = useState<string>("");
@@ -260,6 +275,42 @@ function App() {
   const [addWarnings, setAddWarnings] = useState<string[]>([]);
   const [isSavingSnippet, setIsSavingSnippet] = useState<boolean>(false);
   const formTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const [alertDialog, setAlertDialog] = useState<AlertDialogState>({
+    isOpen: false,
+    title: "",
+    description: "",
+    confirmText: "OK",
+  });
+
+  const showAlert = useCallback((description: string, title = "Expandso") => {
+    setAlertDialog({
+      isOpen: true,
+      title,
+      description,
+      confirmText: "OK",
+    });
+  }, []);
+
+  const showConfirm = useCallback(
+    (
+      description: string,
+      onConfirm: () => void,
+      title = "Expandso",
+      confirmText = "OK",
+      cancelText = "Cancel",
+    ) => {
+      setAlertDialog({
+        isOpen: true,
+        title,
+        description,
+        confirmText,
+        cancelText,
+        onConfirm,
+      });
+    },
+    [],
+  );
 
   const buildEspansoConfigPreviews = useCallback(async (configs: EspansoConfigFile[]): Promise<EspansoConfigPreview[]> => {
     const previews: EspansoConfigPreview[] = [];
@@ -337,13 +388,13 @@ function App() {
     if (isAddSnippetOpen) {
       if (addSnippetKind === "file") {
         if (isImageFilePath(path)) {
-          alert("检测到所选文件为图片文件。File Tab 仅用于文本文件，请切换至 [Image Tab] 添加图片 Snippet。");
+          showAlert(MSG_IMAGE_FILE_NOT_ALLOWED, "Invalid File Type");
           setIsDragging(false);
           return;
         }
         const isBinary = await checkIsBinaryFilePath(path, (p) => readFile(p));
         if (isBinary) {
-          alert("检测到所选文件为二进制文件。File Tab 仅适用于纯文本文件，无法读取二进制内容。");
+          showAlert(MSG_BINARY_FILE_NOT_ALLOWED, "Invalid File Type");
           setIsDragging(false);
           return;
         }
@@ -363,7 +414,7 @@ function App() {
 
     const lowerPath = path.toLowerCase();
     if (!lowerPath.endsWith(".yml") && !lowerPath.endsWith(".yaml")) {
-      alert("Please drop an Espanso YAML file.");
+      showAlert("Please drop an Espanso YAML file.", "Invalid File");
       return;
     }
 
@@ -496,7 +547,7 @@ function App() {
 
   function openAddSnippetDialog() {
     if (!selectedEspansoPreview) {
-      alert("Select a YAML config before adding a snippet.");
+      showAlert("Please select a YAML config before adding a snippet.", "No Config Selected");
       return;
     }
     setSnippetEditTarget(null);
@@ -701,12 +752,12 @@ function App() {
 
     if (selectedPath) {
       if (isImageFilePath(selectedPath)) {
-        alert("检测到所选文件为图片文件。File Tab 仅用于文本文件，请切换至 [Image Tab] 添加图片 Snippet。");
+        showAlert(MSG_IMAGE_FILE_NOT_ALLOWED, "Invalid File Type");
         return;
       }
       const isBinary = await checkIsBinaryFilePath(selectedPath, (p) => readFile(p));
       if (isBinary) {
-        alert("检测到所选文件为二进制文件。File Tab 仅适用于纯文本文件，无法读取二进制内容。");
+        showAlert(MSG_BINARY_FILE_NOT_ALLOWED, "Invalid File Type");
         return;
       }
       setEditIncludeFile(selectedPath);
@@ -736,7 +787,7 @@ function App() {
     const targetPreview = snippetEditTarget?.preview || selectedEspansoPreview;
     if (!targetPreview || isSavingSnippet) return;
     if (addErrors.length > 0) {
-      alert("Please fix validation errors before saving.");
+      showAlert("Please fix validation errors before saving.", "Validation Error");
       return;
     }
 
@@ -756,7 +807,7 @@ function App() {
       await scanDefaultEspansoConfigDir();
       setSelectedEspansoConfigPath(targetPreview.config.path);
     } catch (e: any) {
-      alert(`Failed to save snippet: ${e?.message || e}`);
+      showAlert(`Failed to save snippet: ${e?.message || e}`, "Error");
     } finally {
       setIsSavingSnippet(false);
     }
@@ -765,30 +816,36 @@ function App() {
   async function deleteSnippetFromYaml(target: SnippetEditTarget) {
     const triggers = getSnippetTriggers(target.match.originalSnippet || target.match.snippet);
     const displayTrigger = triggers.length > 0 ? triggers.join(", ") : `Snippet ${target.displayIndex + 1}`;
-    const confirmed = window.confirm(`Delete ${displayTrigger} from ${target.preview.config.relativePath}?`);
-    if (!confirmed) return;
 
-    try {
-      const content = await readTextFile(target.preview.config.path);
-      const updatedContent = deleteSnippetFromYamlContent(content, target.match.originalMatchIndex);
-      await writeTextFile(target.preview.config.path, updatedContent);
-      // Espanso has its own hot-reload path for match files. Keep restart disabled
-      // while testing which edits actually require the more expensive CLI restart.
-      setIsAddSnippetOpen(false);
-      resetSnippetForm();
-      setSnippetEditTarget(null);
-      await scanDefaultEspansoConfigDir();
-      setSelectedEspansoConfigPath(target.preview.config.path);
-    } catch (e: any) {
-      alert(`Failed to delete snippet: ${e?.message || e}`);
-    }
+    showConfirm(
+      `Are you sure you want to delete ${displayTrigger} from ${target.preview.config.relativePath}?`,
+      async () => {
+        try {
+          const content = await readTextFile(target.preview.config.path);
+          const updatedContent = deleteSnippetFromYamlContent(content, target.match.originalMatchIndex);
+          await writeTextFile(target.preview.config.path, updatedContent);
+          // Espanso has its own hot-reload path for match files. Keep restart disabled
+          // while testing which edits actually require the more expensive CLI restart.
+          setIsAddSnippetOpen(false);
+          resetSnippetForm();
+          setSnippetEditTarget(null);
+          await scanDefaultEspansoConfigDir();
+          setSelectedEspansoConfigPath(target.preview.config.path);
+        } catch (e: any) {
+          showAlert(`Failed to delete snippet: ${e?.message || e}`, "Error");
+        }
+      },
+      "Delete Snippet",
+      "Delete",
+      "Cancel",
+    );
   }
 
   async function openYamlFileInDefaultApp(path: string) {
     try {
       await openPath(path);
     } catch (e: any) {
-      alert(`Failed to open YAML file: ${e?.message || e}`);
+      showAlert(`Failed to open YAML file: ${e?.message || e}`, "Error");
     }
   }
 
@@ -1074,13 +1131,13 @@ function App() {
                     if (droppedFile) {
                       const isBinary = await isBinaryDomFile(droppedFile);
                       if (isBinary) {
-                        alert("检测到所选文件为二进制文件。File Tab 仅适用于纯文本文件，无法读取二进制内容。");
+                        showAlert(MSG_BINARY_FILE_NOT_ALLOWED, "Invalid File Type");
                         return;
                       }
                     }
                     if (droppedPath) {
                       if (isImageFilePath(droppedPath)) {
-                        alert("检测到所选文件为图片文件。File Tab 仅用于文本文件，请切换至 [Image Tab] 添加图片 Snippet。");
+                        showAlert(MSG_IMAGE_FILE_NOT_ALLOWED, "Invalid File Type");
                         return;
                       }
                       setEditIncludeFile(droppedPath);
@@ -1104,7 +1161,7 @@ function App() {
                 </div>
                 {isImageFilePath(editIncludeFile) && (
                   <p className="text-xs font-medium text-destructive">
-                    检测到图片文件后缀。File Tab 仅用于文本文件，请切换至 [Image Tab] 添加图片 Snippet。
+                    Image file extension detected. The File tab only supports plain text files. Please switch to the [Image] tab to add an image snippet.
                   </p>
                 )}
               </div>
@@ -1396,6 +1453,50 @@ function App() {
           </div>
           <DialogFooter>
             <Button onClick={() => setIsSettingsOpen(false)}>Done</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={alertDialog.isOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            if (alertDialog.onCancel) alertDialog.onCancel();
+            setAlertDialog((prev) => ({ ...prev, isOpen: false }));
+          }
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{alertDialog.title}</DialogTitle>
+            <DialogDescription className="mt-2 text-sm text-foreground/90 whitespace-pre-line">
+              {alertDialog.description}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4 flex justify-end gap-2">
+            {alertDialog.cancelText && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  if (alertDialog.onCancel) alertDialog.onCancel();
+                  setAlertDialog((prev) => ({ ...prev, isOpen: false }));
+                }}
+              >
+                {alertDialog.cancelText}
+              </Button>
+            )}
+            <Button
+              type="button"
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
+              onClick={() => {
+                const cb = alertDialog.onConfirm;
+                setAlertDialog((prev) => ({ ...prev, isOpen: false }));
+                if (cb) cb();
+              }}
+            >
+              {alertDialog.confirmText}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
