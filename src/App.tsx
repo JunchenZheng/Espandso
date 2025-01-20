@@ -250,6 +250,22 @@ const MSG_IMAGE_FILE_NOT_ALLOWED =
 const MSG_BINARY_FILE_NOT_ALLOWED =
   "Selected file is a binary file. The File tab only supports plain text files.";
 
+function RequiredMark() {
+  return (
+    <span className="ml-1 inline-flex items-center justify-center text-destructive font-semibold align-middle leading-none translate-y-[2px]">
+      *
+    </span>
+  );
+}
+
+function OptionalMark() {
+  return (
+    <span className="ml-1 inline-flex items-center text-xs font-normal text-muted-foreground align-middle leading-none">
+      (optional)
+    </span>
+  );
+}
+
 function App() {
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [espansoMatchDir, setEspansoMatchDir] = useState<string>("");
@@ -684,59 +700,6 @@ function App() {
     });
   }
 
-  useEffect(() => {
-    let active = true;
-
-    async function validateSnippetForm() {
-      if (!isAddSnippetOpen || !selectedEspansoPreview) {
-        setAddErrors([]);
-        setAddWarnings([]);
-        return;
-      }
-
-      const hasAnyInput = editTriggersText.trim()
-        || editReplace.trim()
-        || editIncludeFile.trim()
-        || editImagePath.trim()
-        || editForm.trim()
-        || editFormFieldConfigs.some((field) => field.defaultValue.trim() || field.valuesText.trim() || field.control !== "text")
-        || editDescription.trim();
-      if (!hasAnyInput) {
-        setAddErrors([]);
-        setAddWarnings([]);
-        return;
-      }
-
-      let snippet: Snippet;
-      try {
-        snippet = buildFormSnippet();
-      } catch (e: any) {
-        if (!active) return;
-        setAddErrors([{ message: e?.message || String(e) }]);
-        setAddWarnings([]);
-        return;
-      }
-      const snippetsForValidation = snippetEditTarget
-        ? snippetEditTarget.preview.importedMatches
-          .filter((match) => match.originalMatchIndex !== snippetEditTarget.match.originalMatchIndex)
-          .map((match) => match.snippet)
-        : selectedEspansoPreview.snippets;
-      const result = await validate({
-        version: 1,
-        snippets: [...snippetsForValidation, snippet],
-      });
-
-      if (!active) return;
-      setAddErrors(result.errors);
-      setAddWarnings(result.warnings);
-    }
-
-    validateSnippetForm();
-    return () => {
-      active = false;
-    };
-  }, [activeSnippetKind, editTriggersText, editReplace, editIncludeFile, editImagePath, editForm, editFormFieldConfigs, editDescription, isAddSnippetOpen, selectedEspansoPreview, snippetEditTarget]);
-
   async function chooseSnippetFile() {
     const selected = await openDialog({
       multiple: false,
@@ -786,14 +749,38 @@ function App() {
   async function saveSnippetToYaml() {
     const targetPreview = snippetEditTarget?.preview || selectedEspansoPreview;
     if (!targetPreview || isSavingSnippet) return;
-    if (addErrors.length > 0) {
-      showAlert("Please fix validation errors before saving.", "Validation Error");
+
+    let snippet: Snippet;
+    try {
+      snippet = buildFormSnippet();
+    } catch (e: any) {
+      const errMsg = e?.message || String(e);
+      setAddErrors([{ message: errMsg }]);
+      showAlert(errMsg, "Validation Error");
+      return;
+    }
+
+    const snippetsForValidation = snippetEditTarget
+      ? snippetEditTarget.preview.importedMatches
+        .filter((match) => match.originalMatchIndex !== snippetEditTarget.match.originalMatchIndex)
+        .map((match) => match.snippet)
+      : targetPreview.snippets;
+
+    const validationResult = await validate({
+      version: 1,
+      snippets: [...snippetsForValidation, snippet],
+    });
+
+    setAddErrors(validationResult.errors);
+    setAddWarnings(validationResult.warnings);
+
+    if (validationResult.errors.length > 0) {
+      showAlert(validationResult.errors[0].message, "Validation Error");
       return;
     }
 
     setIsSavingSnippet(true);
     try {
-      const snippet = buildFormSnippet();
       const content = await readTextFile(targetPreview.config.path);
       const updatedContent = snippetEditTarget
         ? replaceSnippetInYamlContent(content, snippetEditTarget.match.originalMatchIndex, snippet)
@@ -1041,7 +1028,9 @@ function App() {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="trigger-0">Trigger</Label>
+              <Label htmlFor="trigger-0" className="inline-flex items-center">
+                Trigger <RequiredMark />
+              </Label>
               <div className="space-y-2">
                 {(editTriggersText ? editTriggersText.split("\n") : [""]).map((line, idx, lines) => (
                   <div key={idx} className="flex items-center gap-2">
@@ -1088,7 +1077,11 @@ function App() {
                 type="button"
                 variant={activeSnippetKind === "text" ? "secondary" : "ghost"}
                 className="h-8"
-                onClick={() => setAddSnippetKind("text")}
+                onClick={() => {
+                  setAddSnippetKind("text");
+                  setAddErrors([]);
+                  setAddWarnings([]);
+                }}
               >
                 Text
               </Button>
@@ -1096,7 +1089,11 @@ function App() {
                 type="button"
                 variant={activeSnippetKind === "file" ? "secondary" : "ghost"}
                 className="h-8"
-                onClick={() => setAddSnippetKind("file")}
+                onClick={() => {
+                  setAddSnippetKind("file");
+                  setAddErrors([]);
+                  setAddWarnings([]);
+                }}
               >
                 File
               </Button>
@@ -1104,7 +1101,11 @@ function App() {
                 type="button"
                 variant={activeSnippetKind === "image" ? "secondary" : "ghost"}
                 className="h-8"
-                onClick={() => setAddSnippetKind("image")}
+                onClick={() => {
+                  setAddSnippetKind("image");
+                  setAddErrors([]);
+                  setAddWarnings([]);
+                }}
               >
                 Image
               </Button>
@@ -1112,7 +1113,11 @@ function App() {
                 type="button"
                 variant={activeSnippetKind === "form" ? "secondary" : "ghost"}
                 className="h-8"
-                onClick={() => setAddSnippetKind("form")}
+                onClick={() => {
+                  setAddSnippetKind("form");
+                  setAddErrors([]);
+                  setAddWarnings([]);
+                }}
               >
                 Form
               </Button>
@@ -1120,7 +1125,9 @@ function App() {
 
             {activeSnippetKind === "file" ? (
               <div className="space-y-3">
-                <Label htmlFor="include-file">File</Label>
+                <Label htmlFor="include-file" className="inline-flex items-center">
+                  File <RequiredMark />
+                </Label>
                 <div
                   className="flex min-h-40 flex-col items-center justify-center gap-3 rounded-md border border-dashed bg-secondary/30 p-5 text-center"
                   onDragOver={(event) => event.preventDefault()}
@@ -1167,7 +1174,9 @@ function App() {
               </div>
             ) : activeSnippetKind === "image" ? (
               <div className="space-y-3">
-                <Label htmlFor="image-path">Image Path</Label>
+                <Label htmlFor="image-path" className="inline-flex items-center">
+                  Image Path <RequiredMark />
+                </Label>
                 <div
                   className="flex min-h-40 flex-col items-center justify-center gap-3 rounded-md border border-dashed bg-secondary/30 p-5 text-center"
                   onDragOver={(event) => event.preventDefault()}
@@ -1199,7 +1208,9 @@ function App() {
             ) : activeSnippetKind === "form" ? (
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="form">Form Layout</Label>
+                  <Label htmlFor="form" className="inline-flex items-center">
+                    Form Layout <RequiredMark />
+                  </Label>
                   <Textarea
                     id="form"
                     ref={formTextareaRef}
@@ -1327,7 +1338,9 @@ function App() {
                               </div>
                             </div>
                             <div className="space-y-2">
-                              <Label htmlFor={`form-field-default-${fieldIndex}`}>Default</Label>
+                              <Label htmlFor={`form-field-default-${fieldIndex}`} className="inline-flex items-center">
+                                Default <OptionalMark />
+                              </Label>
                               {field.control === "multiline" ? (
                                 <Textarea
                                   id={`form-field-default-${fieldIndex}`}
@@ -1348,7 +1361,9 @@ function App() {
                         {(field.control === "choice" || field.control === "list") && (
                           <div className="grid gap-3 sm:grid-cols-2">
                             <div className="space-y-2">
-                              <Label htmlFor={`form-field-default-${fieldIndex}`}>Default</Label>
+                              <Label htmlFor={`form-field-default-${fieldIndex}`} className="inline-flex items-center">
+                                Default <OptionalMark />
+                              </Label>
                               <Input
                                 id={`form-field-default-${fieldIndex}`}
                                 value={field.defaultValue}
@@ -1356,7 +1371,9 @@ function App() {
                               />
                             </div>
                             <div className="space-y-2">
-                              <Label htmlFor={`form-field-values-${fieldIndex}`}>Values</Label>
+                              <Label htmlFor={`form-field-values-${fieldIndex}`} className="inline-flex items-center">
+                                Values <RequiredMark />
+                              </Label>
                               <Textarea
                                 id={`form-field-values-${fieldIndex}`}
                                 className="mono-field min-h-24 resize-y"
@@ -1374,7 +1391,9 @@ function App() {
               </div>
             ) : (
               <div className="space-y-2">
-                <Label htmlFor="replace">Replace Content</Label>
+                <Label htmlFor="replace" className="inline-flex items-center">
+                  Replace Content <RequiredMark />
+                </Label>
                 <Textarea
                   id="replace"
                   className="mono-field min-h-48 resize-y"
@@ -1386,7 +1405,9 @@ function App() {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
+              <Label htmlFor="description" className="inline-flex items-center">
+                Description <OptionalMark />
+              </Label>
               <Input
                 id="description"
                 placeholder="A brief note about what this snippet does..."
