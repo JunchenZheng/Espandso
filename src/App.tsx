@@ -30,7 +30,6 @@ import {
 import "./App.css";
 
 import { Button } from "./components/ui/button";
-import { Card, CardContent } from "./components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -861,122 +860,109 @@ function App() {
       )}
 
       <main className="flex h-full w-full overflow-hidden bg-[linear-gradient(180deg,hsl(var(--background))_0%,hsl(var(--secondary))_100%)] p-4">
-        <Card className="flex h-full w-full flex-col p-4">
-          <CardContent className="flex min-h-0 flex-1 flex-col p-0">
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                onClick={scanDefaultEspansoConfigDir}
-                disabled={isScanningEspanso}
-                aria-label="Refresh YAML configs"
-                title="Refresh YAML configs"
-              >
-                <RefreshCw className={cn("h-4 w-4", isScanningEspanso && "animate-spin")} />
-                Refresh
-              </Button>
-              <Button variant="outline" onClick={() => setIsSettingsOpen(true)}>
-                <Settings />
-                Settings
-              </Button>
-            </div>
-            <div className="mt-3 flex min-h-0 flex-1 flex-col rounded-lg border bg-secondary/40 p-4 text-left">
-              {espansoConfigs.length > 0 ? (
-                <div className="flex min-h-0 flex-1 flex-col gap-3">
-                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-background p-3">
-                    <div className="flex flex-wrap gap-3 text-sm">
-                      <span className="font-semibold">{espansoConfigs.length} YAML files</span>
-                      <span className="text-muted-foreground">{espansoPreviewTotals.snippets} readable snippets</span>
-                      <span className="text-muted-foreground">{espansoPreviewTotals.inline} inline</span>
-                      <span className="text-muted-foreground">{espansoPreviewTotals.resources} external files</span>
-                      <span className="text-muted-foreground">{espansoPreviewTotals.images} images</span>
-                      <span className="text-muted-foreground">{espansoPreviewTotals.forms} forms</span>
-                      {espansoPreviewTotals.warnings > 0 && (
-                        <span className="text-amber-700">{espansoPreviewTotals.warnings} warnings</span>
-                      )}
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={scanDefaultEspansoConfigDir}
-                        disabled={isScanningEspanso}
-                        aria-label="Refresh YAML configs"
-                        title="Refresh YAML configs"
-                      >
-                        <RefreshCw className={cn("h-4 w-4", isScanningEspanso && "animate-spin")} />
-                        Refresh
-                      </Button>
-                      <Button size="sm" onClick={openAddSnippetDialog} disabled={!selectedEspansoPreview}>
-                        <Plus className="h-4 w-4" />
-                        Add Snippet
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden rounded-md border bg-background md:grid-cols-[18rem_1fr]">
-                    <aside className="flex min-h-0 flex-col border-b bg-secondary/30 md:border-b-0 md:border-r">
-                      <div className="flex h-10 shrink-0 items-center justify-between border-b px-3">
-                        <h2 className="text-sm font-semibold">Collection</h2>
-                        <span className="text-xs text-muted-foreground">{espansoPreviewList.length}</span>
-                      </div>
-                      <ScrollArea className="min-h-0 flex-1">
-                        <div className="space-y-1 p-2">
-                          {espansoPreviewTree.map((node) => (
-                            <EspansoConfigTreeNode
-                              key={node.path}
-                              node={node}
-                              activePath={selectedEspansoPreview?.config.path || selectedEspansoConfigPath}
-                              activeAncestorPaths={activeEspansoAncestorPaths}
-                              onSelect={setSelectedEspansoConfigPath}
-                              onOpenFile={openYamlFileInDefaultApp}
-                            />
-                          ))}
-                        </div>
-                      </ScrollArea>
-                    </aside>
-
-                    <section className="flex min-h-0 min-w-0 flex-col">
-                      {selectedEspansoPreview ? (
-                        <EspansoConfigDetail
-                          preview={selectedEspansoPreview}
-                          onViewSnippet={(match, index) =>
-                            openEditSnippetDialog({
-                              preview: selectedEspansoPreview,
-                              match,
-                              displayIndex: index,
-                            })
-                          }
-                        />
-                      ) : (
-                        <EmptyState
-                          icon={FileText}
-                          title="No config selected"
-                          description="Select a YAML config from the collection list to preview its snippets."
-                        />
-                      )}
-                    </section>
-                  </div>
-                </div>
-              ) : (
-                <div className="mt-4 space-y-3">
-                  <p className="text-sm text-muted-foreground">
-                    {isScanningEspanso ? "Scanning Espanso configs..." : espansoScanMessage || "Scanning starts automatically."}
-                  </p>
-                  {!isScanningEspanso && (
-                    <Button
-                      className="w-full"
-                      variant="outline"
-                      onClick={scanDefaultEspansoConfigDir}
-                    >
-                      <RefreshCw className="h-4 w-4" />
-                      Scan Default Espanso Directory
-                    </Button>
+        <div className="flex h-full w-full flex-col rounded-lg border bg-secondary/40 p-4 text-left shadow-sm">
+          {espansoConfigs.length > 0 ? (
+            <div className="flex min-h-0 flex-1 flex-col gap-3">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-background p-3">
+                <div className="flex flex-wrap gap-3 text-sm">
+                  <span className="font-semibold">{espansoConfigs.length} YAML files</span>
+                  <span className="text-muted-foreground">{espansoPreviewTotals.snippets} readable snippets</span>
+                  <span className="text-muted-foreground">{espansoPreviewTotals.inline} inline</span>
+                  <span className="text-muted-foreground">{espansoPreviewTotals.resources} external files</span>
+                  <span className="text-muted-foreground">{espansoPreviewTotals.images} images</span>
+                  <span className="text-muted-foreground">{espansoPreviewTotals.forms} forms</span>
+                  {espansoPreviewTotals.warnings > 0 && (
+                    <span className="text-amber-700">{espansoPreviewTotals.warnings} warnings</span>
                   )}
                 </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={scanDefaultEspansoConfigDir}
+                    disabled={isScanningEspanso}
+                    aria-label="Refresh YAML configs"
+                    title="Refresh YAML configs"
+                  >
+                    <RefreshCw className={cn("h-4 w-4", isScanningEspanso && "animate-spin")} />
+                    Refresh
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setIsSettingsOpen(true)}
+                    aria-label="Open settings"
+                    title="Open settings"
+                  >
+                    <Settings className="h-4 w-4" />
+                    Settings
+                  </Button>
+                </div>
+              </div>
+
+              <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden rounded-md border bg-background md:grid-cols-[18rem_1fr]">
+                <aside className="flex min-h-0 flex-col border-b bg-secondary/30 md:border-b-0 md:border-r">
+                  <div className="flex h-10 shrink-0 items-center justify-between border-b px-3">
+                    <h2 className="text-sm font-semibold">Collection</h2>
+                    <span className="text-xs text-muted-foreground">{espansoPreviewList.length}</span>
+                  </div>
+                  <ScrollArea className="min-h-0 flex-1">
+                    <div className="space-y-1 p-2">
+                      {espansoPreviewTree.map((node) => (
+                        <EspansoConfigTreeNode
+                          key={node.path}
+                          node={node}
+                          activePath={selectedEspansoPreview?.config.path || selectedEspansoConfigPath}
+                          activeAncestorPaths={activeEspansoAncestorPaths}
+                          onSelect={setSelectedEspansoConfigPath}
+                          onOpenFile={openYamlFileInDefaultApp}
+                        />
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </aside>
+
+                <section className="flex min-h-0 min-w-0 flex-col">
+                  {selectedEspansoPreview ? (
+                    <EspansoConfigDetail
+                      preview={selectedEspansoPreview}
+                      onViewSnippet={(match, index) =>
+                        openEditSnippetDialog({
+                          preview: selectedEspansoPreview,
+                          match,
+                          displayIndex: index,
+                        })
+                      }
+                      onAddSnippet={openAddSnippetDialog}
+                    />
+                  ) : (
+                    <EmptyState
+                      icon={FileText}
+                      title="No config selected"
+                      description="Select a YAML config from the collection list to preview its snippets."
+                    />
+                  )}
+                </section>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-4 space-y-3">
+              <p className="text-sm text-muted-foreground">
+                {isScanningEspanso ? "Scanning Espanso configs..." : espansoScanMessage || "Scanning starts automatically."}
+              </p>
+              {!isScanningEspanso && (
+                <Button
+                  className="w-full"
+                  variant="outline"
+                  onClick={scanDefaultEspansoConfigDir}
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Scan Default Espanso Directory
+                </Button>
               )}
             </div>
-          </CardContent>
-        </Card>
+          )}
+        </div>
       </main>
 
       <Dialog open={isAddSnippetOpen} onOpenChange={(open) => {
@@ -1692,9 +1678,10 @@ const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
 interface EspansoConfigDetailProps {
   preview: EspansoConfigPreview;
   onViewSnippet: (match: ImportedMatch, index: number) => void;
+  onAddSnippet: () => void;
 }
 
-function EspansoConfigDetail({ preview, onViewSnippet }: EspansoConfigDetailProps) {
+function EspansoConfigDetail({ preview, onViewSnippet, onAddSnippet }: EspansoConfigDetailProps) {
   const ROW_HEIGHT = 36;
   const OVERSCAN_ROWS = 8;
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -1736,11 +1723,17 @@ function EspansoConfigDetail({ preview, onViewSnippet }: EspansoConfigDetailProp
           <h2 className="truncate text-sm font-semibold">{preview.config.relativePath}</h2>
           <p className="mt-1 truncate text-xs text-muted-foreground">{preview.config.path}</p>
         </div>
-        {preview.warningCount > 0 && (
-          <span className="shrink-0 rounded-md bg-amber-100 px-2 py-1 text-xs text-amber-800">
-            {preview.warningCount} warnings
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {preview.warningCount > 0 && (
+            <span className="shrink-0 rounded-md bg-amber-100 px-2 py-1 text-xs text-amber-800">
+              {preview.warningCount} {preview.warningCount === 1 ? "warning" : "warnings"}
+            </span>
+          )}
+          <Button size="sm" onClick={onAddSnippet}>
+            <Plus className="h-4 w-4" />
+            Add Snippet
+          </Button>
+        </div>
       </div>
 
       <div className="grid h-9 shrink-0 grid-cols-[minmax(8rem,1.1fr)_3rem_minmax(6rem,0.65fr)_minmax(12rem,2fr)_2.25rem] items-center border-b bg-secondary/40 px-3 text-xs font-semibold text-muted-foreground">
