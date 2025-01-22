@@ -561,3 +561,19 @@ describe("resolveIncludeFile", () => {
     expect(res.content).toBe("loaded through shell");
   });
 });
+
+describe("openSourceLibraries", () => {
+  it("should contain isbinaryfile and shadcn/ui library definitions", async () => {
+    const { OPEN_SOURCE_LIBRARIES } = await import("./openSourceLibraries");
+    expect(OPEN_SOURCE_LIBRARIES.length).toBeGreaterThanOrEqual(2);
+    const names = OPEN_SOURCE_LIBRARIES.map((l) => l.name);
+    expect(names).toContain("isbinaryfile");
+    expect(names).toContain("shadcn/ui");
+
+    const isbinary = OPEN_SOURCE_LIBRARIES.find((l) => l.name === "isbinaryfile");
+    expect(isbinary?.url).toBe("https://github.com/gjtorikian/isbinaryfile");
+
+    const shadcn = OPEN_SOURCE_LIBRARIES.find((l) => l.name === "shadcn/ui");
+    expect(shadcn?.url).toBe("https://github.com/shadcn-ui/ui");
+  });
+});
