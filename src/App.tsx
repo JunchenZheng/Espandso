@@ -13,6 +13,7 @@ import {
   Folder,
   FolderOpen,
   Image as ImageIcon,
+  Info,
   List,
   ListChecks,
   Loader2,
@@ -42,6 +43,7 @@ import { Input } from "./components/ui/input";
 import { Label } from "./components/ui/label";
 import { ScrollArea } from "./components/ui/scroll-area";
 import { Textarea } from "./components/ui/textarea";
+import { AboutDialog } from "./components/AboutDialog";
 import { Snippet, ValidationError } from "./logic/types";
 import { validate } from "./logic/validate";
 import { importYamlContent, ImportedMatch } from "./logic/importYaml";
@@ -275,6 +277,7 @@ function App() {
   const [isScanningEspanso, setIsScanningEspanso] = useState<boolean>(false);
   const [espansoScanMessage, setEspansoScanMessage] = useState<string>("");
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+  const [isAboutOpen, setIsAboutOpen] = useState<boolean>(false);
   const [isAddSnippetOpen, setIsAddSnippetOpen] = useState<boolean>(false);
   const [snippetEditTarget, setSnippetEditTarget] = useState<SnippetEditTarget | null>(null);
   const [addSnippetKind, setAddSnippetKind] = useState<AddSnippetKind>("text");
@@ -897,6 +900,16 @@ function App() {
                     <Settings className="h-4 w-4" />
                     Settings
                   </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setIsAboutOpen(true)}
+                    aria-label="About Expandso"
+                    title="About Expandso"
+                  >
+                    <Info className="h-4 w-4" />
+                    About
+                  </Button>
                 </div>
               </div>
 
@@ -1463,6 +1476,8 @@ function App() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AboutDialog open={isAboutOpen} onOpenChange={setIsAboutOpen} />
 
       <Dialog
         open={alertDialog.isOpen}
