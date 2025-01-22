@@ -310,6 +310,19 @@ function App() {
     });
   }, []);
 
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    listen("open-about-dialog", () => {
+      setIsAboutOpen(true);
+    }).then((fn) => {
+      unlisten = fn;
+    });
+
+    return () => {
+      if (unlisten) unlisten();
+    };
+  }, []);
+
   const showConfirm = useCallback(
     (
       description: string,
@@ -900,16 +913,6 @@ function App() {
                     <Settings className="h-4 w-4" />
                     Settings
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setIsAboutOpen(true)}
-                    aria-label="About Expandso"
-                    title="About Expandso"
-                  >
-                    <Info className="h-4 w-4" />
-                    About
-                  </Button>
                 </div>
               </div>
 
@@ -1471,7 +1474,20 @@ function App() {
               </div>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="sm:justify-between">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 text-xs text-muted-foreground hover:text-foreground"
+              onClick={() => {
+                setIsSettingsOpen(false);
+                setIsAboutOpen(true);
+              }}
+            >
+              <Info className="mr-1 h-3.5 w-3.5" />
+              About Expandso
+            </Button>
             <Button onClick={() => setIsSettingsOpen(false)}>Done</Button>
           </DialogFooter>
         </DialogContent>
