@@ -38,14 +38,18 @@ function extractCatPath(varsBlock: any[]): string | null {
     }
   }
 
+  if (shellCmd) {
+    const m = /cat\s+["']?([^"']+)["']?/.exec(shellCmd);
+    if (m) {
+      const pathCandidate = m[1].trim();
+      if (pathCandidate !== "{{path}}" && pathCandidate !== "$path") {
+        return pathCandidate;
+      }
+    }
+  }
+
   if (echoPath) {
     return echoPath;
-  }
-  if (shellCmd) {
-    const m = /cat\s+"([^"]+)"/.exec(shellCmd);
-    if (m) {
-      return m[1];
-    }
   }
   return null;
 }
@@ -129,6 +133,29 @@ export function parseYamlMatch(
         resourcePath: catPath,
         resourceName: resourceFilename,
       };
+    });
+
+    return { matches, warnings };
+  }
+
+  const imagePath = match.image_path;
+  if (imagePath !== undefined && imagePath !== null) {
+    const originalSnippet: Snippet = triggers.length > 1
+      ? { triggers, image_path: String(imagePath) }
+      : { trigger: triggers[0], image_path: String(imagePath) };
+    if (match.description) {
+      originalSnippet.description = match.description;
+    }
+
+    const matches: ImportedMatch[] = triggers.map((trigger) => {
+      const snippet: Snippet = {
+        trigger,
+        image_path: String(imagePath),
+      };
+      if (match.description) {
+        snippet.description = match.description;
+      }
+      return { snippet, originalSnippet, originalMatchIndex };
     });
 
     return { matches, warnings };

@@ -1,3 +1,6 @@
+use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
+use tauri::Emitter;
+
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -44,6 +47,100 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_store::Builder::new().build())
+        .setup(|app| {
+            let about_item = MenuItem::with_id(app, "open_about", "About Expandso", true, None::<&str>)?;
+
+            #[cfg(target_os = "macos")]
+            let menu = {
+                let app_submenu = Submenu::with_items(
+                    app,
+                    "Expandso",
+                    true,
+                    &[
+                        &about_item,
+                        &PredefinedMenuItem::separator(app)?,
+                        &PredefinedMenuItem::services(app, None)?,
+                        &PredefinedMenuItem::separator(app)?,
+                        &PredefinedMenuItem::hide(app, None)?,
+                        &PredefinedMenuItem::hide_others(app, None)?,
+                        &PredefinedMenuItem::show_all(app, None)?,
+                        &PredefinedMenuItem::separator(app)?,
+                        &PredefinedMenuItem::quit(app, None)?,
+                    ],
+                )?;
+
+                let edit_submenu = Submenu::with_items(
+                    app,
+                    "Edit",
+                    true,
+                    &[
+                        &PredefinedMenuItem::undo(app, None)?,
+                        &PredefinedMenuItem::redo(app, None)?,
+                        &PredefinedMenuItem::separator(app)?,
+                        &PredefinedMenuItem::cut(app, None)?,
+                        &PredefinedMenuItem::copy(app, None)?,
+                        &PredefinedMenuItem::paste(app, None)?,
+                        &PredefinedMenuItem::select_all(app, None)?,
+                    ],
+                )?;
+
+                let window_submenu = Submenu::with_items(
+                    app,
+                    "Window",
+                    true,
+                    &[
+                        &PredefinedMenuItem::minimize(app, None)?,
+                        &PredefinedMenuItem::separator(app)?,
+                        &PredefinedMenuItem::close_window(app, None)?,
+                    ],
+                )?;
+
+                Menu::with_items(app, &[&app_submenu, &edit_submenu, &window_submenu])?
+            };
+
+            #[cfg(not(target_os = "macos"))]
+            let menu = {
+                let file_submenu = Submenu::with_items(
+                    app,
+                    "File",
+                    true,
+                    &[&PredefinedMenuItem::quit(app, None)?],
+                )?;
+
+                let edit_submenu = Submenu::with_items(
+                    app,
+                    "Edit",
+                    true,
+                    &[
+                        &PredefinedMenuItem::undo(app, None)?,
+                        &PredefinedMenuItem::redo(app, None)?,
+                        &PredefinedMenuItem::separator(app)?,
+                        &PredefinedMenuItem::cut(app, None)?,
+                        &PredefinedMenuItem::copy(app, None)?,
+                        &PredefinedMenuItem::paste(app, None)?,
+                        &PredefinedMenuItem::select_all(app, None)?,
+                    ],
+                )?;
+
+                let help_submenu = Submenu::with_items(
+                    app,
+                    "Help",
+                    true,
+                    &[&about_item],
+                )?;
+
+                Menu::with_items(app, &[&file_submenu, &edit_submenu, &help_submenu])?
+            };
+
+            app.set_menu(menu)?;
+
+            Ok(())
+        })
+        .on_menu_event(|app, event| {
+            if event.id() == "open_about" {
+                let _ = app.emit("open-about-dialog", ());
+            }
+        })
         .invoke_handler(tauri::generate_handler![greet, execute_shell_cmd])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -9,7 +9,8 @@ import {
   resolveAndExecuteIncludeFileCommand,
   resolveExistingIncludeFilePath,
 } from "./resolveIncludeFile";
-import { getSnippetTriggers, normalizeTriggerLines, buildTriggerInput } from "./snippetUtils";
+import { getSnippetTriggers, normalizeTriggerLines, buildTriggerInput, isImageFilePath } from "./snippetUtils";
+import { isBinaryData, checkIsBinaryFilePath } from "./fileCheck";
 
 describe("snippetUtils", () => {
   it("should return triggers for single and multiple trigger snippets", () => {
@@ -35,6 +36,40 @@ describe("snippetUtils", () => {
       multiline: ":hi\n:hello",
     });
   });
+
+  it("should correctly identify image file paths", () => {
+    expect(isImageFilePath("/path/to/cat.PNG")).toBe(true);
+    expect(isImageFilePath("image.jpg")).toBe(true);
+    expect(isImageFilePath("icon.svg")).toBe(true);
+    expect(isImageFilePath("photo.webp")).toBe(true);
+    expect(isImageFilePath("/path/to/document.pdf")).toBe(false);
+    expect(isImageFilePath("notes.txt")).toBe(false);
+    expect(isImageFilePath("")).toBe(false);
+  });
+});
+
+describe("fileCheck", () => {
+  it("should identify text vs binary buffers", () => {
+    const textBuffer = new TextEncoder().encode("Hello world! This is a standard plain text file.");
+    expect(isBinaryData(textBuffer)).toBe(false);
+
+    const binaryBuffer = new Uint8Array([0x00, 0x01, 0x02, 0x03, 0xff]);
+    expect(isBinaryData(binaryBuffer)).toBe(true);
+
+    const pdfBuffer = new TextEncoder().encode("%PDF-1.5 header content");
+    expect(isBinaryData(pdfBuffer)).toBe(true);
+  });
+
+  it("should check binary file path using mock byte reader", async () => {
+    const mockReader = async (p: string) => {
+      if (p.endsWith(".bin")) return new Uint8Array([0x00, 0x01]);
+      return new TextEncoder().encode("Text file content");
+    };
+
+    expect(await checkIsBinaryFilePath("/tmp/test.txt", mockReader)).toBe(false);
+    expect(await checkIsBinaryFilePath("/tmp/test.bin", mockReader)).toBe(true);
+    expect(await checkIsBinaryFilePath("/tmp/cat.png", mockReader)).toBe(true);
+  });
 });
 
 describe("validate", () => {
@@ -45,6 +80,7 @@ describe("validate", () => {
         { trigger: ":hello", replace: "world", description: "simple" },
         { triggers: [":hi", ":hey"], replace: "world 2" },
         { trigger: ":file", include_file: "test.txt" },
+        { trigger: ":cat", image_path: "/path/to/cat.png" },
         { trigger: ":form", form: "Hello [[name]]", form_fields: { name: { default: "Ada" } } },
       ],
     };
@@ -68,6 +104,7 @@ describe("validate", () => {
         { triggers: [":t1", ":t1"], replace: "dup in triggers" }, // duplicate inside triggers
         { trigger: ":empty-form", form: "" }, // empty form
         { trigger: ":fields", replace: "x", form_fields: { value: { multiline: true } } }, // fields without form
+        { trigger: ":bad-img", image_path: "" }, // empty image_path
       ],
     };
 
@@ -80,11 +117,12 @@ describe("validate", () => {
     expect(messages).toContain("snippet #0: 'trigger' must be a non-empty string");
     expect(messages).toContain("snippet #2: duplicate trigger ':dup' (first at #1)");
     expect(messages).toContain("snippet #3: cannot combine 'replace', 'include_file', and 'form'");
-    expect(messages).toContain("snippet #4: must have either 'replace', 'include_file', or 'form'");
+    expect(messages).toContain("snippet #4: must have either 'replace', 'include_file', 'image_path', or 'form'");
     expect(messages).toContain("snippet #6: cannot have both 'trigger' and 'triggers'");
     expect(messages).toContain("snippet #7: duplicate trigger ':t1' (first at #7)");
     expect(messages).toContain("snippet #8: 'form' must be a non-empty string");
     expect(messages).toContain("snippet #9: 'form_fields' can only be used with 'form'");
+    expect(messages).toContain("snippet #10: 'image_path' must be a non-empty string");
   });
 
   it("should check include_file existence", async () => {
@@ -101,6 +139,17 @@ describe("validate", () => {
     expect(errors).toHaveLength(1);
     expect(errors[0].message).toContain("include_file 'missing.txt' not found");
   });
+
+  it("should reject include_file if it is an image file", async () => {
+    const data = {
+      version: 1,
+      snippets: [{ trigger: ":test", include_file: "picture.png" }],
+    };
+
+    const { errors } = await validate(data);
+    expect(errors).toHaveLength(1);
+    expect(errors[0].message).toContain("'include_file' cannot be an image file");
+  });
 });
 
 describe("importYaml", () => {
@@ -114,21 +163,25 @@ matches:
       - :hi
       - :hey
     replace: greeting
+  - trigger: :cat
+    image_path: /path/to/cat.png
+    description: cat image
 `;
     const res = importYamlContent(yaml, "base.yml");
     expect(res.warnings).toHaveLength(0);
-    expect(res.snippets).toHaveLength(3);
+    expect(res.snippets).toHaveLength(4);
     expect(res.snippets[0]).toEqual({ trigger: ":hello", replace: "world", description: "simple" });
     expect(res.snippets[1]).toEqual({ trigger: ":hi", replace: "greeting" });
     expect(res.snippets[2]).toEqual({ trigger: ":hey", replace: "greeting" });
+    expect(res.snippets[3]).toEqual({ trigger: ":cat", image_path: "/path/to/cat.png", description: "cat image" });
     expect(res.importedMatches[1].originalMatchIndex).toBe(1);
     expect(res.importedMatches[1].originalSnippet).toEqual({ triggers: [":hi", ":hey"], replace: "greeting" });
   });
 
-  it("should import include_file snippets and warn about unsupported stuff", () => {
+  it("should import include_file snippets (both single shell var and legacy echo+shell) and warn about unsupported stuff", () => {
     const yaml = `
 matches:
-  - trigger: :inc
+  - trigger: :inc_legacy
     replace: "{{output}}"
     vars:
       - name: path
@@ -139,6 +192,13 @@ matches:
         type: shell
         params:
           cmd: cat "{{path}}"
+  - trigger: :inc_single
+    replace: "{{output}}"
+    vars:
+      - name: output
+        type: shell
+        params:
+          cmd: cat "/path/to/single_resource.json"
   - trigger: :unsupported
     replace: "{{bad}}"
     vars:
@@ -148,8 +208,9 @@ matches:
           format: "%Y"
 `;
     const res = importYamlContent(yaml, "test.yml");
-    expect(res.snippets).toHaveLength(1);
-    expect(res.snippets[0]).toEqual({ trigger: ":inc", include_file: "resource_data.json" });
+    expect(res.snippets).toHaveLength(2);
+    expect(res.snippets[0]).toEqual({ trigger: ":inc_legacy", include_file: "resource_data.json" });
+    expect(res.snippets[1]).toEqual({ trigger: ":inc_single", include_file: "single_resource_data.json" });
     expect(res.warnings).toContain("[test.yml] Snippet for :unsupported has unsupported var type(s) [date], skipping");
   });
 
@@ -238,11 +299,21 @@ matches:
 
     expect(updated).toContain("trigger: :file");
     expect(updated).toContain('replace: "{{output}}"');
-    expect(updated).toContain("name: path");
-    expect(updated).toContain("echo: /Users/test/snippets/note.md");
     expect(updated).toContain("name: output");
-    expect(updated).toContain('cmd: cat "{{path}}"');
+    expect(updated).toContain('cmd: cat "/Users/test/snippets/note.md"');
     expect(updated).toContain("description: external note");
+  });
+
+  it("should append an image snippet with image_path", () => {
+    const updated = appendSnippetToYamlContent("matches: []\n", {
+      trigger: ":cat",
+      image_path: "/path/to/cat.png",
+      description: "cat image snippet",
+    });
+
+    expect(updated).toContain("trigger: :cat");
+    expect(updated).toContain('image_path: /path/to/cat.png');
+    expect(updated).toContain("description: cat image snippet");
   });
 
   it("should append a form snippet with field controls", () => {
@@ -279,14 +350,10 @@ matches:
   - trigger: :plan
     replace: "{{output}}"
     vars:
-      - name: path
-        type: echo
-        params:
-          echo: old-plan.md
       - name: output
         type: shell
         params:
-          cmd: cat "{{path}}"
+          cmd: cat "old-plan.md"
 `;
 
     const updated = replaceSnippetInYamlContent(yaml, 1, {
@@ -297,8 +364,7 @@ matches:
 
     expect(updated).toContain("trigger: :hello");
     expect(updated).toContain("trigger: :new-plan");
-    expect(updated).toContain("echo: /Users/test/snippets/new-plan.md");
-    expect(updated).toContain('cmd: cat "{{path}}"');
+    expect(updated).toContain('cmd: cat "/Users/test/snippets/new-plan.md"');
     expect(updated).toContain("description: updated external plan");
     expect(updated).not.toContain("old-plan.md");
   });
@@ -493,5 +559,21 @@ describe("resolveIncludeFile", () => {
     expect(res.found).toBe(true);
     expect(res.resolvedPath).toBe("/Users/test/private/resource.md");
     expect(res.content).toBe("loaded through shell");
+  });
+});
+
+describe("openSourceLibraries", () => {
+  it("should contain isbinaryfile and shadcn/ui library definitions", async () => {
+    const { OPEN_SOURCE_LIBRARIES } = await import("./openSourceLibraries");
+    expect(OPEN_SOURCE_LIBRARIES.length).toBeGreaterThanOrEqual(2);
+    const names = OPEN_SOURCE_LIBRARIES.map((l) => l.name);
+    expect(names).toContain("isbinaryfile");
+    expect(names).toContain("shadcn/ui");
+
+    const isbinary = OPEN_SOURCE_LIBRARIES.find((l) => l.name === "isbinaryfile");
+    expect(isbinary?.url).toBe("https://github.com/gjtorikian/isbinaryfile");
+
+    const shadcn = OPEN_SOURCE_LIBRARIES.find((l) => l.name === "shadcn/ui");
+    expect(shadcn?.url).toBe("https://github.com/shadcn-ui/ui");
   });
 });
