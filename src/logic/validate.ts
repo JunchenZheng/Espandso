@@ -1,5 +1,5 @@
 import { ValidationError } from "./types";
-import { getSnippetTriggers } from "./snippetUtils";
+import { getSnippetTriggers, isImageFilePath } from "./snippetUtils";
 
 export interface ValidateOptions {
   snippetsDir?: string;
@@ -41,6 +41,7 @@ export async function validate(
     const triggers = snippet.triggers;
     const replace = snippet.replace;
     const includeFile = snippet.include_file;
+    const imagePath = snippet.image_path;
     const form = snippet.form;
     const formFields = snippet.form_fields;
     const description = snippet.description;
@@ -83,11 +84,12 @@ export async function validate(
     // Replacement kind validation
     const hasReplace = replace !== undefined && replace !== null;
     const hasInclude = includeFile !== undefined && includeFile !== null;
+    const hasImagePath = imagePath !== undefined && imagePath !== null;
     const hasForm = form !== undefined && form !== null;
-    const replacementKindCount = [hasReplace, hasInclude, hasForm].filter(Boolean).length;
+    const replacementKindCount = [hasReplace, hasInclude, hasImagePath, hasForm].filter(Boolean).length;
 
     if (replacementKindCount === 0) {
-      errors.push({ message: `snippet #${i}: must have either 'replace', 'include_file', or 'form'` });
+      errors.push({ message: `snippet #${i}: must have either 'replace', 'include_file', 'image_path', or 'form'` });
     } else if (replacementKindCount > 1) {
       errors.push({ message: `snippet #${i}: cannot combine 'replace', 'include_file', and 'form'` });
     } else if (hasReplace) {
@@ -97,6 +99,8 @@ export async function validate(
     } else if (hasInclude) {
       if (typeof includeFile !== "string" || !includeFile) {
         errors.push({ message: `snippet #${i}: 'include_file' must be a non-empty string` });
+      } else if (isImageFilePath(includeFile)) {
+        errors.push({ message: `snippet #${i}: 'include_file' cannot be an image file ('${includeFile}'). Use 'image_path' for image snippets.` });
       } else if (options?.snippetsDir && options?.checkFileExists) {
         // Resolve absolute or relative path
         // For simplicity, we pass the relative includeFile to checkFileExists helper
@@ -106,6 +110,10 @@ export async function validate(
             message: `snippet #${i}: include_file '${includeFile}' not found`,
           });
         }
+      }
+    } else if (hasImagePath) {
+      if (typeof imagePath !== "string" || !imagePath) {
+        errors.push({ message: `snippet #${i}: 'image_path' must be a non-empty string` });
       }
     } else if (typeof form !== "string" || !form) {
       errors.push({ message: `snippet #${i}: 'form' must be a non-empty string` });
