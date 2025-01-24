@@ -14,20 +14,15 @@ export function snippetToYamlMatch(snippet: Snippet): Record<string, any> {
     match.replace = "{{output}}";
     match.vars = [
       {
-        name: "path",
-        type: "echo",
-        params: {
-          echo: snippet.include_file,
-        },
-      },
-      {
         name: "output",
         type: "shell",
         params: {
-          cmd: 'cat "{{path}}"',
+          cmd: `cat "${snippet.include_file}"`,
         },
       },
     ];
+  } else if (snippet.image_path !== undefined) {
+    match.image_path = snippet.image_path;
   } else if (snippet.form !== undefined) {
     match.form = snippet.form;
     if (snippet.form_fields && Object.keys(snippet.form_fields).length > 0) {
