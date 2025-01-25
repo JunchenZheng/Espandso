@@ -8,10 +8,17 @@ export interface EspansoConfigFile {
   relativePath: string;
 }
 
+export interface EspansoDirectoryInfo {
+  name: string;
+  path: string;
+  relativePath: string;
+}
+
 export interface EspansoConfigScanResult {
   matchDir: string;
   pathSource: EspansoPathSource;
   files: EspansoConfigFile[];
+  directories: EspansoDirectoryInfo[];
 }
 
 export type EspansoPathSource = "cli" | "default";
@@ -92,6 +99,10 @@ export function sortEspansoConfigFiles(files: EspansoConfigFile[]): EspansoConfi
   return [...files].sort((a, b) => a.relativePath.localeCompare(b.relativePath));
 }
 
+export function sortEspansoDirectories(directories: EspansoDirectoryInfo[]): EspansoDirectoryInfo[] {
+  return [...directories].sort((a, b) => a.relativePath.localeCompare(b.relativePath));
+}
+
 export async function scanEspansoConfigFiles(
   matchDir?: string,
   basePath: string = "",
@@ -101,27 +112,37 @@ export async function scanEspansoConfigFiles(
     : await getEspansoMatchDirDetails();
   const rootDir = pathResult.matchDir;
   const files: EspansoConfigFile[] = [];
+  const directories: EspansoDirectoryInfo[] = [];
 
   async function scanDir(dirPath: string, relativeBase: string) {
-    const entries = await readDir(dirPath);
+    try {
+      const entries = await readDir(dirPath);
 
-    for (const entry of entries) {
-      if (entry.name.startsWith(".")) {
-        continue;
+      for (const entry of entries) {
+        if (entry.name.startsWith(".")) {
+          continue;
+        }
+
+        const fullPath = `${dirPath}/${entry.name}`;
+        const relativePath = relativeBase ? `${relativeBase}/${entry.name}` : entry.name;
+
+        if (entry.isDirectory) {
+          directories.push({
+            name: entry.name,
+            path: fullPath,
+            relativePath,
+          });
+          await scanDir(fullPath, relativePath);
+        } else if (entry.isFile && isEspansoYamlConfigFile(entry.name)) {
+          files.push({
+            name: entry.name,
+            path: fullPath,
+            relativePath,
+          });
+        }
       }
-
-      const fullPath = `${dirPath}/${entry.name}`;
-      const relativePath = relativeBase ? `${relativeBase}/${entry.name}` : entry.name;
-
-      if (entry.isDirectory) {
-        await scanDir(fullPath, relativePath);
-      } else if (entry.isFile && isEspansoYamlConfigFile(entry.name)) {
-        files.push({
-          name: entry.name,
-          path: fullPath,
-          relativePath,
-        });
-      }
+    } catch (e) {
+      console.warn(`Failed to read directory ${dirPath}:`, e);
     }
   }
 
@@ -131,5 +152,6 @@ export async function scanEspansoConfigFiles(
     matchDir: rootDir,
     pathSource: pathResult.source,
     files: sortEspansoConfigFiles(files),
+    directories: sortEspansoDirectories(directories),
   };
 }
