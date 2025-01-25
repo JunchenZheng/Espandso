@@ -119,7 +119,7 @@ export async function scanEspansoConfigFiles(
       const entries = await readDir(dirPath);
 
       for (const entry of entries) {
-        if (entry.name.startsWith(".")) {
+        if (entry.name.startsWith(".") || entry.name.toLowerCase() === "packages") {
           continue;
         }
 
