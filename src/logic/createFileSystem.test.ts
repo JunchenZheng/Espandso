@@ -55,6 +55,11 @@ describe("createFileSystem logic", () => {
       expect(validateFolderName("folder:1")).toContain("invalid characters");
     });
 
+    it("returns error for reserved protected folder names like packages", () => {
+      expect(validateFolderName("packages")).toContain("reserved Espanso directory name");
+      expect(validateFolderName("PACKAGES")).toContain("reserved Espanso directory name");
+    });
+
     it("returns error for duplicate folder names", () => {
       expect(validateFolderName("work", ["work", "personal"])).toBe('Folder "work" already exists in the selected directory.');
     });
