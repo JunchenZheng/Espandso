@@ -39,10 +39,20 @@ export function validateFileName(fileName: string, existingFileNames: string[] =
   return null;
 }
 
+export const PROTECTED_DIRECTORY_NAMES = new Set(["packages"]);
+
+export function isProtectedDirectoryName(name: string): boolean {
+  return PROTECTED_DIRECTORY_NAMES.has(name.trim().toLowerCase());
+}
+
 export function validateFolderName(folderName: string, existingFolderNames: string[] = []): string | null {
   const trimmed = folderName.trim();
   if (!trimmed) {
     return "Folder name cannot be empty.";
+  }
+
+  if (isProtectedDirectoryName(trimmed)) {
+    return `'${trimmed}' is a reserved Espanso directory name and cannot be used.`;
   }
 
   if (/[\\/:*?"<>|]/.test(trimmed)) {
