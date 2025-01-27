@@ -1990,24 +1990,34 @@ const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
 
   if (node.isDir) {
     return (
-      <div>
+      <div className="mb-0.5">
         <div
           className={cn(
-            "group flex w-full items-center justify-between rounded-md px-2 py-1 text-left text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
-            containsActive && "text-foreground",
+            "group flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent/70",
+            containsActive ? "text-foreground font-semibold" : "text-foreground/80 font-medium",
           )}
         >
           <button
-            className="flex min-w-0 flex-1 items-center gap-2 py-0.5 text-left"
+            className="flex min-w-0 flex-1 items-center gap-2 text-left"
             onClick={() => setIsOpen(!isOpen)}
           >
-            {isOpen ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
-            {isOpen ? <FolderOpen className="h-4 w-4 shrink-0 text-amber-500" /> : <Folder className="h-4 w-4 shrink-0 text-amber-500" />}
-            <div className="min-w-0 flex-1">
-              <div className="truncate font-medium">{node.name}</div>
+            {isOpen ? (
+              <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground/70 transition-transform" />
+            ) : (
+              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/70 transition-transform" />
+            )}
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-400">
+              {isOpen ? <FolderOpen className="h-4 w-4" /> : <Folder className="h-4 w-4" />}
             </div>
-            {node.fileCount === 0 && (
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm font-semibold tracking-tight">{node.name}</div>
+            </div>
+            {node.fileCount === 0 ? (
               <span className="mr-1 text-[10px] font-normal text-muted-foreground/70">(empty)</span>
+            ) : (
+              <span className="mr-1 rounded-full bg-muted/60 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                {node.fileCount}
+              </span>
             )}
           </button>
           <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
@@ -2034,7 +2044,7 @@ const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
           </div>
         </div>
         {isOpen && node.children && (
-          <div className="ml-4 mt-1 space-y-1 border-l pl-2">
+          <div className="ml-3.5 mt-0.5 space-y-0.5 border-l border-border/50 pl-2">
             {node.children.map((child) => (
               <EspansoConfigTreeNode
                 key={child.path}
@@ -2058,31 +2068,31 @@ const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
   return (
     <div
       className={cn(
-        "group flex w-full items-center rounded-md transition-colors hover:bg-accent",
-        isActive && "bg-primary text-primary-foreground hover:bg-primary/90",
+        "group flex w-full items-center rounded-md transition-colors",
+        isActive
+          ? "bg-primary text-primary-foreground font-medium"
+          : "text-foreground/80 hover:bg-accent hover:text-foreground",
       )}
     >
       <button
-        className="flex min-w-0 flex-1 items-center gap-3 rounded-l-md px-3 py-2 text-left"
+        className="flex min-w-0 flex-1 items-center gap-2 rounded-l-md px-2 py-1.5 text-left"
         onClick={() => node.preview && onSelect(node.preview.config.path)}
       >
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-background/80 text-primary">
-          <FileText className="h-5 w-5" />
-        </div>
+        <FileText className={cn("h-4 w-4 shrink-0", isActive ? "text-primary-foreground" : "text-muted-foreground")} />
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-semibold">{node.name.replace(/\.ya?ml$/i, "")}</div>
+          <div className="truncate text-xs font-medium">{node.name.replace(/\.ya?ml$/i, "")}</div>
         </div>
       </button>
       {node.preview && (
         <button
           className={cn(
-            "mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-md opacity-70 transition hover:bg-background/80 hover:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-            isActive && "hover:bg-primary-foreground/20",
+            "mr-1 flex h-6 w-6 shrink-0 items-center justify-center rounded opacity-70 transition hover:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+            isActive ? "hover:bg-primary-foreground/20 text-primary-foreground" : "hover:bg-accent-foreground/10 text-muted-foreground",
           )}
           title={`Open ${node.name} in default app`}
           onClick={() => onOpenFile(node.preview!.config.path)}
         >
-          <SquareArrowOutUpRight className="h-4 w-4" />
+          <SquareArrowOutUpRight className="h-3.5 w-3.5" />
         </button>
       )}
     </div>
