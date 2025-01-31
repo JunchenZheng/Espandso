@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { readFile, readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
+import { mkdir, readFile, readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import { listen } from "@tauri-apps/api/event";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { openPath } from "@tauri-apps/plugin-opener";
@@ -8,10 +8,12 @@ import {
   AlignLeft,
   ChevronDown,
   ChevronRight,
+  FilePlus,
   FileSearch,
   FileText,
   Folder,
   FolderOpen,
+  FolderPlus,
   Image as ImageIcon,
   Info,
   List,
@@ -49,7 +51,8 @@ import { validate } from "./logic/validate";
 import { importYamlContent, ImportedMatch } from "./logic/importYaml";
 import { buildTriggerInput, getSnippetTriggers, isImageFilePath, normalizeTriggerLines } from "./logic/snippetUtils";
 import { appendSnippetToYamlContent, deleteSnippetFromYamlContent, replaceSnippetInYamlContent } from "./logic/yamlEditor";
-import { EspansoConfigFile, EspansoPathSource, scanEspansoConfigFiles } from "./logic/espansoPaths";
+import { EspansoConfigFile, EspansoDirectoryInfo, EspansoPathSource, scanEspansoConfigFiles } from "./logic/espansoPaths";
+import { getInitialYamlTemplate, normalizeYamlFileName, resolveTargetPath, validateFileName, validateFolderName } from "./logic/createFileSystem";
 import { checkIsBinaryFilePath, isBinaryDomFile } from "./logic/fileCheck";
 import { cn } from "./lib/utils";
 
@@ -73,6 +76,7 @@ interface EspansoConfigPreview {
 interface EspansoConfigPreviewTreeNode {
   name: string;
   path: string;
+  relativePath: string;
   isDir: boolean;
   snippetCount: number;
   fileCount: number;
@@ -272,6 +276,7 @@ function App() {
   const [espansoMatchDir, setEspansoMatchDir] = useState<string>("");
   const [espansoPathSource, setEspansoPathSource] = useState<EspansoPathSource | "">("");
   const [espansoConfigs, setEspansoConfigs] = useState<EspansoConfigFile[]>([]);
+  const [espansoDirectories, setEspansoDirectories] = useState<EspansoDirectoryInfo[]>([]);
   const [espansoConfigPreviews, setEspansoConfigPreviews] = useState<EspansoConfigPreview[]>([]);
   const [selectedEspansoConfigPath, setSelectedEspansoConfigPath] = useState<string>("");
   const [isScanningEspanso, setIsScanningEspanso] = useState<boolean>(false);
@@ -293,6 +298,89 @@ function App() {
   const [addWarnings, setAddWarnings] = useState<string[]>([]);
   const [isSavingSnippet, setIsSavingSnippet] = useState<boolean>(false);
   const formTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const espansoPreviewList = useMemo(
+    () => espansoConfigPreviews.length > 0
+      ? espansoConfigPreviews
+      : espansoConfigs.map((config) => ({
+        config,
+        snippetCount: 0,
+        inlineCount: 0,
+        resourceCount: 0,
+        imageCount: 0,
+        formCount: 0,
+        warningCount: 0,
+        snippets: [],
+        importedMatches: [],
+      })),
+    [espansoConfigPreviews, espansoConfigs],
+  );
+
+  const espansoPreviewTotals = useMemo(
+    () => espansoPreviewList.reduce(
+      (total, preview) => ({
+        snippets: total.snippets + preview.snippetCount,
+        inline: total.inline + preview.inlineCount,
+        resources: total.resources + preview.resourceCount,
+        images: total.images + preview.imageCount,
+        forms: total.forms + preview.formCount,
+        warnings: total.warnings + preview.warningCount,
+      }),
+      { snippets: 0, inline: 0, resources: 0, images: 0, forms: 0, warnings: 0 },
+    ),
+    [espansoPreviewList],
+  );
+
+  const espansoPreviewTree = useMemo(
+    () => buildEspansoConfigPreviewTree(espansoPreviewList, espansoDirectories),
+    [espansoPreviewList, espansoDirectories],
+  );
+
+  const selectedTreeNode = useMemo(
+    () => (selectedEspansoConfigPath ? findTreeNode(espansoPreviewTree, selectedEspansoConfigPath) : null),
+    [espansoPreviewTree, selectedEspansoConfigPath],
+  );
+
+  const selectedEspansoPreview = useMemo(() => {
+    if (selectedTreeNode && !selectedTreeNode.isDir && selectedTreeNode.preview) {
+      return selectedTreeNode.preview;
+    }
+    if (selectedTreeNode && selectedTreeNode.isDir) {
+      return null;
+    }
+    if (selectedEspansoConfigPath) {
+      const found = espansoPreviewList.find(
+        (preview) => preview.config.path === selectedEspansoConfigPath,
+      );
+      if (found) return found;
+    }
+    return espansoPreviewList[0] || null;
+  }, [selectedTreeNode, espansoPreviewList, selectedEspansoConfigPath]);
+
+  const selectedDirectoryNode = useMemo(() => {
+    if (selectedTreeNode && selectedTreeNode.isDir) {
+      return selectedTreeNode;
+    }
+    return null;
+  }, [selectedTreeNode]);
+
+  const activeDirectoryRelPath = useMemo(() => {
+    if (selectedDirectoryNode) {
+      return selectedDirectoryNode.relativePath;
+    }
+    if (selectedEspansoPreview) {
+      const rel = selectedEspansoPreview.config.relativePath;
+      const lastSlash = rel.lastIndexOf("/");
+      return lastSlash > -1 ? rel.slice(0, lastSlash) : "";
+    }
+    return "";
+  }, [selectedDirectoryNode, selectedEspansoPreview]);
+
+  const activeEspansoAncestorPaths = useMemo(() => {
+    const targetRelPath =
+      selectedDirectoryNode?.relativePath || selectedEspansoPreview?.config.relativePath || "";
+    return getEspansoConfigAncestorPaths(targetRelPath);
+  }, [selectedDirectoryNode, selectedEspansoPreview]);
 
   const [alertDialog, setAlertDialog] = useState<AlertDialogState>({
     isOpen: false,
@@ -384,6 +472,22 @@ function App() {
     return previews;
   }, []);
 
+
+
+  // Create File State
+  const [isCreateFileOpen, setIsCreateFileOpen] = useState<boolean>(false);
+  const [createFileName, setCreateFileName] = useState<string>("");
+  const [createFileParentRelPath, setCreateFileParentRelPath] = useState<string>("");
+  const [createFileError, setCreateFileError] = useState<string>("");
+  const [isCreatingFile, setIsCreatingFile] = useState<boolean>(false);
+
+  // Create Folder State
+  const [isCreateFolderOpen, setIsCreateFolderOpen] = useState<boolean>(false);
+  const [createFolderName, setCreateFolderName] = useState<string>("");
+  const [createFolderParentRelPath, setCreateFolderParentRelPath] = useState<string>("");
+  const [createFolderError, setCreateFolderError] = useState<string>("");
+  const [isCreatingFolder, setIsCreatingFolder] = useState<boolean>(false);
+
   const scanDefaultEspansoConfigDir = useCallback(async () => {
     setIsScanningEspanso(true);
     setEspansoScanMessage("Scanning Espanso match directory...");
@@ -392,6 +496,7 @@ function App() {
       setEspansoMatchDir(result.matchDir);
       setEspansoPathSource(result.pathSource);
       setEspansoConfigs(result.files);
+      setEspansoDirectories(result.directories || []);
       setEspansoConfigPreviews(await buildEspansoConfigPreviews(result.files));
       setSelectedEspansoConfigPath((current) => {
         if (current && result.files.some((file) => file.path === current)) return current;
@@ -404,12 +509,126 @@ function App() {
         ? `Espanso path was resolved, but Tauri blocked file access. Add the Espanso match directory to the filesystem scope, then restart the app. (${message})`
         : `Failed to scan Espanso configs: ${message}`;
       setEspansoConfigs([]);
+      setEspansoDirectories([]);
       setEspansoConfigPreviews([]);
       setEspansoScanMessage(permissionHint);
     } finally {
       setIsScanningEspanso(false);
     }
   }, [buildEspansoConfigPreviews]);
+
+  const openCreateFileDialog = useCallback((defaultParentRelPath?: string) => {
+    const targetParent = defaultParentRelPath !== undefined ? defaultParentRelPath : activeDirectoryRelPath;
+    setCreateFileName("");
+    setCreateFileParentRelPath(targetParent);
+    setCreateFileError("");
+    setIsCreateFileOpen(true);
+  }, [activeDirectoryRelPath]);
+
+  const openCreateFolderDialog = useCallback((defaultParentRelPath?: string) => {
+    const targetParent = defaultParentRelPath !== undefined ? defaultParentRelPath : activeDirectoryRelPath;
+    setCreateFolderName("");
+    setCreateFolderParentRelPath(targetParent);
+    setCreateFolderError("");
+    setIsCreateFolderOpen(true);
+  }, [activeDirectoryRelPath]);
+
+  const handleCreateFile = async () => {
+    if (!espansoMatchDir) {
+      setCreateFileError("Espanso match directory path is unavailable.");
+      return;
+    }
+
+    const normalizedName = normalizeYamlFileName(createFileName);
+
+    const existingFileNames = espansoConfigs
+      .filter((file) => {
+        if (!createFileParentRelPath) {
+          return !file.relativePath.includes("/");
+        }
+        const parentPrefix = `${createFileParentRelPath}/`;
+        if (!file.relativePath.startsWith(parentPrefix)) return false;
+        const subPath = file.relativePath.slice(parentPrefix.length);
+        return !subPath.includes("/");
+      })
+      .map((file) => file.name);
+
+    const err = validateFileName(createFileName, existingFileNames);
+    if (err) {
+      setCreateFileError(err);
+      return;
+    }
+
+    setIsCreatingFile(true);
+    setCreateFileError("");
+
+    try {
+      const parentAbsPath = createFileParentRelPath
+        ? `${espansoMatchDir}/${createFileParentRelPath}`
+        : espansoMatchDir;
+      const targetAbsPath = resolveTargetPath(parentAbsPath, normalizedName);
+
+      const template = getInitialYamlTemplate(normalizedName);
+      await writeTextFile(targetAbsPath, template);
+
+      setIsCreateFileOpen(false);
+      await scanDefaultEspansoConfigDir();
+      setSelectedEspansoConfigPath(targetAbsPath);
+    } catch (e: any) {
+      setCreateFileError(`Failed to create file: ${e?.message || e}`);
+    } finally {
+      setIsCreatingFile(false);
+    }
+  };
+
+  const handleCreateFolder = async () => {
+    if (!espansoMatchDir) {
+      setCreateFolderError("Espanso match directory path is unavailable.");
+      return;
+    }
+
+    const existingFolderNames = espansoDirectories
+      .filter((dir) => {
+        if (!createFolderParentRelPath) {
+          return !dir.relativePath.includes("/");
+        }
+        const parentPrefix = `${createFolderParentRelPath}/`;
+        if (!dir.relativePath.startsWith(parentPrefix)) return false;
+        const subPath = dir.relativePath.slice(parentPrefix.length);
+        return !subPath.includes("/");
+      })
+      .map((dir) => dir.name);
+
+    const err = validateFolderName(createFolderName, existingFolderNames);
+    if (err) {
+      setCreateFolderError(err);
+      return;
+    }
+
+    setIsCreatingFolder(true);
+    setCreateFolderError("");
+
+    try {
+      const parentAbsPath = createFolderParentRelPath
+        ? `${espansoMatchDir}/${createFolderParentRelPath}`
+        : espansoMatchDir;
+      const targetAbsPath = resolveTargetPath(parentAbsPath, createFolderName.trim());
+
+      await mkdir(targetAbsPath, { recursive: true });
+
+      const newRelPath = createFolderParentRelPath
+        ? `${createFolderParentRelPath}/${createFolderName.trim()}`
+        : createFolderName.trim();
+
+      setIsCreateFolderOpen(false);
+      await scanDefaultEspansoConfigDir();
+      setSelectedEspansoConfigPath(newRelPath);
+    } catch (e: any) {
+      setCreateFolderError(`Failed to create directory: ${e?.message || e}`);
+    } finally {
+      setIsCreatingFolder(false);
+    }
+  };
 
   useEffect(() => {
     scanDefaultEspansoConfigDir();
@@ -504,50 +723,6 @@ function App() {
     };
   }, [addSnippetKind, buildEspansoConfigPreviews, espansoConfigs, isAddSnippetOpen, snippetEditTarget]);
 
-  const espansoPreviewList = useMemo(
-    () => espansoConfigPreviews.length > 0
-      ? espansoConfigPreviews
-      : espansoConfigs.map((config) => ({
-        config,
-        snippetCount: 0,
-        inlineCount: 0,
-        resourceCount: 0,
-        imageCount: 0,
-        formCount: 0,
-        warningCount: 0,
-        snippets: [],
-        importedMatches: [],
-      })),
-    [espansoConfigPreviews, espansoConfigs],
-  );
-  const espansoPreviewTotals = useMemo(
-    () => espansoPreviewList.reduce(
-      (total, preview) => ({
-        snippets: total.snippets + preview.snippetCount,
-        inline: total.inline + preview.inlineCount,
-        resources: total.resources + preview.resourceCount,
-        images: total.images + preview.imageCount,
-        forms: total.forms + preview.formCount,
-        warnings: total.warnings + preview.warningCount,
-      }),
-      { snippets: 0, inline: 0, resources: 0, images: 0, forms: 0, warnings: 0 },
-    ),
-    [espansoPreviewList],
-  );
-  const selectedEspansoPreview = useMemo(
-    () => espansoPreviewList.find(
-      (preview) => preview.config.path === selectedEspansoConfigPath,
-    ) || espansoPreviewList[0],
-    [espansoPreviewList, selectedEspansoConfigPath],
-  );
-  const espansoPreviewTree = useMemo(
-    () => buildEspansoConfigPreviewTree(espansoPreviewList),
-    [espansoPreviewList],
-  );
-  const activeEspansoAncestorPaths = useMemo(
-    () => getEspansoConfigAncestorPaths(selectedEspansoPreview?.config.relativePath || ""),
-    [selectedEspansoPreview],
-  );
   const activeSnippetKind: AddSnippetKind = addSnippetKind;
   const detectedFormFieldNames = useMemo(() => extractFormFieldNames(editForm), [editForm]);
   const detectedFormFieldKey = detectedFormFieldNames.join("\n");
@@ -920,7 +1095,27 @@ function App() {
                 <aside className="flex min-h-0 flex-col border-b bg-secondary/30 md:border-b-0 md:border-r">
                   <div className="flex h-10 shrink-0 items-center justify-between border-b px-3">
                     <h2 className="text-sm font-semibold">Collection</h2>
-                    <span className="text-xs text-muted-foreground">{espansoPreviewList.length}</span>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0"
+                        title={activeDirectoryRelPath ? `Create New YAML File in /${activeDirectoryRelPath}` : "Create New YAML File"}
+                        onClick={() => openCreateFileDialog()}
+                      >
+                        <FilePlus className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0"
+                        title={activeDirectoryRelPath ? `Create New Subdirectory in /${activeDirectoryRelPath}` : "Create New Subdirectory"}
+                        onClick={() => openCreateFolderDialog()}
+                      >
+                        <FolderPlus className="h-4 w-4" />
+                      </Button>
+                      <span className="ml-1 text-xs text-muted-foreground">{espansoPreviewList.length}</span>
+                    </div>
                   </div>
                   <ScrollArea className="min-h-0 flex-1">
                     <div className="space-y-1 p-2">
@@ -928,10 +1123,12 @@ function App() {
                         <EspansoConfigTreeNode
                           key={node.path}
                           node={node}
-                          activePath={selectedEspansoPreview?.config.path || selectedEspansoConfigPath}
+                          activePath={selectedEspansoConfigPath}
                           activeAncestorPaths={activeEspansoAncestorPaths}
                           onSelect={setSelectedEspansoConfigPath}
                           onOpenFile={openYamlFileInDefaultApp}
+                          onCreateFile={openCreateFileDialog}
+                          onCreateFolder={openCreateFolderDialog}
                         />
                       ))}
                     </div>
@@ -951,30 +1148,47 @@ function App() {
                       }
                       onAddSnippet={openAddSnippetDialog}
                     />
+                  ) : selectedDirectoryNode ? (
+                    <EspansoDirectoryDetail
+                      node={selectedDirectoryNode}
+                      onSelectFile={setSelectedEspansoConfigPath}
+                      onCreateFile={openCreateFileDialog}
+                      onCreateFolder={openCreateFolderDialog}
+                    />
                   ) : (
                     <EmptyState
                       icon={FileText}
-                      title="No config selected"
-                      description="Select a YAML config from the collection list to preview its snippets."
+                      title="No config or directory selected"
+                      description="Select a YAML config or directory from the collection list to preview its contents."
                     />
                   )}
                 </section>
               </div>
             </div>
           ) : (
-            <div className="mt-4 space-y-3">
-              <p className="text-sm text-muted-foreground">
-                {isScanningEspanso ? "Scanning Espanso configs..." : espansoScanMessage || "Scanning starts automatically."}
+            <div className="flex flex-col items-center justify-center p-8 text-center rounded-lg border border-dashed my-auto bg-background/50">
+              <FolderOpen className="h-12 w-12 text-muted-foreground/60 mb-3" />
+              <h3 className="text-lg font-semibold mb-1">No YAML Config Files Found</h3>
+              <p className="text-sm text-muted-foreground max-w-md mb-6">
+                {isScanningEspanso
+                  ? "Scanning Espanso configs..."
+                  : espansoScanMessage || "Your Espanso match directory does not contain any YAML files yet."}
               </p>
               {!isScanningEspanso && (
-                <Button
-                  className="w-full"
-                  variant="outline"
-                  onClick={scanDefaultEspansoConfigDir}
-                >
-                  <RefreshCw className="h-4 w-4" />
-                  Scan Default Espanso Directory
-                </Button>
+                <div className="flex flex-wrap justify-center gap-3">
+                  <Button onClick={() => openCreateFileDialog("")}>
+                    <FilePlus className="h-4 w-4 mr-2" />
+                    Create New YAML File
+                  </Button>
+                  <Button variant="outline" onClick={() => openCreateFolderDialog("")}>
+                    <FolderPlus className="h-4 w-4 mr-2" />
+                    Create Subdirectory
+                  </Button>
+                  <Button variant="ghost" onClick={scanDefaultEspansoConfigDir}>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Refresh
+                  </Button>
+                </div>
               )}
             </div>
           )}
@@ -1539,6 +1753,167 @@ function App() {
         </DialogContent>
       </Dialog>
 
+      {/* Create New YAML File Dialog */}
+      <Dialog open={isCreateFileOpen} onOpenChange={setIsCreateFileOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FilePlus className="h-5 w-5 text-primary" />
+              Create New YAML File
+            </DialogTitle>
+            <DialogDescription>
+              Add a new Espanso match configuration file.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {createFileError && (
+              <div className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+                <XCircle className="h-4 w-4 shrink-0" />
+                <span>{createFileError}</span>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="create-file-name">
+                File Name <RequiredMark />
+              </Label>
+              <Input
+                id="create-file-name"
+                placeholder="e.g. email or work.yml"
+                value={createFileName}
+                onChange={(e) => {
+                  setCreateFileName(e.target.value);
+                  setCreateFileError("");
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !isCreatingFile) {
+                    e.preventDefault();
+                    handleCreateFile();
+                  }
+                }}
+                autoFocus
+              />
+              <p className="text-xs text-muted-foreground">
+                If omitted, <code>.yml</code> extension will be added automatically.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="create-file-parent">Target Location</Label>
+              <select
+                id="create-file-parent"
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                value={createFileParentRelPath}
+                onChange={(e) => setCreateFileParentRelPath(e.target.value)}
+              >
+                <option value="">/ (Root Match Directory)</option>
+                {espansoDirectories.map((dir) => (
+                  <option key={dir.relativePath} value={dir.relativePath}>
+                    /{dir.relativePath}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsCreateFileOpen(false)} disabled={isCreatingFile}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreateFile} disabled={isCreatingFile || !createFileName.trim()}>
+              {isCreatingFile ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Creating...
+                </>
+              ) : (
+                "Create File"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create New Subdirectory Dialog */}
+      <Dialog open={isCreateFolderOpen} onOpenChange={setIsCreateFolderOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FolderPlus className="h-5 w-5 text-primary" />
+              Create New Subdirectory
+            </DialogTitle>
+            <DialogDescription>
+              Create a new subfolder in your Espanso match directory.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {createFolderError && (
+              <div className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+                <XCircle className="h-4 w-4 shrink-0" />
+                <span>{createFolderError}</span>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="create-folder-name">
+                Folder Name <RequiredMark />
+              </Label>
+              <Input
+                id="create-folder-name"
+                placeholder="e.g. work or social"
+                value={createFolderName}
+                onChange={(e) => {
+                  setCreateFolderName(e.target.value);
+                  setCreateFolderError("");
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !isCreatingFolder) {
+                    e.preventDefault();
+                    handleCreateFolder();
+                  }
+                }}
+                autoFocus
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="create-folder-parent">Target Location</Label>
+              <select
+                id="create-folder-parent"
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                value={createFolderParentRelPath}
+                onChange={(e) => setCreateFolderParentRelPath(e.target.value)}
+              >
+                <option value="">/ (Root Match Directory)</option>
+                {espansoDirectories.map((dir) => (
+                  <option key={dir.relativePath} value={dir.relativePath}>
+                    /{dir.relativePath}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsCreateFolderOpen(false)} disabled={isCreatingFolder}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreateFolder} disabled={isCreatingFolder || !createFolderName.trim()}>
+              {isCreatingFolder ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Creating...
+                </>
+              ) : (
+                "Create Folder"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }
@@ -1557,13 +1932,38 @@ function getEspansoConfigAncestorPaths(relativePath: string): Set<string> {
   return paths;
 }
 
-function buildEspansoConfigPreviewTree(previews: EspansoConfigPreview[]): EspansoConfigPreviewTreeNode[] {
+function findTreeNode(
+  nodes: EspansoConfigPreviewTreeNode[],
+  targetPath: string,
+): EspansoConfigPreviewTreeNode | null {
+  if (!targetPath) return null;
+  for (const node of nodes) {
+    if (
+      node.path === targetPath ||
+      node.relativePath === targetPath ||
+      (node.preview && node.preview.config.path === targetPath)
+    ) {
+      return node;
+    }
+    if (node.children) {
+      const found = findTreeNode(node.children, targetPath);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+function buildEspansoConfigPreviewTree(
+  previews: EspansoConfigPreview[],
+  directories: EspansoDirectoryInfo[] = [],
+): EspansoConfigPreviewTreeNode[] {
   const root: EspansoConfigPreviewTreeNode[] = [];
 
   function getOrCreateDir(
     nodes: EspansoConfigPreviewTreeNode[],
     name: string,
     path: string,
+    relativePath: string,
   ): EspansoConfigPreviewTreeNode {
     const existing = nodes.find((node) => node.isDir && node.path === path);
     if (existing) return existing;
@@ -1571,6 +1971,7 @@ function buildEspansoConfigPreviewTree(previews: EspansoConfigPreview[]): Espans
     const dir: EspansoConfigPreviewTreeNode = {
       name,
       path,
+      relativePath,
       isDir: true,
       snippetCount: 0,
       fileCount: 0,
@@ -1581,27 +1982,49 @@ function buildEspansoConfigPreviewTree(previews: EspansoConfigPreview[]): Espans
     return dir;
   }
 
+  // Register all directories first so empty folders are preserved in the tree
+  for (const directory of directories) {
+    const parts = directory.relativePath.split("/");
+    let currentNodes = root;
+    let currentPath = "";
+    let currentRelPath = "";
+
+    parts.forEach((part) => {
+      currentPath = currentPath ? `${currentPath}/${part}` : part;
+      currentRelPath = currentRelPath ? `${currentRelPath}/${part}` : part;
+
+      const dirNode = getOrCreateDir(currentNodes, part, currentPath, currentRelPath);
+      currentNodes = dirNode.children || [];
+    });
+  }
+
+  // Register files
   for (const preview of previews) {
     const parts = preview.config.relativePath.split("/");
     let currentNodes = root;
     let currentPath = "";
+    let currentRelPath = "";
 
     parts.forEach((part, index) => {
       const isLast = index === parts.length - 1;
       currentPath = currentPath ? `${currentPath}/${part}` : part;
+      currentRelPath = currentRelPath ? `${currentRelPath}/${part}` : part;
 
       if (isLast) {
-        currentNodes.push({
-          name: part,
-          path: currentPath,
-          isDir: false,
-          snippetCount: preview.snippetCount,
-          fileCount: 1,
-          preview,
-        });
-        currentNodes.sort((a, b) => Number(a.isDir !== b.isDir) || a.name.localeCompare(b.name));
+        if (!currentNodes.some((n) => !n.isDir && n.path === preview.config.path)) {
+          currentNodes.push({
+            name: part,
+            path: preview.config.path,
+            relativePath: currentRelPath,
+            isDir: false,
+            snippetCount: preview.snippetCount,
+            fileCount: 1,
+            preview,
+          });
+          currentNodes.sort((a, b) => Number(a.isDir !== b.isDir) || a.name.localeCompare(b.name));
+        }
       } else {
-        const dir = getOrCreateDir(currentNodes, part, currentPath);
+        const dir = getOrCreateDir(currentNodes, part, currentPath, currentRelPath);
         dir.snippetCount += preview.snippetCount;
         dir.fileCount += 1;
         currentNodes = dir.children || [];
@@ -1618,6 +2041,8 @@ interface EspansoConfigTreeNodeProps {
   activeAncestorPaths: Set<string>;
   onSelect: (path: string) => void;
   onOpenFile: (path: string) => void;
+  onCreateFile?: (parentRelPath: string) => void;
+  onCreateFolder?: (parentRelPath: string) => void;
 }
 
 const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
@@ -1626,8 +2051,10 @@ const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
   activeAncestorPaths,
   onSelect,
   onOpenFile,
+  onCreateFile,
+  onCreateFolder,
 }: EspansoConfigTreeNodeProps) {
-  const containsActive = activeAncestorPaths.has(node.path);
+  const containsActive = activeAncestorPaths.has(node.relativePath || node.path);
   const [isOpen, setIsOpen] = useState<boolean>(containsActive);
 
   useEffect(() => {
@@ -1638,22 +2065,61 @@ const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
 
   if (node.isDir) {
     return (
-      <div>
-        <button
+      <div className="mb-0.5">
+        <div
           className={cn(
-            "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
-            containsActive && "text-foreground",
+            "group flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent/70",
+            containsActive ? "text-foreground font-semibold" : "text-foreground/80 font-medium",
           )}
-          onClick={() => setIsOpen(!isOpen)}
         >
-          {isOpen ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
-          {isOpen ? <FolderOpen className="h-4 w-4 shrink-0" /> : <Folder className="h-4 w-4 shrink-0" />}
-          <div className="min-w-0 flex-1">
-            <div className="truncate font-medium">{node.name}</div>
+          <button
+            className="flex min-w-0 flex-1 items-center gap-2 text-left"
+            onClick={() => setIsOpen(!isOpen)}
+          >
+            {isOpen ? (
+              <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground/70 transition-transform" />
+            ) : (
+              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/70 transition-transform" />
+            )}
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-400">
+              {isOpen ? <FolderOpen className="h-4 w-4" /> : <Folder className="h-4 w-4" />}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm font-semibold tracking-tight">{node.name}</div>
+            </div>
+            {node.fileCount === 0 ? (
+              <span className="mr-1 text-[10px] font-normal text-muted-foreground/70">(empty)</span>
+            ) : (
+              <span className="mr-1 rounded-full bg-muted/60 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                {node.fileCount}
+              </span>
+            )}
+          </button>
+          <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+            <button
+              className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent-foreground/10 hover:text-foreground"
+              title={`Create YAML file in ${node.name}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onCreateFile?.(node.relativePath);
+              }}
+            >
+              <FilePlus className="h-3.5 w-3.5" />
+            </button>
+            <button
+              className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent-foreground/10 hover:text-foreground"
+              title={`Create subdirectory in ${node.name}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onCreateFolder?.(node.relativePath);
+              }}
+            >
+              <FolderPlus className="h-3.5 w-3.5" />
+            </button>
           </div>
-        </button>
+        </div>
         {isOpen && node.children && (
-          <div className="ml-4 mt-1 space-y-1 border-l pl-2">
+          <div className="ml-3.5 mt-0.5 space-y-0.5 border-l border-border/50 pl-2">
             {node.children.map((child) => (
               <EspansoConfigTreeNode
                 key={child.path}
@@ -1662,6 +2128,8 @@ const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
                 activeAncestorPaths={activeAncestorPaths}
                 onSelect={onSelect}
                 onOpenFile={onOpenFile}
+                onCreateFile={onCreateFile}
+                onCreateFolder={onCreateFolder}
               />
             ))}
           </div>
@@ -1675,31 +2143,31 @@ const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
   return (
     <div
       className={cn(
-        "group flex w-full items-center rounded-md transition-colors hover:bg-accent",
-        isActive && "bg-primary text-primary-foreground hover:bg-primary/90",
+        "group flex w-full items-center rounded-md transition-colors",
+        isActive
+          ? "bg-primary text-primary-foreground font-medium"
+          : "text-foreground/80 hover:bg-accent hover:text-foreground",
       )}
     >
       <button
-        className="flex min-w-0 flex-1 items-center gap-3 rounded-l-md px-3 py-2 text-left"
+        className="flex min-w-0 flex-1 items-center gap-2 rounded-l-md px-2 py-1.5 text-left"
         onClick={() => node.preview && onSelect(node.preview.config.path)}
       >
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-background/80 text-primary">
-          <FileText className="h-5 w-5" />
-        </div>
+        <FileText className={cn("h-4 w-4 shrink-0", isActive ? "text-primary-foreground" : "text-muted-foreground")} />
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-semibold">{node.name.replace(/\.ya?ml$/i, "")}</div>
+          <div className="truncate text-xs font-medium">{node.name.replace(/\.ya?ml$/i, "")}</div>
         </div>
       </button>
       {node.preview && (
         <button
           className={cn(
-            "mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-md opacity-70 transition hover:bg-background/80 hover:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-            isActive && "hover:bg-primary-foreground/20",
+            "mr-1 flex h-6 w-6 shrink-0 items-center justify-center rounded opacity-70 transition hover:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+            isActive ? "hover:bg-primary-foreground/20 text-primary-foreground" : "hover:bg-accent-foreground/10 text-muted-foreground",
           )}
           title={`Open ${node.name} in default app`}
           onClick={() => onOpenFile(node.preview!.config.path)}
         >
-          <SquareArrowOutUpRight className="h-4 w-4" />
+          <SquareArrowOutUpRight className="h-3.5 w-3.5" />
         </button>
       )}
     </div>
@@ -1858,6 +2326,129 @@ function EspansoConfigDetail({ preview, onViewSnippet, onAddSnippet }: EspansoCo
         )}
       </div>
     </>
+  );
+}
+
+interface EspansoDirectoryDetailProps {
+  node: EspansoConfigPreviewTreeNode;
+  onSelectFile: (path: string) => void;
+  onCreateFile: (parentRelPath?: string) => void;
+  onCreateFolder: (parentRelPath?: string) => void;
+}
+
+function EspansoDirectoryDetail({
+  node,
+  onSelectFile,
+  onCreateFile,
+  onCreateFolder,
+}: EspansoDirectoryDetailProps) {
+  return (
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
+      {/* Directory Header */}
+      <div className="flex items-center justify-between border-b px-6 py-4 bg-secondary/20">
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-400">
+            <FolderOpen className="h-6 w-6" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-bold text-foreground">{node.name}</h2>
+              <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-mono text-muted-foreground">
+                {node.relativePath ? `/${node.relativePath}` : "/"}
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Directory • {node.fileCount} {node.fileCount === 1 ? "file" : "files"} • {node.snippetCount} {node.snippetCount === 1 ? "snippet" : "snippets"}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            onClick={() => onCreateFile(node.relativePath)}
+            className="gap-1.5"
+          >
+            <FilePlus className="h-4 w-4" />
+            New File
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => onCreateFolder(node.relativePath)}
+            className="gap-1.5"
+          >
+            <FolderPlus className="h-4 w-4" />
+            New Subdirectory
+          </Button>
+        </div>
+      </div>
+
+      {/* Directory Contents */}
+      <ScrollArea className="flex-1 p-6">
+        <div className="max-w-4xl space-y-4">
+          <h3 className="text-sm font-semibold text-foreground/80">Contents in {node.name}</h3>
+          {!node.children || node.children.length === 0 ? (
+            <div className="rounded-lg border border-dashed p-8 text-center bg-muted/10">
+              <Folder className="h-10 w-10 text-muted-foreground/50 mx-auto mb-2" />
+              <p className="text-sm font-medium text-muted-foreground">This directory is empty</p>
+              <p className="text-xs text-muted-foreground/70 mt-1 mb-4">
+                Create a new YAML file or subdirectory to start organizing snippets.
+              </p>
+              <div className="flex justify-center gap-2">
+                <Button size="sm" onClick={() => onCreateFile(node.relativePath)}>
+                  <FilePlus className="h-3.5 w-3.5 mr-1.5" />
+                  Create YAML File
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => onCreateFolder(node.relativePath)}>
+                  <FolderPlus className="h-3.5 w-3.5 mr-1.5" />
+                  Create Subdirectory
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {node.children.map((child) => (
+                <div
+                  key={child.path}
+                  className="flex items-center justify-between rounded-lg border bg-card p-3.5 shadow-sm hover:border-primary/50 hover:shadow-md transition-all cursor-pointer group"
+                  onClick={() => {
+                    if (child.isDir) {
+                      onSelectFile(child.relativePath || child.path);
+                    } else if (child.preview) {
+                      onSelectFile(child.preview.config.path);
+                    }
+                  }}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    {child.isDir ? (
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                        <Folder className="h-4 w-4" />
+                      </div>
+                    ) : (
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                        <FileText className="h-4 w-4" />
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-semibold text-foreground group-hover:text-primary transition-colors">
+                        {child.name}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {child.isDir
+                          ? `${child.fileCount} file(s)`
+                          : `${child.snippetCount} snippet(s)`}
+                      </div>
+                    </div>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground/40 group-hover:text-foreground transition-colors shrink-0" />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </ScrollArea>
+    </div>
   );
 }
 
