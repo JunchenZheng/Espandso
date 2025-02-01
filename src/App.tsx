@@ -46,6 +46,7 @@ import { Label } from "./components/ui/label";
 import { ScrollArea } from "./components/ui/scroll-area";
 import { Textarea } from "./components/ui/textarea";
 import { AboutDialog } from "./components/AboutDialog";
+import { WarningsDialog } from "./components/WarningsDialog";
 import { Snippet, ValidationError } from "./logic/types";
 import { validate } from "./logic/validate";
 import { importYamlContent, ImportedMatch } from "./logic/importYaml";
@@ -61,7 +62,7 @@ interface DragDropPayload {
   position: { x: number; y: number };
 }
 
-interface EspansoConfigPreview {
+export interface EspansoConfigPreview {
   config: EspansoConfigFile;
   snippetCount: number;
   inlineCount: number;
@@ -69,6 +70,7 @@ interface EspansoConfigPreview {
   imageCount: number;
   formCount: number;
   warningCount: number;
+  warnings: string[];
   snippets: Snippet[];
   importedMatches: ImportedMatch[];
 }
@@ -310,6 +312,7 @@ function App() {
         imageCount: 0,
         formCount: 0,
         warningCount: 0,
+        warnings: [],
         snippets: [],
         importedMatches: [],
       })),
@@ -451,10 +454,11 @@ function App() {
           imageCount,
           formCount,
           warningCount: result.warnings.length,
+          warnings: result.warnings,
           snippets: result.snippets,
           importedMatches: result.importedMatches,
         });
-      } catch {
+      } catch (e: any) {
         previews.push({
           config,
           snippetCount: 0,
@@ -463,6 +467,7 @@ function App() {
           imageCount: 0,
           formCount: 0,
           warningCount: 1,
+          warnings: [`[${config.name}] Failed to read file: ${e?.message || e}`],
           snippets: [],
           importedMatches: [],
         });
@@ -487,6 +492,10 @@ function App() {
   const [createFolderParentRelPath, setCreateFolderParentRelPath] = useState<string>("");
   const [createFolderError, setCreateFolderError] = useState<string>("");
   const [isCreatingFolder, setIsCreatingFolder] = useState<boolean>(false);
+
+  // Warnings Dialog State
+  const [isWarningsDialogOpen, setIsWarningsDialogOpen] = useState<boolean>(false);
+  const [warningsFilterPath, setWarningsFilterPath] = useState<string | null>(null);
 
   const scanDefaultEspansoConfigDir = useCallback(async () => {
     setIsScanningEspanso(true);
@@ -1063,7 +1072,18 @@ function App() {
                   <span className="text-muted-foreground">{espansoPreviewTotals.images} images</span>
                   <span className="text-muted-foreground">{espansoPreviewTotals.forms} forms</span>
                   {espansoPreviewTotals.warnings > 0 && (
-                    <span className="text-amber-700">{espansoPreviewTotals.warnings} warnings</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setWarningsFilterPath(null);
+                        setIsWarningsDialogOpen(true);
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded bg-amber-500/10 px-2 py-0.5 text-amber-700 hover:bg-amber-500/20 text-xs font-medium cursor-pointer transition-colors"
+                      title="Click to view all warnings"
+                    >
+                      <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                      <span>{espansoPreviewTotals.warnings} warnings</span>
+                    </button>
                   )}
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -1147,6 +1167,10 @@ function App() {
                         })
                       }
                       onAddSnippet={openAddSnippetDialog}
+                      onOpenWarnings={(path) => {
+                        setWarningsFilterPath(path);
+                        setIsWarningsDialogOpen(true);
+                      }}
                     />
                   ) : selectedDirectoryNode ? (
                     <EspansoDirectoryDetail
@@ -1709,6 +1733,17 @@ function App() {
 
       <AboutDialog open={isAboutOpen} onOpenChange={setIsAboutOpen} />
 
+      <WarningsDialog
+        open={isWarningsDialogOpen}
+        onOpenChange={setIsWarningsDialogOpen}
+        previews={espansoConfigPreviews}
+        filterPath={warningsFilterPath}
+        onClearFilter={() => setWarningsFilterPath(null)}
+        onSelectFile={(path) => {
+          setSelectedEspansoConfigPath(path);
+        }}
+      />
+
       <Dialog
         open={alertDialog.isOpen}
         onOpenChange={(open) => {
@@ -2178,9 +2213,15 @@ interface EspansoConfigDetailProps {
   preview: EspansoConfigPreview;
   onViewSnippet: (match: ImportedMatch, index: number) => void;
   onAddSnippet: () => void;
+  onOpenWarnings?: (path: string) => void;
 }
 
-function EspansoConfigDetail({ preview, onViewSnippet, onAddSnippet }: EspansoConfigDetailProps) {
+function EspansoConfigDetail({
+  preview,
+  onViewSnippet,
+  onAddSnippet,
+  onOpenWarnings,
+}: EspansoConfigDetailProps) {
   const ROW_HEIGHT = 36;
   const OVERSCAN_ROWS = 8;
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -2224,9 +2265,17 @@ function EspansoConfigDetail({ preview, onViewSnippet, onAddSnippet }: EspansoCo
         </div>
         <div className="flex items-center gap-2">
           {preview.warningCount > 0 && (
-            <span className="shrink-0 rounded-md bg-amber-100 px-2 py-1 text-xs text-amber-800">
-              {preview.warningCount} {preview.warningCount === 1 ? "warning" : "warnings"}
-            </span>
+            <button
+              type="button"
+              onClick={() => onOpenWarnings?.(preview.config.path)}
+              className="shrink-0 inline-flex items-center gap-1 rounded-md bg-amber-100 hover:bg-amber-200 px-2 py-1 text-xs text-amber-800 transition-colors cursor-pointer font-medium"
+              title="Click to view warnings for this file"
+            >
+              <AlertTriangle className="h-3.5 w-3.5 text-amber-700" />
+              <span>
+                {preview.warningCount} {preview.warningCount === 1 ? "warning" : "warnings"}
+              </span>
+            </button>
           )}
           <Button size="sm" onClick={onAddSnippet}>
             <Plus className="h-4 w-4" />
