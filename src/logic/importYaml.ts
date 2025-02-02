@@ -234,11 +234,19 @@ export function importYamlContent(
     };
   }
 
-  if (!data || !Array.isArray(data.matches)) {
+  if (!data || data.matches === undefined || data.matches === null) {
     return {
       snippets: [],
       importedMatches: [],
-      warnings: [`[${fileName}] No matches key or matches is not an array`],
+      warnings: [],
+    };
+  }
+
+  if (!Array.isArray(data.matches)) {
+    return {
+      snippets: [],
+      importedMatches: [],
+      warnings: [`[${fileName}] 'matches' key is not an array`],
     };
   }
 
