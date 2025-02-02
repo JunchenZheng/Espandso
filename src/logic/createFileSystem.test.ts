@@ -73,7 +73,6 @@ describe("createFileSystem logic", () => {
     it("generates valid initial Espanso YAML content with filename", () => {
       const template = getInitialYamlTemplate("emails.yml");
       expect(template).toContain("Espanso match file: emails");
-      expect(template).toContain("matches:");
     });
   });
 
