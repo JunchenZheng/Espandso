@@ -1742,6 +1742,7 @@ function App() {
         onSelectFile={(path) => {
           setSelectedEspansoConfigPath(path);
         }}
+        onOpenFileExternal={openYamlFileInDefaultApp}
       />
 
       <Dialog
