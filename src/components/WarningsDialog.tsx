@@ -1,4 +1,4 @@
-import { AlertTriangle, FileText, Filter, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, FileText, Filter, CheckCircle2, SquareArrowOutUpRight } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -17,6 +17,7 @@ export interface WarningsDialogProps {
   filterPath?: string | null;
   onClearFilter?: () => void;
   onSelectFile?: (path: string) => void;
+  onOpenFileExternal?: (path: string) => void;
 }
 
 export function WarningsDialog({
@@ -26,6 +27,7 @@ export function WarningsDialog({
   filterPath,
   onClearFilter,
   onSelectFile,
+  onOpenFileExternal,
 }: WarningsDialogProps) {
   const previewsWithWarnings = previews.filter(
     (p) => p.warnings && p.warnings.length > 0
@@ -111,7 +113,7 @@ export function WarningsDialog({
                           {preview.config.relativePath}
                         </span>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center gap-1.5 shrink-0">
                         <span className="rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 text-[11px] font-medium">
                           {preview.warnings.length} {preview.warnings.length === 1 ? "warning" : "warnings"}
                         </span>
@@ -125,7 +127,19 @@ export function WarningsDialog({
                               onOpenChange(false);
                             }}
                           >
-                            View File
+                            View In App
+                          </Button>
+                        )}
+                        {onOpenFileExternal && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className="h-6 px-2 text-[10px] gap-1"
+                            onClick={() => onOpenFileExternal(preview.config.path)}
+                            title="Open YAML file in default external application"
+                          >
+                            <span>View YAML</span>
+                            <SquareArrowOutUpRight className="h-3 w-3" />
                           </Button>
                         )}
                       </div>
