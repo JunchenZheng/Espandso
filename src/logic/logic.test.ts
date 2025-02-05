@@ -214,6 +214,15 @@ matches:
     expect(res.warnings).toContain("[test.yml] Snippet for :unsupported has unsupported var type(s) [date], skipping");
   });
 
+  it("should import empty or comment-only YAML files without warnings", () => {
+    const yaml = `# Espanso match file: Under-first
+# For documentation, see: https://espanso.org/docs/matches/basics/
+`;
+    const res = importYamlContent(yaml, "empty.yml");
+    expect(res.snippets).toHaveLength(0);
+    expect(res.warnings).toHaveLength(0);
+  });
+
   it("should import form snippets with fields", () => {
     const yaml = `
 matches:

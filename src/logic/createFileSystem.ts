@@ -75,10 +75,6 @@ export function getInitialYamlTemplate(fileName: string): string {
   const baseName = fileName.replace(/\.ya?ml$/i, "");
   return `# Espanso match file: ${baseName}
 # For documentation, see: https://espanso.org/docs/matches/basics/
-
-matches:
-  # - trigger: ":hello"
-  #   replace: "world"
 `;
 }
 
