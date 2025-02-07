@@ -28,8 +28,12 @@
       "allow": [
         { "path": "$HOME/Library/Application Support/espanso/match" },
         { "path": "$HOME/Library/Application Support/espanso/match/**" },
+        { "path": "$HOME/Library/Caches/espanso" },
+        { "path": "$HOME/Library/Caches/espanso/**" },
         { "path": "$HOME/AppData/Roaming/espanso/match" },
         { "path": "$HOME/AppData/Roaming/espanso/match/**" },
+        { "path": "$HOME/AppData/Local/espanso" },
+        { "path": "$HOME/AppData/Local/espanso/**" },
         { "path": "$CONFIG/espanso/match" },
         { "path": "$CONFIG/espanso/match/**" },
         { "path": "$DATA/espanso/match" },
@@ -50,6 +54,11 @@
           "name": "espanso",
           "cmd": "espanso",
           "args": ["path"]
+        },
+        {
+          "name": "espanso",
+          "cmd": "espanso",
+          "args": ["log"]
         }
       ]
     }
