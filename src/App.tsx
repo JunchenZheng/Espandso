@@ -25,6 +25,7 @@ import {
   Save,
   Settings,
   SquareArrowOutUpRight,
+  Terminal,
   Trash2,
   Type,
   Upload,
@@ -46,6 +47,7 @@ import { Label } from "./components/ui/label";
 import { ScrollArea } from "./components/ui/scroll-area";
 import { Textarea } from "./components/ui/textarea";
 import { AboutDialog } from "./components/AboutDialog";
+import { EspansoLogDialog } from "./components/EspansoLogDialog";
 import { WarningsDialog } from "./components/WarningsDialog";
 import { Snippet, ValidationError } from "./logic/types";
 import { validate } from "./logic/validate";
@@ -284,6 +286,7 @@ function App() {
   const [isScanningEspanso, setIsScanningEspanso] = useState<boolean>(false);
   const [espansoScanMessage, setEspansoScanMessage] = useState<string>("");
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+  const [isLogOpen, setIsLogOpen] = useState<boolean>(false);
   const [isAboutOpen, setIsAboutOpen] = useState<boolean>(false);
   const [isAddSnippetOpen, setIsAddSnippetOpen] = useState<boolean>(false);
   const [snippetEditTarget, setSnippetEditTarget] = useState<SnippetEditTarget | null>(null);
@@ -1101,6 +1104,16 @@ function App() {
                   <Button
                     size="sm"
                     variant="outline"
+                    onClick={() => setIsLogOpen(true)}
+                    aria-label="Open Espanso log"
+                    title="Open Espanso log"
+                  >
+                    <Terminal className="h-4 w-4" />
+                    Log
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
                     onClick={() => setIsSettingsOpen(true)}
                     aria-label="Open settings"
                     title="Open settings"
@@ -1732,6 +1745,8 @@ function App() {
       </Dialog>
 
       <AboutDialog open={isAboutOpen} onOpenChange={setIsAboutOpen} />
+
+      <EspansoLogDialog open={isLogOpen} onOpenChange={setIsLogOpen} />
 
       <WarningsDialog
         open={isWarningsDialogOpen}
