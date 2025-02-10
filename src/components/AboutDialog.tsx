@@ -10,6 +10,7 @@ import {
 import { ScrollArea } from "./ui/scroll-area";
 import { Button } from "./ui/button";
 import { OPEN_SOURCE_LIBRARIES, OpenSourceLibrary } from "../logic/openSourceLibraries";
+import { useI18n } from "../i18n/useI18n";
 
 interface AboutDialogProps {
   open: boolean;
@@ -17,6 +18,8 @@ interface AboutDialogProps {
 }
 
 export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
+  const { t } = useI18n();
+
   const handleOpenLink = async (url: string) => {
     try {
       await openUrl(url);
@@ -34,9 +37,9 @@ export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
               <Info className="h-5 w-5" />
             </div>
             <div>
-              <DialogTitle className="text-lg font-bold">About Expandso</DialogTitle>
+              <DialogTitle className="text-lg font-bold">{t("dialogs.about.title")}</DialogTitle>
               <DialogDescription className="text-xs text-muted-foreground">
-                Desktop app for managing Espanso match snippets directly in YAML files.
+                {t("dialogs.about.description")}
               </DialogDescription>
             </div>
           </div>
@@ -52,14 +55,14 @@ export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
               </span>
             </div>
             <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
-              Expandso helps you scan, preview, edit, and organize Espanso match snippets with instant YAML validation and runtime restart.
+              {t("dialogs.about.builtWith")}
             </p>
           </div>
 
           {/* Open Source Acknowledgments Header */}
           <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
             <Heart className="h-3.5 w-3.5 text-rose-500 fill-rose-500" />
-            <span>Open Source Acknowledgments</span>
+            <span>{t("dialogs.about.openSourceLicenses")}</span>
           </div>
 
           {/* Open Source Libraries List */}
