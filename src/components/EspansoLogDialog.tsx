@@ -19,6 +19,7 @@ import {
 } from "./ui/dialog";
 import { Button } from "./ui/button";
 import { getEspansoLog } from "../tauri/espansoRuntime";
+import { useI18n } from "../i18n/useI18n";
 
 interface EspansoLogDialogProps {
   open: boolean;
@@ -26,6 +27,7 @@ interface EspansoLogDialogProps {
 }
 
 export function EspansoLogDialog({ open, onOpenChange }: EspansoLogDialogProps) {
+  const { t } = useI18n();
   const [logContent, setLogContent] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
@@ -132,7 +134,7 @@ export function EspansoLogDialog({ open, onOpenChange }: EspansoLogDialogProps) 
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <DialogTitle className="text-base font-bold">Espanso Log</DialogTitle>
+                <DialogTitle className="text-base font-bold">{t("dialogs.logs.title")}</DialogTitle>
                 {autoRefresh && (
                   <span className="flex h-2 w-2 relative" title="Realtime Polling Active">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -141,7 +143,7 @@ export function EspansoLogDialog({ open, onOpenChange }: EspansoLogDialogProps) 
                 )}
               </div>
               <DialogDescription className="text-xs text-muted-foreground">
-                Realtime daemon & worker output from Espanso
+                {t("dialogs.logs.description")}
               </DialogDescription>
             </div>
           </div>
@@ -153,7 +155,6 @@ export function EspansoLogDialog({ open, onOpenChange }: EspansoLogDialogProps) 
               variant={autoRefresh ? "secondary" : "outline"}
               className="h-8 text-xs gap-1.5 px-2.5"
               onClick={() => setAutoRefresh(!autoRefresh)}
-              title={autoRefresh ? "Pause auto refresh" : "Start auto refresh"}
             >
               {autoRefresh ? (
                 <>
@@ -173,7 +174,6 @@ export function EspansoLogDialog({ open, onOpenChange }: EspansoLogDialogProps) 
               variant={autoScroll ? "secondary" : "outline"}
               className="h-8 text-xs gap-1.5 px-2.5"
               onClick={() => setAutoScroll(!autoScroll)}
-              title={autoScroll ? "Disable auto scroll" : "Enable auto scroll to bottom"}
             >
               <ArrowDownCircle className={`h-3.5 w-3.5 ${autoScroll ? "text-primary" : "text-muted-foreground"}`} />
               <span>Scroll</span>
@@ -185,10 +185,9 @@ export function EspansoLogDialog({ open, onOpenChange }: EspansoLogDialogProps) 
               className="h-8 text-xs gap-1.5 px-2.5"
               onClick={fetchLog}
               disabled={isLoading}
-              title="Refresh log now"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
-              <span>Refresh</span>
+              <span>{t("actions.refresh")}</span>
             </Button>
 
             <Button
@@ -197,17 +196,16 @@ export function EspansoLogDialog({ open, onOpenChange }: EspansoLogDialogProps) 
               className="h-8 text-xs gap-1.5 px-2.5"
               onClick={handleCopy}
               disabled={!logContent}
-              title="Copy log to clipboard"
             >
               {copied ? (
                 <>
                   <Check className="h-3.5 w-3.5 text-emerald-500" />
-                  <span>Copied</span>
+                  <span>{t("dialogs.logs.copied")}</span>
                 </>
               ) : (
                 <>
                   <Copy className="h-3.5 w-3.5" />
-                  <span>Copy</span>
+                  <span>{t("actions.copy")}</span>
                 </>
               )}
             </Button>
@@ -218,7 +216,6 @@ export function EspansoLogDialog({ open, onOpenChange }: EspansoLogDialogProps) 
               className="h-8 text-xs gap-1.5 px-2 text-muted-foreground hover:text-destructive"
               onClick={handleClear}
               disabled={!logContent}
-              title="Clear current view log"
             >
               <Trash2 className="h-3.5 w-3.5" />
             </Button>
@@ -242,7 +239,7 @@ export function EspansoLogDialog({ open, onOpenChange }: EspansoLogDialogProps) 
             lines.map((line, idx) => renderFormattedLine(line, idx))
           ) : (
             <div className="flex h-full min-h-[280px] items-center justify-center text-zinc-500 italic text-xs">
-              {isLoading ? "Fetching logs..." : "No log output available."}
+              {isLoading ? t("dialogs.logs.refreshing") : t("dialogs.logs.noLogs")}
             </div>
           )}
         </div>

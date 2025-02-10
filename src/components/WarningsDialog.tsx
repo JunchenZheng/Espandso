@@ -9,6 +9,7 @@ import {
 import { ScrollArea } from "./ui/scroll-area";
 import { Button } from "./ui/button";
 import { EspansoConfigPreview } from "../App";
+import { useI18n } from "../i18n/useI18n";
 
 export interface WarningsDialogProps {
   open: boolean;
@@ -29,6 +30,7 @@ export function WarningsDialog({
   onSelectFile,
   onOpenFileExternal,
 }: WarningsDialogProps) {
+  const { t } = useI18n();
   const previewsWithWarnings = previews.filter(
     (p) => p.warnings && p.warnings.length > 0
   );
@@ -56,13 +58,13 @@ export function WarningsDialog({
             </div>
             <div>
               <DialogTitle className="text-lg font-bold flex items-center gap-2">
-                <span>Espanso Import Warnings</span>
+                <span>{t("dialogs.warnings.title")}</span>
                 <span className="rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 text-xs font-semibold">
                   {activeFilterPreview ? activeFilterPreview.warnings.length : totalWarningsCount}
                 </span>
               </DialogTitle>
               <DialogDescription className="text-xs text-muted-foreground">
-                Warnings encountered during YAML match files parsing. Skipped or unsupported snippets are listed below.
+                {t("dialogs.warnings.description")}
               </DialogDescription>
             </div>
           </div>
@@ -93,10 +95,7 @@ export function WarningsDialog({
           {displayPreviews.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <CheckCircle2 className="h-10 w-10 text-emerald-500/80 mb-2" />
-              <p className="text-sm font-medium text-foreground">No warnings found</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                All YAML match files parsed cleanly without any warnings or skipped matches.
-              </p>
+              <p className="text-sm font-medium text-foreground">{t("dialogs.warnings.noWarnings")}</p>
             </div>
           ) : (
             <ScrollArea className="max-h-[60vh] pr-2">

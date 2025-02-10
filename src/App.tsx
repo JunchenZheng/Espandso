@@ -14,7 +14,8 @@ import {
   Folder,
   FolderOpen,
   FolderPlus,
-  Image as ImageIcon,
+  Globe,
+  ImageIcon,
   Info,
   List,
   ListChecks,
@@ -32,6 +33,8 @@ import {
   XCircle,
 } from "lucide-react";
 import "./App.css";
+
+import { useI18n } from "./i18n/useI18n";
 
 import { Button } from "./components/ui/button";
 import {
@@ -276,7 +279,9 @@ function OptionalMark() {
 }
 
 function App() {
+  const { t, locale, setLocale } = useI18n();
   const [isDragging, setIsDragging] = useState<boolean>(false);
+
   const [espansoMatchDir, setEspansoMatchDir] = useState<string>("");
   const [espansoPathSource, setEspansoPathSource] = useState<EspansoPathSource | "">("");
   const [espansoConfigs, setEspansoConfigs] = useState<EspansoConfigFile[]>([]);
@@ -1095,32 +1100,33 @@ function App() {
                     variant="outline"
                     onClick={scanDefaultEspansoConfigDir}
                     disabled={isScanningEspanso}
-                    aria-label="Refresh YAML configs"
-                    title="Refresh YAML configs"
+                    aria-label={t("actions.refresh")}
+                    title={t("actions.refresh")}
                   >
                     <RefreshCw className={cn("h-4 w-4", isScanningEspanso && "animate-spin")} />
-                    Refresh
+                    {t("actions.refresh")}
                   </Button>
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={() => setIsLogOpen(true)}
-                    aria-label="Open Espanso log"
-                    title="Open Espanso log"
+                    aria-label={t("actions.viewLogs")}
+                    title={t("actions.viewLogs")}
                   >
                     <Terminal className="h-4 w-4" />
-                    Log
+                    {t("actions.viewLogs")}
                   </Button>
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={() => setIsSettingsOpen(true)}
-                    aria-label="Open settings"
-                    title="Open settings"
+                    aria-label={t("actions.settings")}
+                    title={t("actions.settings")}
                   >
                     <Settings className="h-4 w-4" />
-                    Settings
+                    {t("actions.settings")}
                   </Button>
+
                 </div>
               </div>
 
@@ -1696,10 +1702,52 @@ function App() {
       <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Settings</DialogTitle>
-            <DialogDescription>Scan the default Espanso match directory.</DialogDescription>
+            <DialogTitle>{t("settings.title")}</DialogTitle>
+            <DialogDescription>{t("settings.description")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            {/* Language Setting Block */}
+            <div className="rounded-lg border bg-secondary/40 p-4">
+              <div className="flex items-start gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-background text-primary">
+                  <Globe className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-3">
+                    <Label className="text-sm font-semibold">{t("settings.language")}</Label>
+                    <div className="flex items-center rounded-lg border bg-background p-0.5 shadow-sm">
+                      <button
+                        type="button"
+                        onClick={() => setLocale("en")}
+                        className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
+                          locale === "en"
+                            ? "bg-primary text-primary-foreground shadow-xs"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        {t("settings.english")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setLocale("zh-CN")}
+                        className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
+                          locale === "zh-CN"
+                            ? "bg-primary text-primary-foreground shadow-xs"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        {t("settings.chinese")}
+                      </button>
+                    </div>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {t("settings.languageDescription")}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Espanso config scan */}
             <div className="rounded-lg border bg-secondary/40 p-4">
               <div className="flex items-start gap-3">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-background text-primary">
@@ -1707,14 +1755,14 @@ function App() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-3">
-                    <Label className="text-sm font-semibold">Espanso config scan</Label>
+                    <Label className="text-sm font-semibold">{t("settings.espansoConfigScan")}</Label>
                     <Button size="sm" variant="outline" onClick={scanDefaultEspansoConfigDir} disabled={isScanningEspanso}>
                       {isScanningEspanso ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-                      Scan
+                      {t("actions.refresh")}
                     </Button>
                   </div>
                   <p className="mt-1 truncate text-xs text-muted-foreground">
-                    {espansoMatchDir || "Default match directory"}
+                    {espansoMatchDir || t("settings.notDetected")}
                   </p>
                   {espansoPathSource && (
                     <p className="mt-1 text-xs text-muted-foreground">
@@ -1737,12 +1785,13 @@ function App() {
               }}
             >
               <Info className="mr-1 h-3.5 w-3.5" />
-              About Expandso
+              {t("dialogs.about.title")}
             </Button>
-            <Button onClick={() => setIsSettingsOpen(false)}>Done</Button>
+            <Button onClick={() => setIsSettingsOpen(false)}>{t("actions.done")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
 
       <AboutDialog open={isAboutOpen} onOpenChange={setIsAboutOpen} />
 
@@ -2238,7 +2287,9 @@ function EspansoConfigDetail({
   onAddSnippet,
   onOpenWarnings,
 }: EspansoConfigDetailProps) {
+  const { t } = useI18n();
   const ROW_HEIGHT = 36;
+
   const OVERSCAN_ROWS = 8;
   const scrollRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
@@ -2295,8 +2346,9 @@ function EspansoConfigDetail({
           )}
           <Button size="sm" onClick={onAddSnippet}>
             <Plus className="h-4 w-4" />
-            Add Snippet
+            {t("actions.addSnippet")}
           </Button>
+
         </div>
       </div>
 
