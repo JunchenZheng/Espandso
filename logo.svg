@@ -1,13 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="190 190 644 644" role="img" aria-labelledby="title desc">
   <title id="title">Expandso logo</title>
-  <desc id="desc">A neon green letter D crossed by a teal leaf on a dark rounded square.</desc>
+  <desc id="desc">A neon green letter D crossed by a teal leaf on a compact dark rounded square.</desc>
   <defs>
-    <radialGradient id="backgroundGlow" cx="50%" cy="44%" r="58%">
-      <stop offset="0%" stop-color="#14191a"/>
-      <stop offset="58%" stop-color="#050606"/>
-      <stop offset="100%" stop-color="#010202"/>
-    </radialGradient>
-
     <linearGradient id="tileSurface" x1="230" y1="205" x2="790" y2="820" gradientUnits="userSpaceOnUse">
       <stop offset="0%" stop-color="#181b20"/>
       <stop offset="45%" stop-color="#070809"/>
@@ -68,9 +62,6 @@
       <path d="M454 310H575C661 310 732 382 732 512C732 642 661 714 575 714H405C384 714 368 697 368 676V594H452V632H575C613 632 648 592 648 512C648 432 613 392 575 392H452V485H368V348C368 327 384 310 405 310H454Z"/>
     </clipPath>
   </defs>
-
-  <rect width="1024" height="1024" fill="#020303"/>
-  <circle cx="512" cy="484" r="454" fill="url(#backgroundGlow)" opacity="0.55"/>
 
   <rect x="196" y="190" width="632" height="642" rx="128" fill="url(#tileSurface)" stroke="#20242a" stroke-width="2"/>
   <rect x="216" y="210" width="592" height="602" rx="108" fill="none" stroke="#30363c" stroke-width="1.4" opacity="0.32"/>
