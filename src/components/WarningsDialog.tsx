@@ -9,6 +9,7 @@ import {
 import { ScrollArea } from "./ui/scroll-area";
 import { Button } from "./ui/button";
 import { EspansoConfigPreview } from "../App";
+import { useI18n } from "../i18n/useI18n";
 
 export interface WarningsDialogProps {
   open: boolean;
@@ -29,6 +30,7 @@ export function WarningsDialog({
   onSelectFile,
   onOpenFileExternal,
 }: WarningsDialogProps) {
+  const { t } = useI18n();
   const previewsWithWarnings = previews.filter(
     (p) => p.warnings && p.warnings.length > 0
   );
@@ -56,13 +58,13 @@ export function WarningsDialog({
             </div>
             <div>
               <DialogTitle className="text-lg font-bold flex items-center gap-2">
-                <span>Espanso Import Warnings</span>
+                <span>{t("dialogs.warnings.title")}</span>
                 <span className="rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 text-xs font-semibold">
                   {activeFilterPreview ? activeFilterPreview.warnings.length : totalWarningsCount}
                 </span>
               </DialogTitle>
               <DialogDescription className="text-xs text-muted-foreground">
-                Warnings encountered during YAML match files parsing. Skipped or unsupported snippets are listed below.
+                {t("dialogs.warnings.description")}
               </DialogDescription>
             </div>
           </div>
@@ -74,7 +76,7 @@ export function WarningsDialog({
               <div className="flex items-center gap-2 text-amber-900 min-w-0">
                 <Filter className="h-3.5 w-3.5 shrink-0 text-amber-700" />
                 <span className="truncate">
-                  Filtering for: <strong>{activeFilterPreview.config.relativePath}</strong>
+                  {t("dialogs.warnings.filteringFor")}: <strong>{activeFilterPreview.config.relativePath}</strong>
                 </span>
               </div>
               {onClearFilter && (
@@ -84,7 +86,7 @@ export function WarningsDialog({
                   className="h-6 px-2 text-[11px] text-amber-800 hover:bg-amber-100 hover:text-amber-900"
                   onClick={onClearFilter}
                 >
-                  Show all files ({totalWarningsCount})
+                  {t("dialogs.warnings.showAllFiles", { count: totalWarningsCount })}
                 </Button>
               )}
             </div>
@@ -93,10 +95,7 @@ export function WarningsDialog({
           {displayPreviews.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <CheckCircle2 className="h-10 w-10 text-emerald-500/80 mb-2" />
-              <p className="text-sm font-medium text-foreground">No warnings found</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                All YAML match files parsed cleanly without any warnings or skipped matches.
-              </p>
+              <p className="text-sm font-medium text-foreground">{t("dialogs.warnings.noWarnings")}</p>
             </div>
           ) : (
             <ScrollArea className="max-h-[60vh] pr-2">
@@ -115,7 +114,7 @@ export function WarningsDialog({
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
                         <span className="rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 text-[11px] font-medium">
-                          {preview.warnings.length} {preview.warnings.length === 1 ? "warning" : "warnings"}
+                          {preview.warnings.length} {t(preview.warnings.length === 1 ? "counts.warning" : "counts.warnings")}
                         </span>
                         {onSelectFile && preview.config.path !== filterPath && (
                           <Button
@@ -127,7 +126,7 @@ export function WarningsDialog({
                               onOpenChange(false);
                             }}
                           >
-                            View In App
+                            {t("dialogs.warnings.viewInApp")}
                           </Button>
                         )}
                         {onOpenFileExternal && (
@@ -136,9 +135,9 @@ export function WarningsDialog({
                             variant="secondary"
                             className="h-6 px-2 text-[10px] gap-1"
                             onClick={() => onOpenFileExternal(preview.config.path)}
-                            title="Open YAML file in default external application"
+                            title={t("dialogs.warnings.openYamlExternalTitle")}
                           >
-                            <span>View YAML</span>
+                            <span>{t("dialogs.warnings.viewYaml")}</span>
                             <SquareArrowOutUpRight className="h-3 w-3" />
                           </Button>
                         )}
