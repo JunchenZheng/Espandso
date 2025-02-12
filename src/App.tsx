@@ -115,11 +115,13 @@ interface FormFieldConfig {
   valuesText: string;
 }
 
-function snippetKindLabel(kind: AddSnippetKind): string {
-  if (kind === "file") return "File";
-  if (kind === "image") return "Image";
-  if (kind === "form") return "Form";
-  return "Text";
+type TranslateFn = ReturnType<typeof useI18n>["t"];
+
+function snippetKindLabel(kind: AddSnippetKind, t: TranslateFn): string {
+  if (kind === "file") return t("snippets.typeFileShort");
+  if (kind === "image") return t("snippets.typeImageShort");
+  if (kind === "form") return t("snippets.typeFormShort");
+  return t("snippets.typeTextShort");
 }
 
 function createDefaultFormFieldConfig(id: string): FormFieldConfig {
@@ -257,10 +259,9 @@ interface AlertDialogState {
   onCancel?: () => void;
 }
 
-const MSG_IMAGE_FILE_NOT_ALLOWED =
-  "Selected file is an image. The File tab only supports plain text files. Please switch to the [Image] tab to add an image snippet.";
-const MSG_BINARY_FILE_NOT_ALLOWED =
-  "Selected file is a binary file. The File tab only supports plain text files.";
+function formatCount(t: TranslateFn, count: number, singularKey: string, pluralKey: string): string {
+  return `${count} ${t(count === 1 ? singularKey : pluralKey)}`;
+}
 
 function RequiredMark() {
   return (
@@ -271,9 +272,10 @@ function RequiredMark() {
 }
 
 function OptionalMark() {
+  const { t } = useI18n();
   return (
     <span className="ml-1 inline-flex items-center text-xs font-normal text-muted-foreground align-middle leading-none">
-      (optional)
+      {t("common.optional")}
     </span>
   );
 }
@@ -397,17 +399,43 @@ function App() {
     isOpen: false,
     title: "",
     description: "",
-    confirmText: "OK",
+    confirmText: t("actions.ok"),
   });
 
-  const showAlert = useCallback((description: string, title = "Expandso") => {
+  const localizeFileSystemError = useCallback((message: string): string => {
+    const fileDuplicate = message.match(/^File "(.+)" already exists in the selected directory\.$/);
+    if (fileDuplicate) {
+      return t("filesystem.fileAlreadyExists", { name: fileDuplicate[1] });
+    }
+
+    const folderDuplicate = message.match(/^Folder "(.+)" already exists in the selected directory\.$/);
+    if (folderDuplicate) {
+      return t("filesystem.folderAlreadyExists", { name: folderDuplicate[1] });
+    }
+
+    const reservedFolder = message.match(/^'(.+)' is a reserved Espanso directory name and cannot be used\.$/);
+    if (reservedFolder) {
+      return t("filesystem.folderReserved", { name: reservedFolder[1] });
+    }
+
+    const staticMessages: Record<string, string> = {
+      "File name cannot be empty.": t("filesystem.fileNameRequired"),
+      "File name contains invalid characters (/ \\ : * ? \" < > |).": t("filesystem.fileNameInvalidChars"),
+      "Folder name cannot be empty.": t("filesystem.folderNameRequired"),
+      "Folder name contains invalid characters (/ \\ : * ? \" < > |).": t("filesystem.folderNameInvalidChars"),
+    };
+
+    return staticMessages[message] || message;
+  }, [t]);
+
+  const showAlert = useCallback((description: string, title = t("app.name")) => {
     setAlertDialog({
       isOpen: true,
       title,
       description,
-      confirmText: "OK",
+      confirmText: t("actions.ok"),
     });
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;
@@ -426,9 +454,9 @@ function App() {
     (
       description: string,
       onConfirm: () => void,
-      title = "Expandso",
-      confirmText = "OK",
-      cancelText = "Cancel",
+      title = t("app.name"),
+      confirmText = t("actions.ok"),
+      cancelText = t("actions.cancel"),
     ) => {
       setAlertDialog({
         isOpen: true,
@@ -439,7 +467,7 @@ function App() {
         onConfirm,
       });
     },
-    [],
+    [t],
   );
 
   const buildEspansoConfigPreviews = useCallback(async (configs: EspansoConfigFile[]): Promise<EspansoConfigPreview[]> => {
@@ -475,7 +503,7 @@ function App() {
           imageCount: 0,
           formCount: 0,
           warningCount: 1,
-          warnings: [`[${config.name}] Failed to read file: ${e?.message || e}`],
+          warnings: [t("errors.failedToReadFile", { file: config.name, message: e?.message || e })],
           snippets: [],
           importedMatches: [],
         });
@@ -483,7 +511,7 @@ function App() {
     }
 
     return previews;
-  }, []);
+  }, [t]);
 
 
 
@@ -507,7 +535,7 @@ function App() {
 
   const scanDefaultEspansoConfigDir = useCallback(async () => {
     setIsScanningEspanso(true);
-    setEspansoScanMessage("Scanning Espanso match directory...");
+    setEspansoScanMessage(t("status.scanningEspansoConfigs"));
     try {
       const result = await scanEspansoConfigFiles();
       setEspansoMatchDir(result.matchDir);
@@ -519,12 +547,12 @@ function App() {
         if (current && result.files.some((file) => file.path === current)) return current;
         return result.files[0]?.path || "";
       });
-      setEspansoScanMessage(result.files.length > 0 ? "" : "No YAML configs found in the Espanso match directory.");
+      setEspansoScanMessage(result.files.length > 0 ? "" : t("empty.noYamlFilesMessage"));
     } catch (e: any) {
       const message = e?.message || String(e);
       const permissionHint = message.toLowerCase().includes("forbidden")
-        ? `Espanso path was resolved, but Tauri blocked file access. Add the Espanso match directory to the filesystem scope, then restart the app. (${message})`
-        : `Failed to scan Espanso configs: ${message}`;
+        ? t("errors.espansoPathBlocked", { message })
+        : t("errors.failedToScanEspansoConfigs", { message });
       setEspansoConfigs([]);
       setEspansoDirectories([]);
       setEspansoConfigPreviews([]);
@@ -532,7 +560,7 @@ function App() {
     } finally {
       setIsScanningEspanso(false);
     }
-  }, [buildEspansoConfigPreviews]);
+  }, [buildEspansoConfigPreviews, t]);
 
   const openCreateFileDialog = useCallback((defaultParentRelPath?: string) => {
     const targetParent = defaultParentRelPath !== undefined ? defaultParentRelPath : activeDirectoryRelPath;
@@ -552,7 +580,7 @@ function App() {
 
   const handleCreateFile = async () => {
     if (!espansoMatchDir) {
-      setCreateFileError("Espanso match directory path is unavailable.");
+      setCreateFileError(t("errors.espansoMatchDirUnavailable"));
       return;
     }
 
@@ -572,7 +600,7 @@ function App() {
 
     const err = validateFileName(createFileName, existingFileNames);
     if (err) {
-      setCreateFileError(err);
+      setCreateFileError(localizeFileSystemError(err));
       return;
     }
 
@@ -592,7 +620,7 @@ function App() {
       await scanDefaultEspansoConfigDir();
       setSelectedEspansoConfigPath(targetAbsPath);
     } catch (e: any) {
-      setCreateFileError(`Failed to create file: ${e?.message || e}`);
+      setCreateFileError(t("errors.failedToCreateFile", { message: e?.message || e }));
     } finally {
       setIsCreatingFile(false);
     }
@@ -600,7 +628,7 @@ function App() {
 
   const handleCreateFolder = async () => {
     if (!espansoMatchDir) {
-      setCreateFolderError("Espanso match directory path is unavailable.");
+      setCreateFolderError(t("errors.espansoMatchDirUnavailable"));
       return;
     }
 
@@ -618,7 +646,7 @@ function App() {
 
     const err = validateFolderName(createFolderName, existingFolderNames);
     if (err) {
-      setCreateFolderError(err);
+      setCreateFolderError(localizeFileSystemError(err));
       return;
     }
 
@@ -641,7 +669,7 @@ function App() {
       await scanDefaultEspansoConfigDir();
       setSelectedEspansoConfigPath(newRelPath);
     } catch (e: any) {
-      setCreateFolderError(`Failed to create directory: ${e?.message || e}`);
+      setCreateFolderError(t("errors.failedToCreateDirectory", { message: e?.message || e }));
     } finally {
       setIsCreatingFolder(false);
     }
@@ -655,13 +683,13 @@ function App() {
     if (isAddSnippetOpen) {
       if (addSnippetKind === "file") {
         if (isImageFilePath(path)) {
-          showAlert(MSG_IMAGE_FILE_NOT_ALLOWED, "Invalid File Type");
+          showAlert(t("errors.imageFileNotAllowed"), t("errors.invalidFileType"));
           setIsDragging(false);
           return;
         }
         const isBinary = await checkIsBinaryFilePath(path, (p) => readFile(p));
         if (isBinary) {
-          showAlert(MSG_BINARY_FILE_NOT_ALLOWED, "Invalid File Type");
+          showAlert(t("errors.binaryFileNotAllowed"), t("errors.invalidFileType"));
           setIsDragging(false);
           return;
         }
@@ -681,7 +709,7 @@ function App() {
 
     const lowerPath = path.toLowerCase();
     if (!lowerPath.endsWith(".yml") && !lowerPath.endsWith(".yaml")) {
-      showAlert("Please drop an Espanso YAML file.", "Invalid File");
+      showAlert(t("errors.dropYamlFile"), t("errors.invalidFile"));
       return;
     }
 
@@ -744,8 +772,8 @@ function App() {
   const detectedFormFieldNames = useMemo(() => extractFormFieldNames(editForm), [editForm]);
   const detectedFormFieldKey = detectedFormFieldNames.join("\n");
   const snippetDialogTitle = snippetEditTarget
-    ? `Edit ${snippetKindLabel(activeSnippetKind)} Snippet`
-    : `Add ${snippetKindLabel(activeSnippetKind)} Snippet`;
+    ? t("snippets.editKindSnippetTitle", { kind: snippetKindLabel(activeSnippetKind, t) })
+    : t("snippets.addKindSnippetTitle", { kind: snippetKindLabel(activeSnippetKind, t) });
 
   useEffect(() => {
     setEditFormFieldConfigs((current) => {
@@ -770,7 +798,7 @@ function App() {
 
   function openAddSnippetDialog() {
     if (!selectedEspansoPreview) {
-      showAlert("Please select a YAML config before adding a snippet.", "No Config Selected");
+      showAlert(t("errors.selectConfigBeforeAddingSnippet"), t("errors.noConfigSelected"));
       return;
     }
     setSnippetEditTarget(null);
@@ -922,12 +950,12 @@ function App() {
 
     if (selectedPath) {
       if (isImageFilePath(selectedPath)) {
-        showAlert(MSG_IMAGE_FILE_NOT_ALLOWED, "Invalid File Type");
+        showAlert(t("errors.imageFileNotAllowed"), t("errors.invalidFileType"));
         return;
       }
       const isBinary = await checkIsBinaryFilePath(selectedPath, (p) => readFile(p));
       if (isBinary) {
-        showAlert(MSG_BINARY_FILE_NOT_ALLOWED, "Invalid File Type");
+        showAlert(t("errors.binaryFileNotAllowed"), t("errors.invalidFileType"));
         return;
       }
       setEditIncludeFile(selectedPath);
@@ -940,7 +968,7 @@ function App() {
       directory: false,
       filters: [
         {
-          name: "Images",
+          name: t("snippets.imageFilesFilter"),
           extensions: ["png", "jpg", "jpeg", "gif", "svg", "webp", "bmp"],
         },
       ],
@@ -963,7 +991,7 @@ function App() {
     } catch (e: any) {
       const errMsg = e?.message || String(e);
       setAddErrors([{ message: errMsg }]);
-      showAlert(errMsg, "Validation Error");
+      showAlert(errMsg, t("errors.validationError"));
       return;
     }
 
@@ -982,7 +1010,7 @@ function App() {
     setAddWarnings(validationResult.warnings);
 
     if (validationResult.errors.length > 0) {
-      showAlert(validationResult.errors[0].message, "Validation Error");
+      showAlert(validationResult.errors[0].message, t("errors.validationError"));
       return;
     }
 
@@ -1001,7 +1029,7 @@ function App() {
       await scanDefaultEspansoConfigDir();
       setSelectedEspansoConfigPath(targetPreview.config.path);
     } catch (e: any) {
-      showAlert(`Failed to save snippet: ${e?.message || e}`, "Error");
+      showAlert(t("errors.failedToSaveSnippet", { message: e?.message || e }), t("errors.genericError"));
     } finally {
       setIsSavingSnippet(false);
     }
@@ -1012,7 +1040,7 @@ function App() {
     const displayTrigger = triggers.length > 0 ? triggers.join(", ") : `Snippet ${target.displayIndex + 1}`;
 
     showConfirm(
-      `Are you sure you want to delete ${displayTrigger} from ${target.preview.config.relativePath}?`,
+      t("dialogs.confirmDelete.message", { trigger: displayTrigger, file: target.preview.config.relativePath }),
       async () => {
         try {
           const content = await readTextFile(target.preview.config.path);
@@ -1026,12 +1054,12 @@ function App() {
           await scanDefaultEspansoConfigDir();
           setSelectedEspansoConfigPath(target.preview.config.path);
         } catch (e: any) {
-          showAlert(`Failed to delete snippet: ${e?.message || e}`, "Error");
+          showAlert(t("errors.failedToDeleteSnippet", { message: e?.message || e }), t("errors.genericError"));
         }
       },
-      "Delete Snippet",
-      "Delete",
-      "Cancel",
+      t("dialogs.confirmDelete.title"),
+      t("actions.delete"),
+      t("actions.cancel"),
     );
   }
 
@@ -1039,7 +1067,7 @@ function App() {
     try {
       await openPath(path);
     } catch (e: any) {
-      showAlert(`Failed to open YAML file: ${e?.message || e}`, "Error");
+      showAlert(t("errors.failedToOpenYamlFile", { message: e?.message || e }), t("errors.genericError"));
     }
   }
 
@@ -1047,24 +1075,24 @@ function App() {
     <div className="app-shell">
       {isDragging && (!isAddSnippetOpen || addSnippetKind === "file" || addSnippetKind === "image") && (
         <div className="drag-overlay">
-          <div className="drag-zone">
-            <Upload className="mb-5 h-12 w-12" />
-            <div className="text-xl font-semibold">
-              {isAddSnippetOpen && addSnippetKind === "file"
-                ? "Drop file here"
-                : isAddSnippetOpen && addSnippetKind === "image"
-                  ? "Drop image file here"
-                  : "Drop YAML file here"}
+              <div className="drag-zone">
+                <Upload className="mb-5 h-12 w-12" />
+                <div className="text-xl font-semibold">
+                  {isAddSnippetOpen && addSnippetKind === "file"
+                    ? t("drag.dropFileHere")
+                    : isAddSnippetOpen && addSnippetKind === "image"
+                      ? t("drag.dropImageFileHere")
+                      : t("drag.dropYamlFileHere")}
+                </div>
+                <div className="mt-2 text-sm text-muted-foreground">
+                  {isAddSnippetOpen && addSnippetKind === "file"
+                    ? t("drag.fileSourceDescription")
+                    : isAddSnippetOpen && addSnippetKind === "image"
+                      ? t("drag.imageSourceDescription")
+                      : t("drag.yamlSourceDescription")}
+                </div>
+              </div>
             </div>
-            <div className="mt-2 text-sm text-muted-foreground">
-              {isAddSnippetOpen && addSnippetKind === "file"
-                ? "Dropped files are used as the snippet source."
-                : isAddSnippetOpen && addSnippetKind === "image"
-                  ? "Dropped image files are used as the image match source."
-                  : "Dropped YAML files are previewed and edited directly."}
-            </div>
-          </div>
-        </div>
       )}
 
       <main className="flex h-full w-full overflow-hidden bg-[linear-gradient(180deg,hsl(var(--background))_0%,hsl(var(--secondary))_100%)] p-4">
@@ -1073,12 +1101,24 @@ function App() {
             <div className="flex min-h-0 flex-1 flex-col gap-3">
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-background p-3">
                 <div className="flex flex-wrap gap-3 text-sm">
-                  <span className="font-semibold">{espansoConfigs.length} YAML files</span>
-                  <span className="text-muted-foreground">{espansoPreviewTotals.snippets} readable snippets</span>
-                  <span className="text-muted-foreground">{espansoPreviewTotals.inline} inline</span>
-                  <span className="text-muted-foreground">{espansoPreviewTotals.resources} external files</span>
-                  <span className="text-muted-foreground">{espansoPreviewTotals.images} images</span>
-                  <span className="text-muted-foreground">{espansoPreviewTotals.forms} forms</span>
+                  <span className="font-semibold">
+                    {formatCount(t, espansoConfigs.length, "counts.yamlFile", "counts.yamlFiles")}
+                  </span>
+                  <span className="text-muted-foreground">
+                    {formatCount(t, espansoPreviewTotals.snippets, "counts.readableSnippet", "counts.readableSnippets")}
+                  </span>
+                  <span className="text-muted-foreground">
+                    {formatCount(t, espansoPreviewTotals.inline, "counts.inline", "counts.inline")}
+                  </span>
+                  <span className="text-muted-foreground">
+                    {formatCount(t, espansoPreviewTotals.resources, "counts.externalFile", "counts.externalFiles")}
+                  </span>
+                  <span className="text-muted-foreground">
+                    {formatCount(t, espansoPreviewTotals.images, "counts.image", "counts.images")}
+                  </span>
+                  <span className="text-muted-foreground">
+                    {formatCount(t, espansoPreviewTotals.forms, "counts.form", "counts.forms")}
+                  </span>
                   {espansoPreviewTotals.warnings > 0 && (
                     <button
                       type="button"
@@ -1087,10 +1127,10 @@ function App() {
                         setIsWarningsDialogOpen(true);
                       }}
                       className="inline-flex items-center gap-1.5 rounded bg-amber-500/10 px-2 py-0.5 text-amber-700 hover:bg-amber-500/20 text-xs font-medium cursor-pointer transition-colors"
-                      title="Click to view all warnings"
+                      title={t("warnings.viewAllTitle")}
                     >
                       <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
-                      <span>{espansoPreviewTotals.warnings} warnings</span>
+                      <span>{formatCount(t, espansoPreviewTotals.warnings, "counts.warning", "counts.warnings")}</span>
                     </button>
                   )}
                 </div>
@@ -1133,13 +1173,13 @@ function App() {
               <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden rounded-md border bg-background md:grid-cols-[18rem_1fr]">
                 <aside className="flex min-h-0 flex-col border-b bg-secondary/30 md:border-b-0 md:border-r">
                   <div className="flex h-10 shrink-0 items-center justify-between border-b px-3">
-                    <h2 className="text-sm font-semibold">Collection</h2>
+                    <h2 className="text-sm font-semibold">{t("navigation.collection")}</h2>
                     <div className="flex items-center gap-1">
                       <Button
                         size="sm"
                         variant="ghost"
                         className="h-7 w-7 p-0"
-                        title={activeDirectoryRelPath ? `Create New YAML File in /${activeDirectoryRelPath}` : "Create New YAML File"}
+                        title={activeDirectoryRelPath ? t("filesystem.createFileIn", { path: `/${activeDirectoryRelPath}` }) : t("filesystem.createFile")}
                         onClick={() => openCreateFileDialog()}
                       >
                         <FilePlus className="h-4 w-4" />
@@ -1148,7 +1188,7 @@ function App() {
                         size="sm"
                         variant="ghost"
                         className="h-7 w-7 p-0"
-                        title={activeDirectoryRelPath ? `Create New Subdirectory in /${activeDirectoryRelPath}` : "Create New Subdirectory"}
+                        title={activeDirectoryRelPath ? t("filesystem.createFolderIn", { path: `/${activeDirectoryRelPath}` }) : t("filesystem.createFolder")}
                         onClick={() => openCreateFolderDialog()}
                       >
                         <FolderPlus className="h-4 w-4" />
@@ -1201,8 +1241,8 @@ function App() {
                   ) : (
                     <EmptyState
                       icon={FileText}
-                      title="No config or directory selected"
-                      description="Select a YAML config or directory from the collection list to preview its contents."
+                      title={t("empty.noSelection")}
+                      description={t("empty.noSelectionDescription")}
                     />
                   )}
                 </section>
@@ -1211,25 +1251,25 @@ function App() {
           ) : (
             <div className="flex flex-col items-center justify-center p-8 text-center rounded-lg border border-dashed my-auto bg-background/50">
               <FolderOpen className="h-12 w-12 text-muted-foreground/60 mb-3" />
-              <h3 className="text-lg font-semibold mb-1">No YAML Config Files Found</h3>
+              <h3 className="text-lg font-semibold mb-1">{t("empty.noYamlFilesTitle")}</h3>
               <p className="text-sm text-muted-foreground max-w-md mb-6">
                 {isScanningEspanso
-                  ? "Scanning Espanso configs..."
-                  : espansoScanMessage || "Your Espanso match directory does not contain any YAML files yet."}
+                  ? t("status.scanningEspansoConfigs")
+                  : espansoScanMessage || t("empty.noYamlFilesMessage")}
               </p>
               {!isScanningEspanso && (
                 <div className="flex flex-wrap justify-center gap-3">
                   <Button onClick={() => openCreateFileDialog("")}>
                     <FilePlus className="h-4 w-4 mr-2" />
-                    Create New YAML File
+                    {t("filesystem.createFile")}
                   </Button>
                   <Button variant="outline" onClick={() => openCreateFolderDialog("")}>
                     <FolderPlus className="h-4 w-4 mr-2" />
-                    Create Subdirectory
+                    {t("filesystem.createFolder")}
                   </Button>
                   <Button variant="ghost" onClick={scanDefaultEspansoConfigDir}>
                     <RefreshCw className="h-4 w-4 mr-2" />
-                    Refresh
+                    {t("actions.refresh")}
                   </Button>
                 </div>
               )}
@@ -1256,8 +1296,8 @@ function App() {
           <DialogHeader>
             <DialogTitle>{snippetDialogTitle}</DialogTitle>
             <DialogDescription className="break-all">
-              {snippetEditTarget?.preview.config.relativePath || selectedEspansoPreview?.config.relativePath || "Select a YAML file"}
-              {snippetEditTarget ? ` · Snippet #${snippetEditTarget.displayIndex + 1}` : ""}
+              {snippetEditTarget?.preview.config.relativePath || selectedEspansoPreview?.config.relativePath || t("snippets.selectYamlFile")}
+              {snippetEditTarget ? ` · ${t("snippets.snippetNumber", { number: snippetEditTarget.displayIndex + 1 })}` : ""}
             </DialogDescription>
           </DialogHeader>
 
@@ -1288,7 +1328,7 @@ function App() {
 
             <div className="space-y-2">
               <Label htmlFor="trigger-0" className="inline-flex items-center">
-                Trigger <RequiredMark />
+                {t("snippets.trigger")} <RequiredMark />
               </Label>
               <div className="space-y-2">
                 {(editTriggersText ? editTriggersText.split("\n") : [""]).map((line, idx, lines) => (
@@ -1310,7 +1350,7 @@ function App() {
                         size="icon"
                         variant="ghost"
                         className="h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive"
-                        title="Remove trigger"
+                      title={t("snippets.removeTrigger")}
                         onClick={() => setEditTriggersText(lines.filter((_, i) => i !== idx).join("\n"))}
                       >
                         <XCircle className="h-4 w-4" />
@@ -1326,7 +1366,7 @@ function App() {
                   onClick={() => setEditTriggersText([...(editTriggersText ? editTriggersText.split("\n") : [""]), ""].join("\n"))}
                 >
                   <Plus className="h-3.5 w-3.5" />
-                  Add Trigger Alias
+                  {t("snippets.addTriggerAlias")}
                 </Button>
               </div>
             </div>
@@ -1342,7 +1382,7 @@ function App() {
                   setAddWarnings([]);
                 }}
               >
-                Text
+                {t("snippets.typeTextShort")}
               </Button>
               <Button
                 type="button"
@@ -1354,7 +1394,7 @@ function App() {
                   setAddWarnings([]);
                 }}
               >
-                File
+                {t("snippets.typeFileShort")}
               </Button>
               <Button
                 type="button"
@@ -1366,7 +1406,7 @@ function App() {
                   setAddWarnings([]);
                 }}
               >
-                Image
+                {t("snippets.typeImageShort")}
               </Button>
               <Button
                 type="button"
@@ -1378,14 +1418,14 @@ function App() {
                   setAddWarnings([]);
                 }}
               >
-                Form
+                {t("snippets.typeFormShort")}
               </Button>
             </div>
 
             {activeSnippetKind === "file" ? (
               <div className="space-y-3">
                 <Label htmlFor="include-file" className="inline-flex items-center">
-                  File <RequiredMark />
+                  {t("snippets.file")} <RequiredMark />
                 </Label>
                 <div
                   className="flex min-h-40 flex-col items-center justify-center gap-3 rounded-md border border-dashed bg-secondary/30 p-5 text-center"
@@ -1397,13 +1437,13 @@ function App() {
                     if (droppedFile) {
                       const isBinary = await isBinaryDomFile(droppedFile);
                       if (isBinary) {
-                        showAlert(MSG_BINARY_FILE_NOT_ALLOWED, "Invalid File Type");
+                        showAlert(t("errors.binaryFileNotAllowed"), t("errors.invalidFileType"));
                         return;
                       }
                     }
                     if (droppedPath) {
                       if (isImageFilePath(droppedPath)) {
-                        showAlert(MSG_IMAGE_FILE_NOT_ALLOWED, "Invalid File Type");
+                        showAlert(t("errors.imageFileNotAllowed"), t("errors.invalidFileType"));
                         return;
                       }
                       setEditIncludeFile(droppedPath);
@@ -1415,26 +1455,26 @@ function App() {
                     <Input
                       id="include-file"
                       className="mono-field"
-                      placeholder="Choose or drop a file path..."
+                      placeholder={t("snippets.filePathPlaceholder")}
                       value={editIncludeFile}
                       onChange={(e) => setEditIncludeFile(e.target.value)}
                     />
                     <Button type="button" variant="outline" onClick={chooseSnippetFile}>
                       <FileSearch className="h-4 w-4" />
-                      Choose File
+                      {t("snippets.chooseFile")}
                     </Button>
                   </div>
                 </div>
                 {isImageFilePath(editIncludeFile) && (
                   <p className="text-xs font-medium text-destructive">
-                    Image file extension detected. The File tab only supports plain text files. Please switch to the [Image] tab to add an image snippet.
+                    {t("errors.imageFileNotAllowed")}
                   </p>
                 )}
               </div>
             ) : activeSnippetKind === "image" ? (
               <div className="space-y-3">
                 <Label htmlFor="image-path" className="inline-flex items-center">
-                  Image Path <RequiredMark />
+                  {t("snippets.imagePath")} <RequiredMark />
                 </Label>
                 <div
                   className="flex min-h-40 flex-col items-center justify-center gap-3 rounded-md border border-dashed bg-secondary/30 p-5 text-center"
@@ -1453,13 +1493,13 @@ function App() {
                     <Input
                       id="image-path"
                       className="mono-field"
-                      placeholder="Choose or drop an image file path..."
+                      placeholder={t("snippets.imagePathPlaceholder")}
                       value={editImagePath}
                       onChange={(e) => setEditImagePath(e.target.value)}
                     />
                     <Button type="button" variant="outline" onClick={chooseSnippetImageFile}>
                       <FileSearch className="h-4 w-4" />
-                      Choose Image
+                      {t("snippets.chooseImage")}
                     </Button>
                   </div>
                 </div>
@@ -1468,7 +1508,7 @@ function App() {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="form" className="inline-flex items-center">
-                    Form Layout <RequiredMark />
+                    {t("snippets.formLayout")} <RequiredMark />
                   </Label>
                   <Textarea
                     id="form"
@@ -1498,17 +1538,17 @@ function App() {
                   />
                   <div className="space-y-2 rounded-md border bg-secondary/25 p-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <Label>Selected Text Action</Label>
+                      <Label>{t("formBuilder.selectedTextAction")}</Label>
                       <span className="max-w-full truncate text-xs text-muted-foreground">
-                        {formSelection ? formSelection.text.trim() : "Select text in the form layout"}
+                        {formSelection ? formSelection.text.trim() : t("formBuilder.selectTextHint")}
                       </span>
                     </div>
                     <div className="grid gap-2 sm:grid-cols-4">
                       {([
-                        ["text", "Single-line Text", Type],
-                        ["multiline", "Multiline Text", AlignLeft],
-                        ["choice", "Choice Box", ListChecks],
-                        ["list", "List Box", List],
+                        ["text", t("formBuilder.singleLineText"), Type],
+                        ["multiline", t("formBuilder.multilineText"), AlignLeft],
+                        ["choice", t("formBuilder.choiceBox"), ListChecks],
+                        ["list", t("formBuilder.listBox"), List],
                       ] as const).map(([control, label, Icon]) => (
                         <Button
                           key={control}
@@ -1528,7 +1568,7 @@ function App() {
                 </div>
                 {editFormFieldConfigs.length > 0 && (
                   <div className="space-y-3">
-                    <Label>Fields</Label>
+                    <Label>{t("formBuilder.fields")}</Label>
                     {editFormFieldConfigs.map((field, fieldIndex) => (
                       <div key={field.id} className="space-y-3 rounded-md border bg-secondary/25 p-3">
                         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1541,14 +1581,14 @@ function App() {
                             onClick={() => undoFormField(field.id)}
                           >
                             <RotateCcw className="h-3.5 w-3.5" />
-                            Undo
+                            {t("actions.undo")}
                           </Button>
                         </div>
                         <div className="grid gap-2 sm:grid-cols-3">
                           {([
-                            ["text", "Text Fields"],
-                            ["choice", "Choice Box"],
-                            ["list", "List Box"],
+                            ["text", t("formBuilder.textFields")],
+                            ["choice", t("formBuilder.choiceBox")],
+                            ["list", t("formBuilder.listBox")],
                           ] as const).map(([category, label]) => (
                             <label
                               key={category}
@@ -1571,11 +1611,11 @@ function App() {
                         {getFormFieldCategory(field) === "text" && (
                           <div className="grid gap-3 sm:grid-cols-2">
                             <div className="space-y-2">
-                              <Label>Text Field Shape</Label>
+                              <Label>{t("formBuilder.textFieldShape")}</Label>
                               <div className="grid grid-cols-2 gap-2">
                                 {([
-                                  ["single", "Single-line"],
-                                  ["multiline", "Multiline"],
+                                  ["single", t("formBuilder.singleLine")],
+                                  ["multiline", t("formBuilder.multiline")],
                                 ] as const).map(([mode, label]) => (
                                   <label
                                     key={mode}
@@ -1598,7 +1638,7 @@ function App() {
                             </div>
                             <div className="space-y-2">
                               <Label htmlFor={`form-field-default-${fieldIndex}`} className="inline-flex items-center">
-                                Default <OptionalMark />
+                                {t("formBuilder.defaultValue")} <OptionalMark />
                               </Label>
                               {field.control === "multiline" ? (
                                 <Textarea
@@ -1621,7 +1661,7 @@ function App() {
                           <div className="grid gap-3 sm:grid-cols-2">
                             <div className="space-y-2">
                               <Label htmlFor={`form-field-default-${fieldIndex}`} className="inline-flex items-center">
-                                Default <OptionalMark />
+                                {t("formBuilder.defaultValue")} <OptionalMark />
                               </Label>
                               <Input
                                 id={`form-field-default-${fieldIndex}`}
@@ -1631,7 +1671,7 @@ function App() {
                             </div>
                             <div className="space-y-2">
                               <Label htmlFor={`form-field-values-${fieldIndex}`} className="inline-flex items-center">
-                                Values <RequiredMark />
+                                {t("formBuilder.values")} <RequiredMark />
                               </Label>
                               <Textarea
                                 id={`form-field-values-${fieldIndex}`}
@@ -1651,12 +1691,12 @@ function App() {
             ) : (
               <div className="space-y-2">
                 <Label htmlFor="replace" className="inline-flex items-center">
-                  Replace Content <RequiredMark />
+                  {t("snippets.replaceContent")} <RequiredMark />
                 </Label>
                 <Textarea
                   id="replace"
                   className="mono-field min-h-48 resize-y"
-                  placeholder="What to expand trigger into..."
+                  placeholder={t("snippets.replaceContentPlaceholder")}
                   value={editReplace}
                   onChange={(e) => setEditReplace(e.target.value)}
                 />
@@ -1665,11 +1705,11 @@ function App() {
 
             <div className="space-y-2">
               <Label htmlFor="description" className="inline-flex items-center">
-                Description <OptionalMark />
+                {t("snippets.descriptionLabel")} <OptionalMark />
               </Label>
               <Input
                 id="description"
-                placeholder="A brief note about what this snippet does..."
+                placeholder={t("snippets.descriptionPlaceholder")}
                 value={editDescription}
                 onChange={(e) => setEditDescription(e.target.value)}
               />
@@ -1683,16 +1723,16 @@ function App() {
                 onClick={() => deleteSnippetFromYaml(snippetEditTarget)}
               >
                 <Trash2 className="h-4 w-4" />
-                Delete
+                {t("actions.delete")}
               </Button>
             )}
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button variant="outline" onClick={() => setIsAddSnippetOpen(false)}>
-                Cancel
+                {t("actions.cancel")}
               </Button>
               <Button onClick={saveSnippetToYaml} disabled={isSavingSnippet}>
                 {isSavingSnippet ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                {snippetEditTarget ? "Update YAML" : "Save to YAML"}
+                {snippetEditTarget ? t("actions.updateYaml") : t("actions.saveToYaml")}
               </Button>
             </div>
           </DialogFooter>
@@ -1766,7 +1806,7 @@ function App() {
                   </p>
                   {espansoPathSource && (
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {espansoPathSource === "cli" ? "Resolved with espanso path" : "Using platform default path"}
+                      {espansoPathSource === "cli" ? t("settings.resolvedWithCli") : t("settings.usingPlatformDefault")}
                     </p>
                   )}
                 </div>
@@ -1859,10 +1899,10 @@ function App() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FilePlus className="h-5 w-5 text-primary" />
-              Create New YAML File
+              {t("filesystem.createFile")}
             </DialogTitle>
             <DialogDescription>
-              Add a new Espanso match configuration file.
+              {t("filesystem.createFileDescription")}
             </DialogDescription>
           </DialogHeader>
 
@@ -1876,11 +1916,11 @@ function App() {
 
             <div className="space-y-2">
               <Label htmlFor="create-file-name">
-                File Name <RequiredMark />
+                {t("filesystem.fileName")} <RequiredMark />
               </Label>
               <Input
                 id="create-file-name"
-                placeholder="e.g. email or work.yml"
+                placeholder={t("filesystem.fileNamePlaceholder")}
                 value={createFileName}
                 onChange={(e) => {
                   setCreateFileName(e.target.value);
@@ -1895,19 +1935,19 @@ function App() {
                 autoFocus
               />
               <p className="text-xs text-muted-foreground">
-                If omitted, <code>.yml</code> extension will be added automatically.
+                {t("filesystem.fileExtensionHint")}
               </p>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="create-file-parent">Target Location</Label>
+              <Label htmlFor="create-file-parent">{t("filesystem.targetLocation")}</Label>
               <select
                 id="create-file-parent"
                 className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 value={createFileParentRelPath}
                 onChange={(e) => setCreateFileParentRelPath(e.target.value)}
               >
-                <option value="">/ (Root Match Directory)</option>
+                <option value="">{t("filesystem.rootMatchDirectory")}</option>
                 {espansoDirectories.map((dir) => (
                   <option key={dir.relativePath} value={dir.relativePath}>
                     /{dir.relativePath}
@@ -1919,16 +1959,16 @@ function App() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsCreateFileOpen(false)} disabled={isCreatingFile}>
-              Cancel
+              {t("actions.cancel")}
             </Button>
             <Button onClick={handleCreateFile} disabled={isCreatingFile || !createFileName.trim()}>
               {isCreatingFile ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  Creating...
+                  {t("filesystem.creating")}
                 </>
               ) : (
-                "Create File"
+                t("filesystem.createFileShort")
               )}
             </Button>
           </DialogFooter>
@@ -1941,10 +1981,10 @@ function App() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FolderPlus className="h-5 w-5 text-primary" />
-              Create New Subdirectory
+              {t("filesystem.createFolder")}
             </DialogTitle>
             <DialogDescription>
-              Create a new subfolder in your Espanso match directory.
+              {t("filesystem.createFolderDescription")}
             </DialogDescription>
           </DialogHeader>
 
@@ -1958,11 +1998,11 @@ function App() {
 
             <div className="space-y-2">
               <Label htmlFor="create-folder-name">
-                Folder Name <RequiredMark />
+                {t("filesystem.folderName")} <RequiredMark />
               </Label>
               <Input
                 id="create-folder-name"
-                placeholder="e.g. work or social"
+                placeholder={t("filesystem.folderNamePlaceholder")}
                 value={createFolderName}
                 onChange={(e) => {
                   setCreateFolderName(e.target.value);
@@ -1979,14 +2019,14 @@ function App() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="create-folder-parent">Target Location</Label>
+              <Label htmlFor="create-folder-parent">{t("filesystem.targetLocation")}</Label>
               <select
                 id="create-folder-parent"
                 className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 value={createFolderParentRelPath}
                 onChange={(e) => setCreateFolderParentRelPath(e.target.value)}
               >
-                <option value="">/ (Root Match Directory)</option>
+                <option value="">{t("filesystem.rootMatchDirectory")}</option>
                 {espansoDirectories.map((dir) => (
                   <option key={dir.relativePath} value={dir.relativePath}>
                     /{dir.relativePath}
@@ -1998,16 +2038,16 @@ function App() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsCreateFolderOpen(false)} disabled={isCreatingFolder}>
-              Cancel
+              {t("actions.cancel")}
             </Button>
             <Button onClick={handleCreateFolder} disabled={isCreatingFolder || !createFolderName.trim()}>
               {isCreatingFolder ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  Creating...
+                  {t("filesystem.creating")}
                 </>
               ) : (
-                "Create Folder"
+                t("filesystem.createFolderShort")
               )}
             </Button>
           </DialogFooter>
@@ -2154,6 +2194,7 @@ const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
   onCreateFile,
   onCreateFolder,
 }: EspansoConfigTreeNodeProps) {
+  const { t } = useI18n();
   const containsActive = activeAncestorPaths.has(node.relativePath || node.path);
   const [isOpen, setIsOpen] = useState<boolean>(containsActive);
 
@@ -2188,7 +2229,7 @@ const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
               <div className="truncate text-sm font-semibold tracking-tight">{node.name}</div>
             </div>
             {node.fileCount === 0 ? (
-              <span className="mr-1 text-[10px] font-normal text-muted-foreground/70">(empty)</span>
+              <span className="mr-1 text-[10px] font-normal text-muted-foreground/70">{t("filesystem.emptyFolderBadge")}</span>
             ) : (
               <span className="mr-1 rounded-full bg-muted/60 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
                 {node.fileCount}
@@ -2198,7 +2239,7 @@ const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
           <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
             <button
               className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent-foreground/10 hover:text-foreground"
-              title={`Create YAML file in ${node.name}`}
+              title={t("filesystem.createFileIn", { path: node.name })}
               onClick={(e) => {
                 e.stopPropagation();
                 onCreateFile?.(node.relativePath);
@@ -2208,7 +2249,7 @@ const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
             </button>
             <button
               className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent-foreground/10 hover:text-foreground"
-              title={`Create subdirectory in ${node.name}`}
+              title={t("filesystem.createFolderIn", { path: node.name })}
               onClick={(e) => {
                 e.stopPropagation();
                 onCreateFolder?.(node.relativePath);
@@ -2264,7 +2305,7 @@ const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
             "mr-1 flex h-6 w-6 shrink-0 items-center justify-center rounded opacity-70 transition hover:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
             isActive ? "hover:bg-primary-foreground/20 text-primary-foreground" : "hover:bg-accent-foreground/10 text-muted-foreground",
           )}
-          title={`Open ${node.name} in default app`}
+          title={t("filesystem.openFileInDefaultApp", { file: node.name })}
           onClick={() => onOpenFile(node.preview!.config.path)}
         >
           <SquareArrowOutUpRight className="h-3.5 w-3.5" />
@@ -2336,11 +2377,11 @@ function EspansoConfigDetail({
               type="button"
               onClick={() => onOpenWarnings?.(preview.config.path)}
               className="shrink-0 inline-flex items-center gap-1 rounded-md bg-amber-100 hover:bg-amber-200 px-2 py-1 text-xs text-amber-800 transition-colors cursor-pointer font-medium"
-              title="Click to view warnings for this file"
+              title={t("warnings.viewFileTitle")}
             >
               <AlertTriangle className="h-3.5 w-3.5 text-amber-700" />
               <span>
-                {preview.warningCount} {preview.warningCount === 1 ? "warning" : "warnings"}
+                {formatCount(t, preview.warningCount, "counts.warning", "counts.warnings")}
               </span>
             </button>
           )}
@@ -2353,11 +2394,11 @@ function EspansoConfigDetail({
       </div>
 
       <div className="grid h-9 shrink-0 grid-cols-[minmax(8rem,1.1fr)_3rem_minmax(6rem,0.65fr)_minmax(12rem,2fr)_2.25rem] items-center border-b bg-secondary/40 px-3 text-xs font-semibold text-muted-foreground">
-        <div className="truncate">Name</div>
+        <div className="truncate">{t("table.name")}</div>
         <div className="truncate text-center">A→</div>
-        <div className="truncate">Keyword</div>
-        <div className="truncate">Snippet</div>
-        <div className="sr-only">Details</div>
+        <div className="truncate">{t("table.keyword")}</div>
+        <div className="truncate">{t("table.snippet")}</div>
+        <div className="sr-only">{t("table.details")}</div>
       </div>
 
       <div
@@ -2374,7 +2415,7 @@ function EspansoConfigDetail({
               {visibleSnippets.map((snippet, offset) => {
                 const index = startIndex + offset;
                 const triggers = getSnippetTriggers(snippet);
-                const displayTrigger = triggers.length > 0 ? triggers.join(", ") : `Snippet ${index + 1}`;
+                const displayTrigger = triggers.length > 0 ? triggers.join(", ") : t("snippets.snippetNumber", { number: index + 1 });
                 const snippetKind = snippet.include_file
                   ? "file"
                   : snippet.image_path !== undefined
@@ -2387,15 +2428,15 @@ function EspansoConfigDetail({
                   : snippet.image_path !== undefined
                     ? `image: ${snippet.image_path}`
                     : snippet.form !== undefined
-                      ? snippet.form || "Empty form"
-                      : snippet.replace || "Empty replacement";
+                      ? snippet.form || t("snippets.emptyForm")
+                      : snippet.replace || t("snippets.emptyReplacement");
 
                 return (
                   <button
                     key={`${triggers.join("-")}-${index}`}
                     className="grid h-9 w-full grid-cols-[minmax(8rem,1.1fr)_3rem_minmax(6rem,0.65fr)_minmax(12rem,2fr)_2.25rem] items-center px-3 text-left text-sm transition-colors hover:bg-secondary/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                     onClick={() => onViewSnippet(preview.importedMatches[index] || { snippet, originalMatchIndex: index }, index)}
-                    title={`View details for ${displayTrigger}`}
+                    title={t("snippets.viewDetailsFor", { trigger: displayTrigger })}
                   >
                     <div className="min-w-0 pr-3">
                       <div className="truncate font-medium">
@@ -2413,12 +2454,12 @@ function EspansoConfigDetail({
                         )}
                         title={
                           snippetKind === "file"
-                            ? "External file snippet"
+                            ? t("snippets.externalFileSnippet")
                             : snippetKind === "image"
-                              ? "Image match snippet"
+                              ? t("snippets.imageMatchSnippet")
                               : snippetKind === "form"
-                                ? "Form snippet"
-                                : "Inline replacement snippet"
+                                ? t("snippets.formSnippet")
+                                : t("snippets.inlineReplacementSnippet")
                         }
                       />
                     </div>
@@ -2437,8 +2478,8 @@ function EspansoConfigDetail({
         ) : (
           <EmptyState
             icon={FileText}
-            title="No supported snippets"
-            description="This YAML file was found, but no supported Espanso matches could be previewed."
+            title={t("empty.noSupportedSnippets")}
+            description={t("empty.noSupportedSnippetsDescription")}
           />
         )}
       </div>
@@ -2459,6 +2500,8 @@ function EspansoDirectoryDetail({
   onCreateFile,
   onCreateFolder,
 }: EspansoDirectoryDetailProps) {
+  const { t } = useI18n();
+
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
       {/* Directory Header */}
@@ -2475,7 +2518,7 @@ function EspansoDirectoryDetail({
               </span>
             </div>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Directory • {node.fileCount} {node.fileCount === 1 ? "file" : "files"} • {node.snippetCount} {node.snippetCount === 1 ? "snippet" : "snippets"}
+              {t("filesystem.directory")} • {formatCount(t, node.fileCount, "counts.file", "counts.files")} • {formatCount(t, node.snippetCount, "counts.snippet", "counts.snippets")}
             </p>
           </div>
         </div>
@@ -2487,7 +2530,7 @@ function EspansoDirectoryDetail({
             className="gap-1.5"
           >
             <FilePlus className="h-4 w-4" />
-            New File
+            {t("filesystem.newFile")}
           </Button>
           <Button
             size="sm"
@@ -2496,7 +2539,7 @@ function EspansoDirectoryDetail({
             className="gap-1.5"
           >
             <FolderPlus className="h-4 w-4" />
-            New Subdirectory
+            {t("filesystem.newSubdirectory")}
           </Button>
         </div>
       </div>
@@ -2504,22 +2547,22 @@ function EspansoDirectoryDetail({
       {/* Directory Contents */}
       <ScrollArea className="flex-1 p-6">
         <div className="max-w-4xl space-y-4">
-          <h3 className="text-sm font-semibold text-foreground/80">Contents in {node.name}</h3>
+          <h3 className="text-sm font-semibold text-foreground/80">{t("filesystem.contentsIn", { name: node.name })}</h3>
           {!node.children || node.children.length === 0 ? (
             <div className="rounded-lg border border-dashed p-8 text-center bg-muted/10">
               <Folder className="h-10 w-10 text-muted-foreground/50 mx-auto mb-2" />
-              <p className="text-sm font-medium text-muted-foreground">This directory is empty</p>
+              <p className="text-sm font-medium text-muted-foreground">{t("empty.directoryEmpty")}</p>
               <p className="text-xs text-muted-foreground/70 mt-1 mb-4">
-                Create a new YAML file or subdirectory to start organizing snippets.
+                {t("empty.directoryEmptyDescription")}
               </p>
               <div className="flex justify-center gap-2">
                 <Button size="sm" onClick={() => onCreateFile(node.relativePath)}>
                   <FilePlus className="h-3.5 w-3.5 mr-1.5" />
-                  Create YAML File
+                  {t("filesystem.createYamlFile")}
                 </Button>
                 <Button size="sm" variant="outline" onClick={() => onCreateFolder(node.relativePath)}>
                   <FolderPlus className="h-3.5 w-3.5 mr-1.5" />
-                  Create Subdirectory
+                  {t("filesystem.createFolderShort")}
                 </Button>
               </div>
             </div>
@@ -2553,8 +2596,8 @@ function EspansoDirectoryDetail({
                       </div>
                       <div className="text-xs text-muted-foreground">
                         {child.isDir
-                          ? `${child.fileCount} file(s)`
-                          : `${child.snippetCount} snippet(s)`}
+                          ? formatCount(t, child.fileCount, "counts.file", "counts.files")
+                          : formatCount(t, child.snippetCount, "counts.snippet", "counts.snippets")}
                       </div>
                     </div>
                   </div>

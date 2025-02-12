@@ -76,7 +76,7 @@ export function WarningsDialog({
               <div className="flex items-center gap-2 text-amber-900 min-w-0">
                 <Filter className="h-3.5 w-3.5 shrink-0 text-amber-700" />
                 <span className="truncate">
-                  Filtering for: <strong>{activeFilterPreview.config.relativePath}</strong>
+                  {t("dialogs.warnings.filteringFor")}: <strong>{activeFilterPreview.config.relativePath}</strong>
                 </span>
               </div>
               {onClearFilter && (
@@ -86,7 +86,7 @@ export function WarningsDialog({
                   className="h-6 px-2 text-[11px] text-amber-800 hover:bg-amber-100 hover:text-amber-900"
                   onClick={onClearFilter}
                 >
-                  Show all files ({totalWarningsCount})
+                  {t("dialogs.warnings.showAllFiles", { count: totalWarningsCount })}
                 </Button>
               )}
             </div>
@@ -114,7 +114,7 @@ export function WarningsDialog({
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
                         <span className="rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 text-[11px] font-medium">
-                          {preview.warnings.length} {preview.warnings.length === 1 ? "warning" : "warnings"}
+                          {preview.warnings.length} {t(preview.warnings.length === 1 ? "counts.warning" : "counts.warnings")}
                         </span>
                         {onSelectFile && preview.config.path !== filterPath && (
                           <Button
@@ -126,7 +126,7 @@ export function WarningsDialog({
                               onOpenChange(false);
                             }}
                           >
-                            View In App
+                            {t("dialogs.warnings.viewInApp")}
                           </Button>
                         )}
                         {onOpenFileExternal && (
@@ -135,9 +135,9 @@ export function WarningsDialog({
                             variant="secondary"
                             className="h-6 px-2 text-[10px] gap-1"
                             onClick={() => onOpenFileExternal(preview.config.path)}
-                            title="Open YAML file in default external application"
+                            title={t("dialogs.warnings.openYamlExternalTitle")}
                           >
-                            <span>View YAML</span>
+                            <span>{t("dialogs.warnings.viewYaml")}</span>
                             <SquareArrowOutUpRight className="h-3 w-3" />
                           </Button>
                         )}
