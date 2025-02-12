@@ -121,6 +121,7 @@ Rules:
 - Keep React components focused on UI state and workflows; move reusable pure behavior into `src/logic/`.
 - Keep Rust changes in `src-tauri/src/` small and limited to native functionality that cannot be handled cleanly through Tauri plugins.
 - Use existing UI primitives in `src/components/ui/` and shared `cn()` from `src/lib/utils.ts`.
+- When changing user-facing behavior, MUST consider internationalization impact. New or changed visible UI copy, dialog text, alerts, validation/error messages surfaced to users, empty states, placeholders, tooltips, accessibility labels, and control text SHOULD use the existing `src/i18n/` translation system with matching keys in every locale instead of hardcoded English.
 - Run relevant tests/builds after changes. For frontend logic, prefer `npx vitest run`; for UI/build changes, run `npm run build`; for desktop integration, run `npm run tauri dev` or `npm run tauri build` when appropriate.
 
 ## Documentation Workflow
