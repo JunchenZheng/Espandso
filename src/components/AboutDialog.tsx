@@ -85,7 +85,7 @@ export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
                       variant="ghost"
                       className="h-7 px-2 text-xs text-muted-foreground group-hover:text-primary"
                       onClick={() => handleOpenLink(lib.url)}
-                      title={`Open ${lib.name} repository`}
+                      title={t("dialogs.about.openRepository", { name: lib.name })}
                     >
                       <span className="mr-1">GitHub</span>
                       <ExternalLink className="h-3 w-3" />

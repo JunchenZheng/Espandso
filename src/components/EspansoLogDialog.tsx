@@ -49,15 +49,15 @@ export function EspansoLogDialog({ open, onOpenChange }: EspansoLogDialogProps) 
         if (res.log) {
           setLogContent(res.log);
         }
-        setErrorMsg(res.message || "Failed to retrieve Espanso logs.");
+        setErrorMsg(res.message || t("errors.failedToRetrieveLogs"));
       }
       setLastUpdated(new Date());
     } catch (err: any) {
-      setErrorMsg(`Error fetching logs: ${err.message || err}`);
+      setErrorMsg(t("errors.errorFetchingLogs", { message: err.message || err }));
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [t]);
 
   // Poll for logs when open & autoRefresh enabled
   useEffect(() => {
@@ -136,7 +136,7 @@ export function EspansoLogDialog({ open, onOpenChange }: EspansoLogDialogProps) 
               <div className="flex items-center gap-2">
                 <DialogTitle className="text-base font-bold">{t("dialogs.logs.title")}</DialogTitle>
                 {autoRefresh && (
-                  <span className="flex h-2 w-2 relative" title="Realtime Polling Active">
+                  <span className="flex h-2 w-2 relative" title={t("dialogs.logs.realtimePollingActive")}>
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                   </span>
@@ -159,12 +159,12 @@ export function EspansoLogDialog({ open, onOpenChange }: EspansoLogDialogProps) 
               {autoRefresh ? (
                 <>
                   <PauseCircle className="h-3.5 w-3.5 text-amber-500" />
-                  <span>Pause</span>
+                  <span>{t("dialogs.logs.pause")}</span>
                 </>
               ) : (
                 <>
                   <PlayCircle className="h-3.5 w-3.5 text-emerald-500" />
-                  <span>Auto Refresh</span>
+                  <span>{t("dialogs.logs.autoRefresh")}</span>
                 </>
               )}
             </Button>
@@ -176,7 +176,7 @@ export function EspansoLogDialog({ open, onOpenChange }: EspansoLogDialogProps) 
               onClick={() => setAutoScroll(!autoScroll)}
             >
               <ArrowDownCircle className={`h-3.5 w-3.5 ${autoScroll ? "text-primary" : "text-muted-foreground"}`} />
-              <span>Scroll</span>
+              <span>{t("dialogs.logs.scroll")}</span>
             </Button>
 
             <Button
@@ -247,9 +247,9 @@ export function EspansoLogDialog({ open, onOpenChange }: EspansoLogDialogProps) 
         {/* Footer Statistics */}
         <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-1 border-t">
           <div className="flex items-center gap-3">
-            <span>Total Lines: <strong className="text-foreground">{lines.length}</strong></span>
+            <span>{t("dialogs.logs.totalLines")}: <strong className="text-foreground">{lines.length}</strong></span>
             {lastUpdated && (
-              <span>Last Updated: {lastUpdated.toLocaleTimeString()}</span>
+              <span>{t("dialogs.logs.lastUpdated")}: {lastUpdated.toLocaleTimeString()}</span>
             )}
           </div>
           <div className="flex items-center gap-2">
