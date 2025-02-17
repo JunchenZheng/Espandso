@@ -8,6 +8,7 @@
     "build": "tsc && vite build",
     "build:frontend": "vite build",
     "preview": "vite preview",
+    "generate:icons": "./scripts/generate_icons.sh",
     "tauri": "tauri"
   },
   "dependencies": {
