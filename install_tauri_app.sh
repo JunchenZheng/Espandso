@@ -199,7 +199,7 @@ check_and_generate_icons() {
   fi
 
   if [ -z "$icon_src" ]; then
-    echo "未找到源图标文件，跳过图标生成。"
+    echo "Source icon file not found, skipping icon generation."
     return
   fi
 
@@ -218,10 +218,10 @@ check_and_generate_icons() {
   fi
 
   if [ -z "$previous_hash" ] || [ "$current_hash" != "$previous_hash" ]; then
-    echo "检测到源图标文件 ($icon_src) 变更或未初始化，正在自动重新生成图标..."
+    echo "Source icon file ($icon_src) changed or uninitialized, regenerating icons..."
     "$ROOT_DIR/scripts/generate_icons.sh" "$icon_src"
   else
-    echo "源图标文件未发生变更 (${current_hash:0:8})，跳过图标生成。"
+    echo "Source icon file unchanged (${current_hash:0:8}), skipping icon generation."
   fi
 }
 
