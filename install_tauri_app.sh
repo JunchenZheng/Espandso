@@ -182,7 +182,51 @@ install_app() {
   open "$DEST_APP_PATH"
 }
 
+check_and_generate_icons() {
+  local HASH_FILE="$ROOT_DIR/src-tauri/.icon_hash"
+  local icon_src=""
+
+  if [ -f "$ROOT_DIR/icon.svg" ]; then
+    icon_src="$ROOT_DIR/icon.svg"
+  elif [ -f "$ROOT_DIR/logo.svg" ]; then
+    icon_src="$ROOT_DIR/logo.svg"
+  elif [ -f "$ROOT_DIR/icon.png" ]; then
+    icon_src="$ROOT_DIR/icon.png"
+  elif [ -f "$ROOT_DIR/logo.png" ]; then
+    icon_src="$ROOT_DIR/logo.png"
+  elif [ -f "$ROOT_DIR/logo.jpg" ]; then
+    icon_src="$ROOT_DIR/logo.jpg"
+  fi
+
+  if [ -z "$icon_src" ]; then
+    echo "未找到源图标文件，跳过图标生成。"
+    return
+  fi
+
+  local current_hash=""
+  if command_exists shasum; then
+    current_hash="$(shasum -a 256 "$icon_src" | awk '{print $1}')"
+  elif command_exists sha256sum; then
+    current_hash="$(sha256sum "$icon_src" | awk '{print $1}')"
+  elif command_exists md5; then
+    current_hash="$(md5 -q "$icon_src")"
+  fi
+
+  local previous_hash=""
+  if [ -f "$HASH_FILE" ]; then
+    previous_hash="$(cat "$HASH_FILE" 2>/dev/null || true)"
+  fi
+
+  if [ -z "$previous_hash" ] || [ "$current_hash" != "$previous_hash" ]; then
+    echo "检测到源图标文件 ($icon_src) 变更或未初始化，正在自动重新生成图标..."
+    "$ROOT_DIR/scripts/generate_icons.sh" "$icon_src"
+  else
+    echo "源图标文件未发生变更 (${current_hash:0:8})，跳过图标生成。"
+  fi
+}
+
 ensure_build_tools
 install_npm_environment
+check_and_generate_icons
 build_tauri_app
 install_app

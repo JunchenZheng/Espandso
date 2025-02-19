@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+HASH_FILE="$ROOT_DIR/src-tauri/.icon_hash"
 cd "$ROOT_DIR"
 
 INPUT_FILE="${1:-}"
@@ -32,6 +33,13 @@ fi
 echo "正在从源图标文件 '$INPUT_FILE' 生成 src-tauri/icons 中的所有图标..."
 npm run tauri -- icon "$INPUT_FILE"
 
+# 记录当前源图标文件的 Hash
+if command -v shasum >/dev/null 2>&1; then
+  shasum -a 256 "$INPUT_FILE" | awk '{print $1}' > "$HASH_FILE"
+elif command -v sha256sum >/dev/null 2>&1; then
+  sha256sum "$INPUT_FILE" | awk '{print $1}' > "$HASH_FILE"
+fi
+
 echo ""
-echo "✅ 图标资源成功已更新至 src-tauri/icons/ 目录！"
+echo "✅ 图标资源已成功更新至 src-tauri/icons/ 目录！"
 echo "你可以运行 ./install_tauri_app.sh 重新编译并安装 Desktop 应用以应用新图标。"
