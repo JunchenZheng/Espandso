@@ -1179,19 +1179,19 @@ function App() {
                         size="sm"
                         variant="ghost"
                         className="h-7 w-7 p-0"
-                        title={activeDirectoryRelPath ? t("filesystem.createFileIn", { path: `/${activeDirectoryRelPath}` }) : t("filesystem.createFile")}
-                        onClick={() => openCreateFileDialog()}
+                        title={activeDirectoryRelPath ? t("filesystem.createFolderIn", { path: `/${activeDirectoryRelPath}` }) : t("filesystem.createFolder")}
+                        onClick={() => openCreateFolderDialog()}
                       >
-                        <FilePlus className="h-4 w-4" />
+                        <FolderPlus className="h-4 w-4" />
                       </Button>
                       <Button
                         size="sm"
                         variant="ghost"
                         className="h-7 w-7 p-0"
-                        title={activeDirectoryRelPath ? t("filesystem.createFolderIn", { path: `/${activeDirectoryRelPath}` }) : t("filesystem.createFolder")}
-                        onClick={() => openCreateFolderDialog()}
+                        title={activeDirectoryRelPath ? t("filesystem.createFileIn", { path: `/${activeDirectoryRelPath}` }) : t("filesystem.createFile")}
+                        onClick={() => openCreateFileDialog()}
                       >
-                        <FolderPlus className="h-4 w-4" />
+                        <FilePlus className="h-4 w-4" />
                       </Button>
                       <span className="ml-1 text-xs text-muted-foreground">{espansoPreviewList.length}</span>
                     </div>
@@ -1259,13 +1259,13 @@ function App() {
               </p>
               {!isScanningEspanso && (
                 <div className="flex flex-wrap justify-center gap-3">
-                  <Button onClick={() => openCreateFileDialog("")}>
-                    <FilePlus className="h-4 w-4 mr-2" />
-                    {t("filesystem.createFile")}
-                  </Button>
-                  <Button variant="outline" onClick={() => openCreateFolderDialog("")}>
+                  <Button onClick={() => openCreateFolderDialog("")}>
                     <FolderPlus className="h-4 w-4 mr-2" />
                     {t("filesystem.createFolder")}
+                  </Button>
+                  <Button variant="outline" onClick={() => openCreateFileDialog("")}>
+                    <FilePlus className="h-4 w-4 mr-2" />
+                    {t("filesystem.createFile")}
                   </Button>
                   <Button variant="ghost" onClick={scanDefaultEspansoConfigDir}>
                     <RefreshCw className="h-4 w-4 mr-2" />
@@ -2239,16 +2239,6 @@ const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
           <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
             <button
               className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent-foreground/10 hover:text-foreground"
-              title={t("filesystem.createFileIn", { path: node.name })}
-              onClick={(e) => {
-                e.stopPropagation();
-                onCreateFile?.(node.relativePath);
-              }}
-            >
-              <FilePlus className="h-3.5 w-3.5" />
-            </button>
-            <button
-              className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent-foreground/10 hover:text-foreground"
               title={t("filesystem.createFolderIn", { path: node.name })}
               onClick={(e) => {
                 e.stopPropagation();
@@ -2256,6 +2246,16 @@ const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
               }}
             >
               <FolderPlus className="h-3.5 w-3.5" />
+            </button>
+            <button
+              className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent-foreground/10 hover:text-foreground"
+              title={t("filesystem.createFileIn", { path: node.name })}
+              onClick={(e) => {
+                e.stopPropagation();
+                onCreateFile?.(node.relativePath);
+              }}
+            >
+              <FilePlus className="h-3.5 w-3.5" />
             </button>
           </div>
         </div>
@@ -2526,20 +2526,20 @@ function EspansoDirectoryDetail({
         <div className="flex items-center gap-2">
           <Button
             size="sm"
-            onClick={() => onCreateFile(node.relativePath)}
-            className="gap-1.5"
-          >
-            <FilePlus className="h-4 w-4" />
-            {t("filesystem.newFile")}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
             onClick={() => onCreateFolder(node.relativePath)}
             className="gap-1.5"
           >
             <FolderPlus className="h-4 w-4" />
             {t("filesystem.newSubdirectory")}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => onCreateFile(node.relativePath)}
+            className="gap-1.5"
+          >
+            <FilePlus className="h-4 w-4" />
+            {t("filesystem.newFile")}
           </Button>
         </div>
       </div>
@@ -2556,13 +2556,13 @@ function EspansoDirectoryDetail({
                 {t("empty.directoryEmptyDescription")}
               </p>
               <div className="flex justify-center gap-2">
-                <Button size="sm" onClick={() => onCreateFile(node.relativePath)}>
-                  <FilePlus className="h-3.5 w-3.5 mr-1.5" />
-                  {t("filesystem.createYamlFile")}
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => onCreateFolder(node.relativePath)}>
+                <Button size="sm" onClick={() => onCreateFolder(node.relativePath)}>
                   <FolderPlus className="h-3.5 w-3.5 mr-1.5" />
                   {t("filesystem.createFolderShort")}
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => onCreateFile(node.relativePath)}>
+                  <FilePlus className="h-3.5 w-3.5 mr-1.5" />
+                  {t("filesystem.createYamlFile")}
                 </Button>
               </div>
             </div>
