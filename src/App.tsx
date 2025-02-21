@@ -11,6 +11,7 @@ import {
   FilePlus,
   FileSearch,
   FileText,
+  FlaskConical,
   Folder,
   FolderOpen,
   FolderPlus,
@@ -48,10 +49,17 @@ import {
 import { Input } from "./components/ui/input";
 import { Label } from "./components/ui/label";
 import { ScrollArea } from "./components/ui/scroll-area";
+import { Switch } from "./components/ui/switch";
 import { Textarea } from "./components/ui/textarea";
 import { AboutDialog } from "./components/AboutDialog";
 import { EspansoLogDialog } from "./components/EspansoLogDialog";
 import { WarningsDialog } from "./components/WarningsDialog";
+import {
+  IS_EXPERIMENTAL_BUILD,
+  getExperimentalYamlWarningsEnabled,
+  setExperimentalYamlWarningsEnabled,
+  isYamlWarningsActive,
+} from "./logic/features";
 import { Snippet, ValidationError } from "./logic/types";
 import { validate } from "./logic/validate";
 import { importYamlContent, ImportedMatch } from "./logic/importYaml";
@@ -311,22 +319,48 @@ function App() {
   const [isSavingSnippet, setIsSavingSnippet] = useState<boolean>(false);
   const formTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
+  const [enableExperimentalYamlWarnings, setEnableExperimentalYamlWarnings] = useState<boolean>(() =>
+    getExperimentalYamlWarningsEnabled(),
+  );
+
+  const isYamlWarningsEnabled = useMemo(
+    () => isYamlWarningsActive(enableExperimentalYamlWarnings),
+    [enableExperimentalYamlWarnings],
+  );
+
+  const handleToggleExperimentalYamlWarnings = (checked: boolean) => {
+    setEnableExperimentalYamlWarnings(checked);
+    setExperimentalYamlWarningsEnabled(checked);
+  };
+
   const espansoPreviewList = useMemo(
-    () => espansoConfigPreviews.length > 0
-      ? espansoConfigPreviews
-      : espansoConfigs.map((config) => ({
-        config,
-        snippetCount: 0,
-        inlineCount: 0,
-        resourceCount: 0,
-        imageCount: 0,
-        formCount: 0,
+    () => {
+      const rawList = espansoConfigPreviews.length > 0
+        ? espansoConfigPreviews
+        : espansoConfigs.map((config) => ({
+          config,
+          snippetCount: 0,
+          inlineCount: 0,
+          resourceCount: 0,
+          imageCount: 0,
+          formCount: 0,
+          warningCount: 0,
+          warnings: [],
+          snippets: [],
+          importedMatches: [],
+        }));
+
+      if (isYamlWarningsEnabled) {
+        return rawList;
+      }
+
+      return rawList.map((item) => ({
+        ...item,
         warningCount: 0,
         warnings: [],
-        snippets: [],
-        importedMatches: [],
-      })),
-    [espansoConfigPreviews, espansoConfigs],
+      }));
+    },
+    [espansoConfigPreviews, espansoConfigs, isYamlWarningsEnabled],
   );
 
   const espansoPreviewTotals = useMemo(
@@ -1302,7 +1336,7 @@ function App() {
           </DialogHeader>
 
           <div className="min-h-0 space-y-5 overflow-auto pr-1">
-            {(addErrors.length > 0 || addWarnings.length > 0) && (
+            {(addErrors.length > 0 || (isYamlWarningsEnabled && addWarnings.length > 0)) && (
               <div
                 className={cn(
                   "space-y-2 rounded-lg border p-4 text-sm",
@@ -1317,12 +1351,13 @@ function App() {
                     <span>{e.message}</span>
                   </div>
                 ))}
-                {addWarnings.map((w, idx) => (
-                  <div key={`warn-${idx}`} className="flex gap-2">
-                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                    <span>{w}</span>
-                  </div>
-                ))}
+                {isYamlWarningsEnabled &&
+                  addWarnings.map((w, idx) => (
+                    <div key={`warn-${idx}`} className="flex gap-2">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                      <span>{w}</span>
+                    </div>
+                  ))}
               </div>
             )}
 
@@ -1812,6 +1847,32 @@ function App() {
                 </div>
               </div>
             </div>
+
+            {/* Experimental Features Block */}
+            {IS_EXPERIMENTAL_BUILD && (
+              <div className="rounded-lg border bg-secondary/40 p-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-background text-primary">
+                    <FlaskConical className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-3">
+                      <Label htmlFor="experimental-yaml-warnings" className="text-sm font-semibold cursor-pointer">
+                        {t("settings.enableYamlWarnings")}
+                      </Label>
+                      <Switch
+                        id="experimental-yaml-warnings"
+                        checked={enableExperimentalYamlWarnings}
+                        onCheckedChange={handleToggleExperimentalYamlWarnings}
+                      />
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {t("settings.enableYamlWarningsDescription")}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter className="sm:justify-between">
             <Button

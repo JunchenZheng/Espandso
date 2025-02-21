@@ -11,22 +11,48 @@ if [ -z "$CONFIGURATION" ]; then
     CONFIGURATION="release"
   fi
 fi
-DEST_DIR="${1:-/Applications}"
+DEST_DIR="/Applications"
+SKIP_NPM_SETUP="${SKIP_NPM_SETUP:-0}"
+NO_SIGN="${NO_SIGN:-0}"
+ENABLE_EXPERIMENTAL="${ENABLE_EXPERIMENTAL:-0}"
+
+# Parse optional arguments
+for arg in "$@"; do
+  case "$arg" in
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    -e|--experimental)
+      ENABLE_EXPERIMENTAL=1
+      ;;
+    -*)
+      echo "Unknown option: $arg" >&2
+      exit 1
+      ;;
+    *)
+      DEST_DIR="$arg"
+      ;;
+  esac
+done
+
 APP_NAME="${APP_NAME:-Expandso.app}"
 BUILT_APP_PATH="$ROOT_DIR/src-tauri/target/$CONFIGURATION/bundle/macos/$APP_NAME"
 DEST_APP_PATH="$DEST_DIR/$APP_NAME"
-SKIP_NPM_SETUP="${SKIP_NPM_SETUP:-0}"
-NO_SIGN="${NO_SIGN:-0}"
 
 usage() {
   cat <<'EOF'
-Usage: ./install_tauri_app.sh [destination-dir]
+Usage: ./install_tauri_app.sh [options] [destination-dir]
 
 Builds the Tauri macOS .app bundle and installs it locally.
 
 Defaults:
   destination-dir        /Applications
   build mode             fast debug build
+
+Options:
+  -e, --experimental     Enable experimental features (e.g. YAML warnings) in build.
+  -h, --help             Show this help message.
 
 Environment:
   CONFIGURATION=debug    Tauri/Rust build profile to install from.
@@ -37,13 +63,9 @@ Environment:
   FORCE_NPM_INSTALL=1    Force scripts/setup_npm_env.sh to reinstall npm dependencies.
   NO_SIGN=1              Pass --no-sign to tauri build.
   SKIP_NPM_SETUP=1       Skip scripts/setup_npm_env.sh.
+  ENABLE_EXPERIMENTAL=1  Include experimental features in build (default: 0).
 EOF
 }
-
-if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
-  usage
-  exit 0
-fi
 
 command_exists() {
   command -v "$1" >/dev/null 2>&1
@@ -99,6 +121,13 @@ build_tauri_app() {
   cd "$ROOT_DIR"
   local tauri_args
   tauri_args=(build --bundles app)
+
+  if [ "$ENABLE_EXPERIMENTAL" = "1" ] || [ "$ENABLE_EXPERIMENTAL" = "true" ]; then
+    echo "Experimental features enabled for this build."
+    export VITE_ENABLE_EXPERIMENTAL=true
+  else
+    export VITE_ENABLE_EXPERIMENTAL=false
+  fi
 
   if [ "$CONFIGURATION" = "debug" ]; then
     tauri_args+=(--debug)
