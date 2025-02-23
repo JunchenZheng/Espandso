@@ -69,6 +69,10 @@ export const en = {
     notDetected: "Not detected",
     resolvedWithCli: "Resolved with espanso path",
     usingPlatformDefault: "Using platform default path",
+    experimentalTitle: "Experimental Features",
+    experimentalDescription: "Features under active testing.",
+    enableYamlWarnings: "YAML Detection & Warnings",
+    enableYamlWarningsDescription: "Scan YAML files for duplicate triggers and potential syntax warnings.",
   },
   stats: {
     totalSnippets: "Total Snippets",

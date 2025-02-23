@@ -71,6 +71,10 @@ export const zhCN: TranslationTree = {
     notDetected: "未检测到",
     resolvedWithCli: "通过 espanso path 解析",
     usingPlatformDefault: "使用平台默认路径",
+    experimentalTitle: "实验性功能",
+    experimentalDescription: "尚在测试中的试验性功能。",
+    enableYamlWarnings: "YAML 文件检测与警告",
+    enableYamlWarningsDescription: "自动扫描 YAML 文件中的重复触发词与潜在语法警告。",
   },
   stats: {
     totalSnippets: "片段总数",

@@ -11,6 +11,7 @@ import {
   FilePlus,
   FileSearch,
   FileText,
+  FlaskConical,
   Folder,
   FolderOpen,
   FolderPlus,
@@ -48,10 +49,17 @@ import {
 import { Input } from "./components/ui/input";
 import { Label } from "./components/ui/label";
 import { ScrollArea } from "./components/ui/scroll-area";
+import { Switch } from "./components/ui/switch";
 import { Textarea } from "./components/ui/textarea";
 import { AboutDialog } from "./components/AboutDialog";
 import { EspansoLogDialog } from "./components/EspansoLogDialog";
 import { WarningsDialog } from "./components/WarningsDialog";
+import {
+  IS_EXPERIMENTAL_BUILD,
+  getExperimentalYamlWarningsEnabled,
+  setExperimentalYamlWarningsEnabled,
+  isYamlWarningsActive,
+} from "./logic/features";
 import { Snippet, ValidationError } from "./logic/types";
 import { validate } from "./logic/validate";
 import { importYamlContent, ImportedMatch } from "./logic/importYaml";
@@ -311,22 +319,48 @@ function App() {
   const [isSavingSnippet, setIsSavingSnippet] = useState<boolean>(false);
   const formTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
+  const [enableExperimentalYamlWarnings, setEnableExperimentalYamlWarnings] = useState<boolean>(() =>
+    getExperimentalYamlWarningsEnabled(),
+  );
+
+  const isYamlWarningsEnabled = useMemo(
+    () => isYamlWarningsActive(enableExperimentalYamlWarnings),
+    [enableExperimentalYamlWarnings],
+  );
+
+  const handleToggleExperimentalYamlWarnings = (checked: boolean) => {
+    setEnableExperimentalYamlWarnings(checked);
+    setExperimentalYamlWarningsEnabled(checked);
+  };
+
   const espansoPreviewList = useMemo(
-    () => espansoConfigPreviews.length > 0
-      ? espansoConfigPreviews
-      : espansoConfigs.map((config) => ({
-        config,
-        snippetCount: 0,
-        inlineCount: 0,
-        resourceCount: 0,
-        imageCount: 0,
-        formCount: 0,
+    () => {
+      const rawList = espansoConfigPreviews.length > 0
+        ? espansoConfigPreviews
+        : espansoConfigs.map((config) => ({
+          config,
+          snippetCount: 0,
+          inlineCount: 0,
+          resourceCount: 0,
+          imageCount: 0,
+          formCount: 0,
+          warningCount: 0,
+          warnings: [],
+          snippets: [],
+          importedMatches: [],
+        }));
+
+      if (isYamlWarningsEnabled) {
+        return rawList;
+      }
+
+      return rawList.map((item) => ({
+        ...item,
         warningCount: 0,
         warnings: [],
-        snippets: [],
-        importedMatches: [],
-      })),
-    [espansoConfigPreviews, espansoConfigs],
+      }));
+    },
+    [espansoConfigPreviews, espansoConfigs, isYamlWarningsEnabled],
   );
 
   const espansoPreviewTotals = useMemo(
@@ -1179,19 +1213,19 @@ function App() {
                         size="sm"
                         variant="ghost"
                         className="h-7 w-7 p-0"
-                        title={activeDirectoryRelPath ? t("filesystem.createFileIn", { path: `/${activeDirectoryRelPath}` }) : t("filesystem.createFile")}
-                        onClick={() => openCreateFileDialog()}
+                        title={activeDirectoryRelPath ? t("filesystem.createFolderIn", { path: `/${activeDirectoryRelPath}` }) : t("filesystem.createFolder")}
+                        onClick={() => openCreateFolderDialog()}
                       >
-                        <FilePlus className="h-4 w-4" />
+                        <FolderPlus className="h-4 w-4" />
                       </Button>
                       <Button
                         size="sm"
                         variant="ghost"
                         className="h-7 w-7 p-0"
-                        title={activeDirectoryRelPath ? t("filesystem.createFolderIn", { path: `/${activeDirectoryRelPath}` }) : t("filesystem.createFolder")}
-                        onClick={() => openCreateFolderDialog()}
+                        title={activeDirectoryRelPath ? t("filesystem.createFileIn", { path: `/${activeDirectoryRelPath}` }) : t("filesystem.createFile")}
+                        onClick={() => openCreateFileDialog()}
                       >
-                        <FolderPlus className="h-4 w-4" />
+                        <FilePlus className="h-4 w-4" />
                       </Button>
                       <span className="ml-1 text-xs text-muted-foreground">{espansoPreviewList.length}</span>
                     </div>
@@ -1259,13 +1293,13 @@ function App() {
               </p>
               {!isScanningEspanso && (
                 <div className="flex flex-wrap justify-center gap-3">
-                  <Button onClick={() => openCreateFileDialog("")}>
-                    <FilePlus className="h-4 w-4 mr-2" />
-                    {t("filesystem.createFile")}
-                  </Button>
-                  <Button variant="outline" onClick={() => openCreateFolderDialog("")}>
+                  <Button onClick={() => openCreateFolderDialog("")}>
                     <FolderPlus className="h-4 w-4 mr-2" />
                     {t("filesystem.createFolder")}
+                  </Button>
+                  <Button variant="outline" onClick={() => openCreateFileDialog("")}>
+                    <FilePlus className="h-4 w-4 mr-2" />
+                    {t("filesystem.createFile")}
                   </Button>
                   <Button variant="ghost" onClick={scanDefaultEspansoConfigDir}>
                     <RefreshCw className="h-4 w-4 mr-2" />
@@ -1302,7 +1336,7 @@ function App() {
           </DialogHeader>
 
           <div className="min-h-0 space-y-5 overflow-auto pr-1">
-            {(addErrors.length > 0 || addWarnings.length > 0) && (
+            {(addErrors.length > 0 || (isYamlWarningsEnabled && addWarnings.length > 0)) && (
               <div
                 className={cn(
                   "space-y-2 rounded-lg border p-4 text-sm",
@@ -1317,12 +1351,13 @@ function App() {
                     <span>{e.message}</span>
                   </div>
                 ))}
-                {addWarnings.map((w, idx) => (
-                  <div key={`warn-${idx}`} className="flex gap-2">
-                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                    <span>{w}</span>
-                  </div>
-                ))}
+                {isYamlWarningsEnabled &&
+                  addWarnings.map((w, idx) => (
+                    <div key={`warn-${idx}`} className="flex gap-2">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                      <span>{w}</span>
+                    </div>
+                  ))}
               </div>
             )}
 
@@ -1812,6 +1847,32 @@ function App() {
                 </div>
               </div>
             </div>
+
+            {/* Experimental Features Block */}
+            {IS_EXPERIMENTAL_BUILD && (
+              <div className="rounded-lg border bg-secondary/40 p-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-background text-primary">
+                    <FlaskConical className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-3">
+                      <Label htmlFor="experimental-yaml-warnings" className="text-sm font-semibold cursor-pointer">
+                        {t("settings.enableYamlWarnings")}
+                      </Label>
+                      <Switch
+                        id="experimental-yaml-warnings"
+                        checked={enableExperimentalYamlWarnings}
+                        onCheckedChange={handleToggleExperimentalYamlWarnings}
+                      />
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {t("settings.enableYamlWarningsDescription")}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter className="sm:justify-between">
             <Button
@@ -2239,16 +2300,6 @@ const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
           <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
             <button
               className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent-foreground/10 hover:text-foreground"
-              title={t("filesystem.createFileIn", { path: node.name })}
-              onClick={(e) => {
-                e.stopPropagation();
-                onCreateFile?.(node.relativePath);
-              }}
-            >
-              <FilePlus className="h-3.5 w-3.5" />
-            </button>
-            <button
-              className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent-foreground/10 hover:text-foreground"
               title={t("filesystem.createFolderIn", { path: node.name })}
               onClick={(e) => {
                 e.stopPropagation();
@@ -2256,6 +2307,16 @@ const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
               }}
             >
               <FolderPlus className="h-3.5 w-3.5" />
+            </button>
+            <button
+              className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent-foreground/10 hover:text-foreground"
+              title={t("filesystem.createFileIn", { path: node.name })}
+              onClick={(e) => {
+                e.stopPropagation();
+                onCreateFile?.(node.relativePath);
+              }}
+            >
+              <FilePlus className="h-3.5 w-3.5" />
             </button>
           </div>
         </div>
@@ -2526,20 +2587,20 @@ function EspansoDirectoryDetail({
         <div className="flex items-center gap-2">
           <Button
             size="sm"
-            onClick={() => onCreateFile(node.relativePath)}
-            className="gap-1.5"
-          >
-            <FilePlus className="h-4 w-4" />
-            {t("filesystem.newFile")}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
             onClick={() => onCreateFolder(node.relativePath)}
             className="gap-1.5"
           >
             <FolderPlus className="h-4 w-4" />
             {t("filesystem.newSubdirectory")}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => onCreateFile(node.relativePath)}
+            className="gap-1.5"
+          >
+            <FilePlus className="h-4 w-4" />
+            {t("filesystem.newFile")}
           </Button>
         </div>
       </div>
@@ -2556,13 +2617,13 @@ function EspansoDirectoryDetail({
                 {t("empty.directoryEmptyDescription")}
               </p>
               <div className="flex justify-center gap-2">
-                <Button size="sm" onClick={() => onCreateFile(node.relativePath)}>
-                  <FilePlus className="h-3.5 w-3.5 mr-1.5" />
-                  {t("filesystem.createYamlFile")}
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => onCreateFolder(node.relativePath)}>
+                <Button size="sm" onClick={() => onCreateFolder(node.relativePath)}>
                   <FolderPlus className="h-3.5 w-3.5 mr-1.5" />
                   {t("filesystem.createFolderShort")}
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => onCreateFile(node.relativePath)}>
+                  <FilePlus className="h-3.5 w-3.5 mr-1.5" />
+                  {t("filesystem.createYamlFile")}
                 </Button>
               </div>
             </div>
