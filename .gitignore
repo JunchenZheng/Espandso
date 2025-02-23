@@ -234,6 +234,7 @@ yarn-error.log*
 src-tauri/target/
 src-tauri/binaries/
 src-tauri/gen/schemas/
+src-tauri/.icon_hash
 .tauri/
 
 # Frontend build output

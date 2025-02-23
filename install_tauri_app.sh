@@ -11,22 +11,48 @@ if [ -z "$CONFIGURATION" ]; then
     CONFIGURATION="release"
   fi
 fi
-DEST_DIR="${1:-/Applications}"
+DEST_DIR="/Applications"
+SKIP_NPM_SETUP="${SKIP_NPM_SETUP:-0}"
+NO_SIGN="${NO_SIGN:-0}"
+ENABLE_EXPERIMENTAL="${ENABLE_EXPERIMENTAL:-0}"
+
+# Parse optional arguments
+for arg in "$@"; do
+  case "$arg" in
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    -e|--experimental)
+      ENABLE_EXPERIMENTAL=1
+      ;;
+    -*)
+      echo "Unknown option: $arg" >&2
+      exit 1
+      ;;
+    *)
+      DEST_DIR="$arg"
+      ;;
+  esac
+done
+
 APP_NAME="${APP_NAME:-Expandso.app}"
 BUILT_APP_PATH="$ROOT_DIR/src-tauri/target/$CONFIGURATION/bundle/macos/$APP_NAME"
 DEST_APP_PATH="$DEST_DIR/$APP_NAME"
-SKIP_NPM_SETUP="${SKIP_NPM_SETUP:-0}"
-NO_SIGN="${NO_SIGN:-0}"
 
 usage() {
   cat <<'EOF'
-Usage: ./install_tauri_app.sh [destination-dir]
+Usage: ./install_tauri_app.sh [options] [destination-dir]
 
 Builds the Tauri macOS .app bundle and installs it locally.
 
 Defaults:
   destination-dir        /Applications
   build mode             fast debug build
+
+Options:
+  -e, --experimental     Enable experimental features (e.g. YAML warnings) in build.
+  -h, --help             Show this help message.
 
 Environment:
   CONFIGURATION=debug    Tauri/Rust build profile to install from.
@@ -37,13 +63,9 @@ Environment:
   FORCE_NPM_INSTALL=1    Force scripts/setup_npm_env.sh to reinstall npm dependencies.
   NO_SIGN=1              Pass --no-sign to tauri build.
   SKIP_NPM_SETUP=1       Skip scripts/setup_npm_env.sh.
+  ENABLE_EXPERIMENTAL=1  Include experimental features in build (default: 0).
 EOF
 }
-
-if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
-  usage
-  exit 0
-fi
 
 command_exists() {
   command -v "$1" >/dev/null 2>&1
@@ -99,6 +121,13 @@ build_tauri_app() {
   cd "$ROOT_DIR"
   local tauri_args
   tauri_args=(build --bundles app)
+
+  if [ "$ENABLE_EXPERIMENTAL" = "1" ] || [ "$ENABLE_EXPERIMENTAL" = "true" ]; then
+    echo "Experimental features enabled for this build."
+    export VITE_ENABLE_EXPERIMENTAL=true
+  else
+    export VITE_ENABLE_EXPERIMENTAL=false
+  fi
 
   if [ "$CONFIGURATION" = "debug" ]; then
     tauri_args+=(--debug)
@@ -182,7 +211,51 @@ install_app() {
   open "$DEST_APP_PATH"
 }
 
+check_and_generate_icons() {
+  local HASH_FILE="$ROOT_DIR/src-tauri/.icon_hash"
+  local icon_src=""
+
+  if [ -f "$ROOT_DIR/icon.svg" ]; then
+    icon_src="$ROOT_DIR/icon.svg"
+  elif [ -f "$ROOT_DIR/logo.svg" ]; then
+    icon_src="$ROOT_DIR/logo.svg"
+  elif [ -f "$ROOT_DIR/icon.png" ]; then
+    icon_src="$ROOT_DIR/icon.png"
+  elif [ -f "$ROOT_DIR/logo.png" ]; then
+    icon_src="$ROOT_DIR/logo.png"
+  elif [ -f "$ROOT_DIR/logo.jpg" ]; then
+    icon_src="$ROOT_DIR/logo.jpg"
+  fi
+
+  if [ -z "$icon_src" ]; then
+    echo "Source icon file not found, skipping icon generation."
+    return
+  fi
+
+  local current_hash=""
+  if command_exists shasum; then
+    current_hash="$(shasum -a 256 "$icon_src" | awk '{print $1}')"
+  elif command_exists sha256sum; then
+    current_hash="$(sha256sum "$icon_src" | awk '{print $1}')"
+  elif command_exists md5; then
+    current_hash="$(md5 -q "$icon_src")"
+  fi
+
+  local previous_hash=""
+  if [ -f "$HASH_FILE" ]; then
+    previous_hash="$(cat "$HASH_FILE" 2>/dev/null || true)"
+  fi
+
+  if [ -z "$previous_hash" ] || [ "$current_hash" != "$previous_hash" ]; then
+    echo "Source icon file ($icon_src) changed or uninitialized, regenerating icons..."
+    "$ROOT_DIR/scripts/generate_icons.sh" "$icon_src"
+  else
+    echo "Source icon file unchanged (${current_hash:0:8}), skipping icon generation."
+  fi
+}
+
 ensure_build_tools
 install_npm_environment
+check_and_generate_icons
 build_tauri_app
 install_app
