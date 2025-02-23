@@ -237,5 +237,8 @@ src-tauri/gen/schemas/
 src-tauri/.icon_hash
 .tauri/
 
+# Change logs
+.change_log/
+
 # Frontend build output
 dist-gui/
