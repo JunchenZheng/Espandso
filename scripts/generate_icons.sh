@@ -16,8 +16,6 @@ if [ -z "$INPUT_FILE" ]; then
     INPUT_FILE="$ROOT_DIR/icon.png"
   elif [ -f "$ROOT_DIR/logo.png" ]; then
     INPUT_FILE="$ROOT_DIR/logo.png"
-  elif [ -f "$ROOT_DIR/logo.jpg" ]; then
-    INPUT_FILE="$ROOT_DIR/logo.jpg"
   else
     echo "Error: Source icon file not found! Place icon.svg, logo.svg, or icon.png in the project root or specify an input file path." >&2
     echo "Usage: ./scripts/generate_icons.sh [source-image-path]" >&2
