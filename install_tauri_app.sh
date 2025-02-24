@@ -223,8 +223,6 @@ check_and_generate_icons() {
     icon_src="$ROOT_DIR/icon.png"
   elif [ -f "$ROOT_DIR/logo.png" ]; then
     icon_src="$ROOT_DIR/logo.png"
-  elif [ -f "$ROOT_DIR/logo.jpg" ]; then
-    icon_src="$ROOT_DIR/logo.jpg"
   fi
 
   if [ -z "$icon_src" ]; then
