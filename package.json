@@ -9,7 +9,9 @@
     "build:frontend": "vite build",
     "preview": "vite preview",
     "generate:icons": "./scripts/generate_icons.sh",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "tauri:dev": "npm run generate:icons && npm run tauri -- dev",
+    "tauri:build": "npm run generate:icons && npm run tauri -- build"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.20",
