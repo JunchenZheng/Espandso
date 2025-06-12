@@ -25,6 +25,7 @@ export const zhCN: TranslationTree = {
     retry: "重试",
     copyLogs: "复制日志",
     addSnippet: "添加片段",
+    visualEditor: "可视化编辑器",
     viewLogs: "查看日志",
     viewWarnings: "查看警告",
     about: "关于",
@@ -289,5 +290,11 @@ export const zhCN: TranslationTree = {
     restarting: "正在重启 Espanso...",
     ready: "就绪",
     scanningEspansoConfigs: "正在扫描 Espanso 配置...",
+  },
+  visualEditor: {
+    title: "可视化编辑器",
+    yamlPreview: "YAML 源码预览（只读）",
+    refresh: "刷新 YAML",
+    loadingYaml: "正在加载 YAML 内容...",
   },
 };
