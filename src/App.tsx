@@ -66,7 +66,7 @@ import { Snippet, ValidationError } from "./logic/types";
 import { validate } from "./logic/validate";
 import { importYamlContent, ImportedMatch } from "./logic/importYaml";
 import { buildTriggerInput, getSnippetTriggers, isImageFilePath, normalizeTriggerLines } from "./logic/snippetUtils";
-import { appendSnippetToYamlContent, deleteSnippetFromYamlContent, replaceSnippetInYamlContent } from "./logic/yamlEditor";
+import { appendSnippetToYamlContent, deleteSnippetFromYamlContent, findSnippetLineRangeInYaml, replaceSnippetInYamlContent, SnippetLineRange } from "./logic/yamlEditor";
 import { EspansoConfigFile, EspansoDirectoryInfo, EspansoPathSource, scanEspansoConfigFiles } from "./logic/espansoPaths";
 import { getInitialYamlTemplate, normalizeYamlFileName, resolveTargetPath, validateFileName, validateFolderName } from "./logic/createFileSystem";
 import { checkIsBinaryFilePath, isBinaryDomFile } from "./logic/fileCheck";
@@ -309,6 +309,7 @@ function App() {
   const [isVisualEditorOpen, setIsVisualEditorOpen] = useState<boolean>(false);
   const [visualEditorYamlContent, setVisualEditorYamlContent] = useState<string>("");
   const [isLoadingVisualEditorYaml, setIsLoadingVisualEditorYaml] = useState<boolean>(false);
+  const [highlightedLineRange, setHighlightedLineRange] = useState<SnippetLineRange | null>(null);
   const [snippetEditTarget, setSnippetEditTarget] = useState<SnippetEditTarget | null>(null);
   const [addSnippetKind, setAddSnippetKind] = useState<AddSnippetKind>("text");
   const [editTriggersText, setEditTriggersText] = useState<string>("");
@@ -337,6 +338,18 @@ function App() {
     setEnableExperimentalYamlWarnings(checked);
     setExperimentalYamlWarningsEnabled(checked);
   };
+
+  useEffect(() => {
+    if (isVisualEditorOpen && highlightedLineRange) {
+      const timer = setTimeout(() => {
+        const el = document.getElementById(`ve-yaml-line-${highlightedLineRange.startLine}`);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 120);
+      return () => clearTimeout(timer);
+    }
+  }, [isVisualEditorOpen, highlightedLineRange, visualEditorYamlContent]);
 
   const espansoPreviewList = useMemo(
     () => {
@@ -835,13 +848,19 @@ function App() {
     setAddWarnings([]);
   }
 
-  const loadVisualEditorYaml = useCallback(async (pathOverride?: string) => {
+  const loadVisualEditorYaml = useCallback(async (pathOverride?: string, matchIndexToHighlight?: number) => {
     const targetPath = pathOverride || snippetEditTarget?.preview.config.path || selectedEspansoPreview?.config.path;
     if (!targetPath) return;
     setIsLoadingVisualEditorYaml(true);
     try {
       const content = await readTextFile(targetPath);
       setVisualEditorYamlContent(content);
+      if (typeof matchIndexToHighlight === "number" && matchIndexToHighlight >= 0) {
+        const range = findSnippetLineRangeInYaml(content, matchIndexToHighlight);
+        setHighlightedLineRange(range);
+      } else {
+        setHighlightedLineRange(null);
+      }
     } catch (e: any) {
       setVisualEditorYamlContent(`# ${t("errors.genericError")}: ${e?.message || e}`);
     } finally {
@@ -856,6 +875,7 @@ function App() {
     }
     setSnippetEditTarget(null);
     resetSnippetForm();
+    setHighlightedLineRange(null);
     setIsVisualEditorOpen(true);
     loadVisualEditorYaml(selectedEspansoPreview.config.path);
   }
@@ -1087,12 +1107,15 @@ function App() {
       await writeTextFile(targetPreview.config.path, updatedContent);
       // Espanso has its own hot-reload path for match files. Keep restart disabled
       // while testing which edits actually require the more expensive CLI restart.
+      const savedMatchIndex = snippetEditTarget
+        ? snippetEditTarget.match.originalMatchIndex
+        : targetPreview.snippets.length;
       resetSnippetForm();
       setSnippetEditTarget(null);
       await scanDefaultEspansoConfigDir();
       setSelectedEspansoConfigPath(targetPreview.config.path);
       if (isVisualEditorOpen) {
-        await loadVisualEditorYaml(targetPreview.config.path);
+        await loadVisualEditorYaml(targetPreview.config.path, savedMatchIndex);
       } else {
         setIsAddSnippetOpen(false);
       }
@@ -2304,16 +2327,46 @@ function App() {
                     </div>
                   ) : (
                     <div className="table w-full select-text leading-relaxed">
-                      {visualEditorYamlContent.split("\n").map((line, idx) => (
-                        <div key={idx} className="table-row hover:bg-muted/40">
-                          <span className="table-cell pr-3 text-right select-none text-muted-foreground/40 w-8 border-r border-border/40 font-mono text-[11px]">
-                            {idx + 1}
-                          </span>
-                          <span className="table-cell pl-3 whitespace-pre font-mono text-foreground font-normal">
-                            {line || " "}
-                          </span>
-                        </div>
-                      ))}
+                      {visualEditorYamlContent.split("\n").map((line, idx) => {
+                        const lineNumber = idx + 1;
+                        const isHighlighted =
+                          highlightedLineRange &&
+                          lineNumber >= highlightedLineRange.startLine &&
+                          lineNumber <= highlightedLineRange.endLine;
+                        return (
+                          <div
+                            key={idx}
+                            id={`ve-yaml-line-${lineNumber}`}
+                            className={cn(
+                              "table-row transition-colors duration-300",
+                              isHighlighted
+                                ? "bg-amber-500/20 dark:bg-amber-400/20"
+                                : "hover:bg-muted/40",
+                            )}
+                          >
+                            <span
+                              className={cn(
+                                "table-cell pr-3 text-right select-none w-8 border-r font-mono text-[11px]",
+                                isHighlighted
+                                  ? "border-amber-500/60 bg-amber-500/30 text-amber-900 dark:text-amber-200 font-bold"
+                                  : "text-muted-foreground/40 border-border/40",
+                              )}
+                            >
+                              {lineNumber}
+                            </span>
+                            <span
+                              className={cn(
+                                "table-cell pl-3 whitespace-pre font-mono",
+                                isHighlighted
+                                  ? "text-amber-950 dark:text-amber-100 font-semibold"
+                                  : "text-foreground font-normal",
+                              )}
+                            >
+                              {line || " "}
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>

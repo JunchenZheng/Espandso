@@ -120,3 +120,35 @@ export function deleteSnippetFromYamlContent(yamlContent: string, matchIndex: nu
 
   return formatYamlDocument(doc);
 }
+
+export interface SnippetLineRange {
+  startLine: number;
+  endLine: number;
+}
+
+export function findSnippetLineRangeInYaml(yamlContent: string, matchIndex: number): SnippetLineRange | null {
+  try {
+    if (!yamlContent || matchIndex < 0) return null;
+    const doc = YAML.parseDocument(yamlContent);
+    const matchesNode = doc.get("matches", true);
+    if (!isSeq(matchesNode) || matchesNode.items.length === 0) return null;
+
+    const idx = Math.min(Math.max(0, matchIndex), matchesNode.items.length - 1);
+    const targetItem = matchesNode.items[idx] as any;
+    if (!targetItem || !targetItem.range) return null;
+
+    const [startOffset, endOffset] = targetItem.range;
+    const startLine = yamlContent.slice(0, startOffset).split("\n").length;
+    const validEndOffset = Math.min(endOffset, yamlContent.length);
+    let endLine = yamlContent.slice(0, validEndOffset).split("\n").length;
+
+    if (endLine > startLine && yamlContent[validEndOffset - 1] === "\n") {
+      endLine = Math.max(startLine, endLine - 1);
+    }
+
+    return { startLine, endLine };
+  } catch {
+    return null;
+  }
+}
+
