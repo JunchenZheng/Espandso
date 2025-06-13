@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { validate } from "./validate";
 import { importYamlContent } from "./importYaml";
-import { appendSnippetToYamlContent, deleteSnippetFromYamlContent, replaceSnippetInYamlContent } from "./yamlEditor";
+import { appendSnippetToYamlContent, deleteSnippetFromYamlContent, findSnippetLineRangeInYaml, replaceSnippetInYamlContent } from "./yamlEditor";
 import { isEspansoYamlConfigFile, parseEspansoConfigDir, sortEspansoConfigFiles } from "./espansoPaths";
 import {
   getIncludeFileCandidates,
@@ -297,6 +297,22 @@ matches:
     });
 
     expect(updated).toContain("replace: |-\n      line one\n      line two");
+  });
+
+  it("should calculate correct line range for snippet in YAML", () => {
+    const yaml = `matches:
+  - trigger: :hello
+    replace: world
+  - trigger: :bye
+    replace: goodbye`;
+
+    const range0 = findSnippetLineRangeInYaml(yaml, 0);
+    const range1 = findSnippetLineRangeInYaml(yaml, 1);
+
+    expect(range0).not.toBeNull();
+    expect(range0?.startLine).toBe(2);
+    expect(range1).not.toBeNull();
+    expect(range1?.startLine).toBe(4);
   });
 
   it("should append a file snippet using Espanso shell vars", () => {
