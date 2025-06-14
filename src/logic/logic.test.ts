@@ -299,6 +299,25 @@ matches:
     expect(updated).toContain("replace: |-\n      line one\n      line two");
   });
 
+  it("should ensure blank line between match items when appending", () => {
+    const yaml = `matches:
+  - trigger: :hello
+    replace: world`;
+
+    const updated = appendSnippetToYamlContent(yaml, {
+      trigger: ":bye",
+      replace: "goodbye",
+    });
+
+    expect(updated).toBe(`matches:
+  - trigger: :hello
+    replace: world
+
+  - trigger: :bye
+    replace: goodbye
+`);
+  });
+
   it("should calculate correct line range for snippet in YAML", () => {
     const yaml = `matches:
   - trigger: :hello
