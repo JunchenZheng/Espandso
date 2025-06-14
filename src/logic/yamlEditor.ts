@@ -76,6 +76,39 @@ function createSnippetNode(doc: EditableYamlDocument, snippet: Snippet) {
   return snippetNode;
 }
 
+export function ensureBlankLinesBetweenMatches(yamlContent: string): string {
+  const lines = yamlContent.split("\n");
+  const result: string[] = [];
+  let inMatches = false;
+  let matchItemCount = 0;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    if (/^\s*matches:\s*$/.test(line)) {
+      inMatches = true;
+      matchItemCount = 0;
+      result.push(line);
+      continue;
+    }
+
+    if (inMatches && /^[^\s#]/.test(line)) {
+      inMatches = false;
+    }
+
+    if (inMatches && /^  - /.test(line)) {
+      matchItemCount++;
+      if (matchItemCount > 1 && result.length > 0 && result[result.length - 1].trim() !== "") {
+        result.push("");
+      }
+    }
+
+    result.push(line);
+  }
+
+  return result.join("\n");
+}
+
 function formatYamlDocument(doc: EditableYamlDocument): string {
   visit(doc, (_key, node) => {
     if (isScalar(node) && typeof node.value === "string" && node.value.includes("\n")) {
@@ -83,7 +116,8 @@ function formatYamlDocument(doc: EditableYamlDocument): string {
     }
   });
 
-  return doc.toString({ lineWidth: 0 });
+  const rawFormatted = doc.toString({ lineWidth: 0 });
+  return ensureBlankLinesBetweenMatches(rawFormatted);
 }
 
 export function appendSnippetToYamlContent(yamlContent: string, snippet: Snippet): string {
