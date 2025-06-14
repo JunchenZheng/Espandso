@@ -76,6 +76,39 @@ function createSnippetNode(doc: EditableYamlDocument, snippet: Snippet) {
   return snippetNode;
 }
 
+export function ensureBlankLinesBetweenMatches(yamlContent: string): string {
+  const lines = yamlContent.split("\n");
+  const result: string[] = [];
+  let inMatches = false;
+  let matchItemCount = 0;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    if (/^\s*matches:\s*$/.test(line)) {
+      inMatches = true;
+      matchItemCount = 0;
+      result.push(line);
+      continue;
+    }
+
+    if (inMatches && /^[^\s#]/.test(line)) {
+      inMatches = false;
+    }
+
+    if (inMatches && /^  - /.test(line)) {
+      matchItemCount++;
+      if (matchItemCount > 1 && result.length > 0 && result[result.length - 1].trim() !== "") {
+        result.push("");
+      }
+    }
+
+    result.push(line);
+  }
+
+  return result.join("\n");
+}
+
 function formatYamlDocument(doc: EditableYamlDocument): string {
   visit(doc, (_key, node) => {
     if (isScalar(node) && typeof node.value === "string" && node.value.includes("\n")) {
@@ -83,7 +116,8 @@ function formatYamlDocument(doc: EditableYamlDocument): string {
     }
   });
 
-  return doc.toString({ lineWidth: 0 });
+  const rawFormatted = doc.toString({ lineWidth: 0 });
+  return ensureBlankLinesBetweenMatches(rawFormatted);
 }
 
 export function appendSnippetToYamlContent(yamlContent: string, snippet: Snippet): string {
@@ -120,3 +154,35 @@ export function deleteSnippetFromYamlContent(yamlContent: string, matchIndex: nu
 
   return formatYamlDocument(doc);
 }
+
+export interface SnippetLineRange {
+  startLine: number;
+  endLine: number;
+}
+
+export function findSnippetLineRangeInYaml(yamlContent: string, matchIndex: number): SnippetLineRange | null {
+  try {
+    if (!yamlContent || matchIndex < 0) return null;
+    const doc = YAML.parseDocument(yamlContent);
+    const matchesNode = doc.get("matches", true);
+    if (!isSeq(matchesNode) || matchesNode.items.length === 0) return null;
+
+    const idx = Math.min(Math.max(0, matchIndex), matchesNode.items.length - 1);
+    const targetItem = matchesNode.items[idx] as any;
+    if (!targetItem || !targetItem.range) return null;
+
+    const [startOffset, endOffset] = targetItem.range;
+    const startLine = yamlContent.slice(0, startOffset).split("\n").length;
+    const validEndOffset = Math.min(endOffset, yamlContent.length);
+    let endLine = yamlContent.slice(0, validEndOffset).split("\n").length;
+
+    if (endLine > startLine && yamlContent[validEndOffset - 1] === "\n") {
+      endLine = Math.max(startLine, endLine - 1);
+    }
+
+    return { startLine, endLine };
+  } catch {
+    return null;
+  }
+}
+

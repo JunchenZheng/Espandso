@@ -23,6 +23,7 @@ export const en = {
     retry: "Retry",
     copyLogs: "Copy Logs",
     addSnippet: "Add Snippet",
+    visualEditor: "Visual Editor",
     viewLogs: "View Logs",
     viewWarnings: "View Warnings",
     about: "About",
@@ -287,6 +288,12 @@ export const en = {
     restarting: "Restarting Espanso...",
     ready: "Ready",
     scanningEspansoConfigs: "Scanning Espanso configs...",
+  },
+  visualEditor: {
+    title: "Visual Editor",
+    yamlPreview: "YAML Source Preview (Read-only)",
+    refresh: "Refresh YAML",
+    loadingYaml: "Loading YAML content...",
   },
 } as const;
 

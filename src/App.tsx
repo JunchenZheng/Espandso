@@ -8,6 +8,8 @@ import {
   AlignLeft,
   ChevronDown,
   ChevronRight,
+  Columns,
+  FileCode,
   FilePlus,
   FileSearch,
   FileText,
@@ -64,7 +66,7 @@ import { Snippet, ValidationError } from "./logic/types";
 import { validate } from "./logic/validate";
 import { importYamlContent, ImportedMatch } from "./logic/importYaml";
 import { buildTriggerInput, getSnippetTriggers, isImageFilePath, normalizeTriggerLines } from "./logic/snippetUtils";
-import { appendSnippetToYamlContent, deleteSnippetFromYamlContent, replaceSnippetInYamlContent } from "./logic/yamlEditor";
+import { appendSnippetToYamlContent, deleteSnippetFromYamlContent, findSnippetLineRangeInYaml, replaceSnippetInYamlContent, SnippetLineRange } from "./logic/yamlEditor";
 import { EspansoConfigFile, EspansoDirectoryInfo, EspansoPathSource, scanEspansoConfigFiles } from "./logic/espansoPaths";
 import { getInitialYamlTemplate, normalizeYamlFileName, resolveTargetPath, validateFileName, validateFolderName } from "./logic/createFileSystem";
 import { checkIsBinaryFilePath, isBinaryDomFile } from "./logic/fileCheck";
@@ -304,6 +306,10 @@ function App() {
   const [isLogOpen, setIsLogOpen] = useState<boolean>(false);
   const [isAboutOpen, setIsAboutOpen] = useState<boolean>(false);
   const [isAddSnippetOpen, setIsAddSnippetOpen] = useState<boolean>(false);
+  const [isVisualEditorOpen, setIsVisualEditorOpen] = useState<boolean>(false);
+  const [visualEditorYamlContent, setVisualEditorYamlContent] = useState<string>("");
+  const [isLoadingVisualEditorYaml, setIsLoadingVisualEditorYaml] = useState<boolean>(false);
+  const [highlightedLineRange, setHighlightedLineRange] = useState<SnippetLineRange | null>(null);
   const [snippetEditTarget, setSnippetEditTarget] = useState<SnippetEditTarget | null>(null);
   const [addSnippetKind, setAddSnippetKind] = useState<AddSnippetKind>("text");
   const [editTriggersText, setEditTriggersText] = useState<string>("");
@@ -332,6 +338,18 @@ function App() {
     setEnableExperimentalYamlWarnings(checked);
     setExperimentalYamlWarningsEnabled(checked);
   };
+
+  useEffect(() => {
+    if (isVisualEditorOpen && highlightedLineRange) {
+      const timer = setTimeout(() => {
+        const el = document.getElementById(`ve-yaml-line-${highlightedLineRange.startLine}`);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 120);
+      return () => clearTimeout(timer);
+    }
+  }, [isVisualEditorOpen, highlightedLineRange, visualEditorYamlContent]);
 
   const espansoPreviewList = useMemo(
     () => {
@@ -830,6 +848,38 @@ function App() {
     setAddWarnings([]);
   }
 
+  const loadVisualEditorYaml = useCallback(async (pathOverride?: string, matchIndexToHighlight?: number) => {
+    const targetPath = pathOverride || snippetEditTarget?.preview.config.path || selectedEspansoPreview?.config.path;
+    if (!targetPath) return;
+    setIsLoadingVisualEditorYaml(true);
+    try {
+      const content = await readTextFile(targetPath);
+      setVisualEditorYamlContent(content);
+      if (typeof matchIndexToHighlight === "number" && matchIndexToHighlight >= 0) {
+        const range = findSnippetLineRangeInYaml(content, matchIndexToHighlight);
+        setHighlightedLineRange(range);
+      } else {
+        setHighlightedLineRange(null);
+      }
+    } catch (e: any) {
+      setVisualEditorYamlContent(`# ${t("errors.genericError")}: ${e?.message || e}`);
+    } finally {
+      setIsLoadingVisualEditorYaml(false);
+    }
+  }, [selectedEspansoPreview, snippetEditTarget, t]);
+
+  function openVisualEditorDialog() {
+    if (!selectedEspansoPreview) {
+      showAlert(t("errors.selectConfigBeforeAddingSnippet"), t("errors.noConfigSelected"));
+      return;
+    }
+    setSnippetEditTarget(null);
+    resetSnippetForm();
+    setHighlightedLineRange(null);
+    setIsVisualEditorOpen(true);
+    loadVisualEditorYaml(selectedEspansoPreview.config.path);
+  }
+
   function openAddSnippetDialog() {
     if (!selectedEspansoPreview) {
       showAlert(t("errors.selectConfigBeforeAddingSnippet"), t("errors.noConfigSelected"));
@@ -1057,11 +1107,18 @@ function App() {
       await writeTextFile(targetPreview.config.path, updatedContent);
       // Espanso has its own hot-reload path for match files. Keep restart disabled
       // while testing which edits actually require the more expensive CLI restart.
-      setIsAddSnippetOpen(false);
+      const savedMatchIndex = snippetEditTarget
+        ? snippetEditTarget.match.originalMatchIndex
+        : targetPreview.snippets.length;
       resetSnippetForm();
       setSnippetEditTarget(null);
       await scanDefaultEspansoConfigDir();
       setSelectedEspansoConfigPath(targetPreview.config.path);
+      if (isVisualEditorOpen) {
+        await loadVisualEditorYaml(targetPreview.config.path, savedMatchIndex);
+      } else {
+        setIsAddSnippetOpen(false);
+      }
     } catch (e: any) {
       showAlert(t("errors.failedToSaveSnippet", { message: e?.message || e }), t("errors.genericError"));
     } finally {
@@ -1082,11 +1139,15 @@ function App() {
           await writeTextFile(target.preview.config.path, updatedContent);
           // Espanso has its own hot-reload path for match files. Keep restart disabled
           // while testing which edits actually require the more expensive CLI restart.
-          setIsAddSnippetOpen(false);
           resetSnippetForm();
           setSnippetEditTarget(null);
           await scanDefaultEspansoConfigDir();
           setSelectedEspansoConfigPath(target.preview.config.path);
+          if (isVisualEditorOpen) {
+            await loadVisualEditorYaml(target.preview.config.path);
+          } else {
+            setIsAddSnippetOpen(false);
+          }
         } catch (e: any) {
           showAlert(t("errors.failedToDeleteSnippet", { message: e?.message || e }), t("errors.genericError"));
         }
@@ -1260,6 +1321,7 @@ function App() {
                         })
                       }
                       onAddSnippet={openAddSnippetDialog}
+                      onOpenVisualEditor={openVisualEditorDialog}
                       onOpenWarnings={(path) => {
                         setWarningsFilterPath(path);
                         setIsWarningsDialogOpen(true);
@@ -1312,6 +1374,7 @@ function App() {
         </div>
       </main>
 
+      {/* Render Snippet Form Body and Footer Helpers */}
       <Dialog open={isAddSnippetOpen} onOpenChange={(open) => {
         setIsAddSnippetOpen(open);
         if (!open) {
@@ -1385,7 +1448,7 @@ function App() {
                         size="icon"
                         variant="ghost"
                         className="h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive"
-                      title={t("snippets.removeTrigger")}
+                        title={t("snippets.removeTrigger")}
                         onClick={() => setEditTriggersText(lines.filter((_, i) => i !== idx).join("\n"))}
                       >
                         <XCircle className="h-4 w-4" />
@@ -1771,6 +1834,545 @@ function App() {
               </Button>
             </div>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isVisualEditorOpen} onOpenChange={(open) => {
+        setIsVisualEditorOpen(open);
+        if (!open) {
+          resetSnippetForm();
+          setSnippetEditTarget(null);
+        }
+      }}>
+        <DialogContent className="max-w-[95vw] w-[95vw] h-[92vh] max-h-[92vh] grid grid-rows-[auto_minmax(0,1fr)] overflow-hidden p-6 gap-4">
+          <DialogHeader className="shrink-0">
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Columns className="h-5 w-5 text-primary" />
+              <span>{t("visualEditor.title")}</span>
+            </DialogTitle>
+            <DialogDescription className="break-all text-xs">
+              {snippetEditTarget?.preview.config.relativePath || selectedEspansoPreview?.config.relativePath || t("snippets.selectYamlFile")}
+              {snippetEditTarget ? ` · ${t("snippets.snippetNumber", { number: snippetEditTarget.displayIndex + 1 })}` : ""}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid grid-cols-2 gap-6 min-h-0 min-w-0">
+            {/* 左侧 50%: 编辑表单 */}
+            <div className="flex flex-col min-h-0 min-w-0 pr-3 border-r">
+              <div className="min-h-0 flex-1 space-y-5 overflow-auto pr-3">
+                {(addErrors.length > 0 || (isYamlWarningsEnabled && addWarnings.length > 0)) && (
+                  <div
+                    className={cn(
+                      "space-y-2 rounded-lg border p-4 text-sm",
+                      addErrors.length > 0
+                        ? "border-destructive/30 bg-destructive/10 text-destructive"
+                        : "border-amber-300 bg-amber-50 text-amber-800",
+                    )}
+                  >
+                    {addErrors.map((e, idx) => (
+                      <div key={`err-${idx}`} className="flex gap-2">
+                        <XCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                        <span>{e.message}</span>
+                      </div>
+                    ))}
+                    {isYamlWarningsEnabled &&
+                      addWarnings.map((w, idx) => (
+                        <div key={`warn-${idx}`} className="flex gap-2">
+                          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                          <span>{w}</span>
+                        </div>
+                      ))}
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="ve-trigger-0" className="inline-flex items-center">
+                    {t("snippets.trigger")} <RequiredMark />
+                  </Label>
+                  <div className="space-y-2">
+                    {(editTriggersText ? editTriggersText.split("\n") : [""]).map((line, idx, lines) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <Input
+                          id={idx === 0 ? "ve-trigger-0" : undefined}
+                          className="mono-field flex-1"
+                          placeholder={`e.g. ${idx === 0 ? ":hello" : idx === 1 ? ":hi" : ":hey"}`}
+                          value={line}
+                          onChange={(e) => {
+                            const newLines = [...lines];
+                            newLines[idx] = e.target.value;
+                            setEditTriggersText(newLines.join("\n"));
+                          }}
+                        />
+                        {lines.length > 1 && (
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive"
+                            title={t("snippets.removeTrigger")}
+                            onClick={() => setEditTriggersText(lines.filter((_, i) => i !== idx).join("\n"))}
+                          >
+                            <XCircle className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="w-full border-dashed text-xs"
+                      onClick={() => setEditTriggersText([...(editTriggersText ? editTriggersText.split("\n") : [""]), ""].join("\n"))}
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      {t("snippets.addTriggerAlias")}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-4 rounded-md border bg-secondary/60 p-1">
+                  <Button
+                    type="button"
+                    variant={activeSnippetKind === "text" ? "secondary" : "ghost"}
+                    className="h-8"
+                    onClick={() => {
+                      setAddSnippetKind("text");
+                      setAddErrors([]);
+                      setAddWarnings([]);
+                    }}
+                  >
+                    {t("snippets.typeTextShort")}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={activeSnippetKind === "file" ? "secondary" : "ghost"}
+                    className="h-8"
+                    onClick={() => {
+                      setAddSnippetKind("file");
+                      setAddErrors([]);
+                      setAddWarnings([]);
+                    }}
+                  >
+                    {t("snippets.typeFileShort")}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={activeSnippetKind === "image" ? "secondary" : "ghost"}
+                    className="h-8"
+                    onClick={() => {
+                      setAddSnippetKind("image");
+                      setAddErrors([]);
+                      setAddWarnings([]);
+                    }}
+                  >
+                    {t("snippets.typeImageShort")}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={activeSnippetKind === "form" ? "secondary" : "ghost"}
+                    className="h-8"
+                    onClick={() => {
+                      setAddSnippetKind("form");
+                      setAddErrors([]);
+                      setAddWarnings([]);
+                    }}
+                  >
+                    {t("snippets.typeFormShort")}
+                  </Button>
+                </div>
+
+                {activeSnippetKind === "file" ? (
+                  <div className="space-y-3">
+                    <Label htmlFor="ve-include-file" className="inline-flex items-center">
+                      {t("snippets.file")} <RequiredMark />
+                    </Label>
+                    <div
+                      className="flex min-h-40 flex-col items-center justify-center gap-3 rounded-md border border-dashed bg-secondary/30 p-5 text-center"
+                      onDragOver={(event) => event.preventDefault()}
+                      onDrop={async (event) => {
+                        event.preventDefault();
+                        const droppedFile = event.dataTransfer.files[0];
+                        const droppedPath = droppedFile ? (droppedFile as File & { path?: string }).path || droppedFile.name : "";
+                        if (droppedFile) {
+                          const isBinary = await isBinaryDomFile(droppedFile);
+                          if (isBinary) {
+                            showAlert(t("errors.binaryFileNotAllowed"), t("errors.invalidFileType"));
+                            return;
+                          }
+                        }
+                        if (droppedPath) {
+                          if (isImageFilePath(droppedPath)) {
+                            showAlert(t("errors.imageFileNotAllowed"), t("errors.invalidFileType"));
+                            return;
+                          }
+                          setEditIncludeFile(droppedPath);
+                        }
+                      }}
+                    >
+                      <Upload className="h-8 w-8 text-muted-foreground" />
+                      <div className="w-full space-y-2">
+                        <Input
+                          id="ve-include-file"
+                          className="mono-field"
+                          placeholder={t("snippets.filePathPlaceholder")}
+                          value={editIncludeFile}
+                          onChange={(e) => setEditIncludeFile(e.target.value)}
+                        />
+                        <Button type="button" variant="outline" onClick={chooseSnippetFile}>
+                          <FileSearch className="h-4 w-4" />
+                          {t("snippets.chooseFile")}
+                        </Button>
+                      </div>
+                    </div>
+                    {isImageFilePath(editIncludeFile) && (
+                      <p className="text-xs font-medium text-destructive">
+                        {t("errors.imageFileNotAllowed")}
+                      </p>
+                    )}
+                  </div>
+                ) : activeSnippetKind === "image" ? (
+                  <div className="space-y-3">
+                    <Label htmlFor="ve-image-path" className="inline-flex items-center">
+                      {t("snippets.imagePath")} <RequiredMark />
+                    </Label>
+                    <div
+                      className="flex min-h-40 flex-col items-center justify-center gap-3 rounded-md border border-dashed bg-secondary/30 p-5 text-center"
+                      onDragOver={(event) => event.preventDefault()}
+                      onDrop={(event) => {
+                        event.preventDefault();
+                        const droppedFile = event.dataTransfer.files[0];
+                        const droppedPath = droppedFile ? (droppedFile as File & { path?: string }).path : "";
+                        if (droppedPath) {
+                          setEditImagePath(droppedPath);
+                        }
+                      }}
+                    >
+                      <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                      <div className="w-full space-y-2">
+                        <Input
+                          id="ve-image-path"
+                          className="mono-field"
+                          placeholder={t("snippets.imagePathPlaceholder")}
+                          value={editImagePath}
+                          onChange={(e) => setEditImagePath(e.target.value)}
+                        />
+                        <Button type="button" variant="outline" onClick={chooseSnippetImageFile}>
+                          <FileSearch className="h-4 w-4" />
+                          {t("snippets.chooseImage")}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ) : activeSnippetKind === "form" ? (
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="ve-form" className="inline-flex items-center">
+                        {t("snippets.formLayout")} <RequiredMark />
+                      </Label>
+                      <Textarea
+                        id="ve-form"
+                        ref={formTextareaRef}
+                        className="mono-field min-h-44 resize-y"
+                        placeholder={"=== Ticket ===\nTitle: title\nCategory: category\n\nDescription:\ndescription"}
+                        value={editForm}
+                        onChange={(e) => {
+                          setEditForm(e.target.value);
+                          setFormSelection(null);
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key !== "Shift" && event.key !== "ArrowLeft" && event.key !== "ArrowRight" && event.key !== "ArrowUp" && event.key !== "ArrowDown") {
+                            setFormSelection(null);
+                          }
+                        }}
+                        onKeyUp={(event) => captureFormSelection(event.currentTarget)}
+                        onMouseUp={(event) => {
+                          if (event.button !== 0) return;
+                          captureFormSelection(event.currentTarget);
+                        }}
+                        onSelect={(event) => captureFormSelection(event.currentTarget)}
+                        onContextMenu={(event) => {
+                          event.preventDefault();
+                          captureFormSelection(event.currentTarget);
+                        }}
+                      />
+                      <div className="space-y-2 rounded-md border bg-secondary/25 p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <Label>{t("formBuilder.selectedTextAction")}</Label>
+                          <span className="max-w-full truncate text-xs text-muted-foreground">
+                            {formSelection ? formSelection.text.trim() : t("formBuilder.selectTextHint")}
+                          </span>
+                        </div>
+                        <div className="grid gap-2 sm:grid-cols-4">
+                          {([
+                            ["text", t("formBuilder.singleLineText"), Type],
+                            ["multiline", t("formBuilder.multilineText"), AlignLeft],
+                            ["choice", t("formBuilder.choiceBox"), ListChecks],
+                            ["list", t("formBuilder.listBox"), List],
+                          ] as const).map(([control, label, Icon]) => (
+                            <Button
+                              key={control}
+                              type="button"
+                              variant="outline"
+                              disabled={!formSelection}
+                              className="justify-start"
+                              onMouseDown={(event) => event.preventDefault()}
+                              onClick={() => configureSelectedFormField(control)}
+                            >
+                              <Icon className="h-4 w-4" />
+                              {label}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    {editFormFieldConfigs.length > 0 && (
+                      <div className="space-y-3">
+                        <Label>{t("formBuilder.fields")}</Label>
+                        {editFormFieldConfigs.map((field, fieldIndex) => (
+                          <div key={field.id} className="space-y-3 rounded-md border bg-secondary/25 p-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="mono-field min-w-0 truncate text-sm font-semibold">[[{field.id}]]</div>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="h-8 shrink-0 text-xs"
+                                onClick={() => undoFormField(field.id)}
+                              >
+                                <RotateCcw className="h-3.5 w-3.5" />
+                                {t("actions.undo")}
+                              </Button>
+                            </div>
+                            <div className="grid gap-2 sm:grid-cols-3">
+                              {([
+                                ["text", t("formBuilder.textFields")],
+                                ["choice", t("formBuilder.choiceBox")],
+                                ["list", t("formBuilder.listBox")],
+                              ] as const).map(([category, label]) => (
+                                <label
+                                  key={category}
+                                  className={cn(
+                                    "flex min-h-9 items-center gap-2 rounded-md border bg-background px-3 text-sm",
+                                    getFormFieldCategory(field) === category && "border-primary bg-primary/10",
+                                  )}
+                                >
+                                  <input
+                                    type="radio"
+                                    name={`ve-form-field-category-${fieldIndex}`}
+                                    className="h-4 w-4 accent-primary"
+                                    checked={getFormFieldCategory(field) === category}
+                                    onChange={() => updateFormFieldConfig(field.id, { control: category })}
+                                  />
+                                  <span>{label}</span>
+                                </label>
+                              ))}
+                            </div>
+                            {getFormFieldCategory(field) === "text" && (
+                              <div className="grid gap-3 sm:grid-cols-2">
+                                <div className="space-y-2">
+                                  <Label>{t("formBuilder.textFieldShape")}</Label>
+                                  <div className="grid grid-cols-2 gap-2">
+                                    {([
+                                      ["single", t("formBuilder.singleLine")],
+                                      ["multiline", t("formBuilder.multiline")],
+                                    ] as const).map(([mode, label]) => (
+                                      <label
+                                        key={mode}
+                                        className={cn(
+                                          "flex min-h-9 items-center gap-2 rounded-md border bg-background px-3 text-sm",
+                                          getTextFieldMode(field) === mode && "border-primary bg-primary/10",
+                                        )}
+                                      >
+                                        <input
+                                          type="radio"
+                                          name={`ve-form-text-mode-${fieldIndex}`}
+                                          className="h-4 w-4 accent-primary"
+                                          checked={getTextFieldMode(field) === mode}
+                                          onChange={() => updateFormFieldConfig(field.id, { control: mode === "multiline" ? "multiline" : "text" })}
+                                        />
+                                        <span>{label}</span>
+                                      </label>
+                                    ))}
+                                  </div>
+                                </div>
+                                <div className="space-y-2">
+                                  <Label htmlFor={`ve-form-field-default-${fieldIndex}`} className="inline-flex items-center">
+                                    {t("formBuilder.defaultValue")} <OptionalMark />
+                                  </Label>
+                                  {field.control === "multiline" ? (
+                                    <Textarea
+                                      id={`ve-form-field-default-${fieldIndex}`}
+                                      className="mono-field min-h-24 resize-y"
+                                      value={field.defaultValue}
+                                      onChange={(event) => updateFormFieldConfig(field.id, { defaultValue: event.target.value })}
+                                    />
+                                  ) : (
+                                    <Input
+                                      id={`ve-form-field-default-${fieldIndex}`}
+                                      value={field.defaultValue}
+                                      onChange={(event) => updateFormFieldConfig(field.id, { defaultValue: event.target.value })}
+                                    />
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                            {(field.control === "choice" || field.control === "list") && (
+                              <div className="grid gap-3 sm:grid-cols-2">
+                                <div className="space-y-2">
+                                  <Label htmlFor={`ve-form-field-default-${fieldIndex}`} className="inline-flex items-center">
+                                    {t("formBuilder.defaultValue")} <OptionalMark />
+                                  </Label>
+                                  <Input
+                                    id={`ve-form-field-default-${fieldIndex}`}
+                                    value={field.defaultValue}
+                                    onChange={(event) => updateFormFieldConfig(field.id, { defaultValue: event.target.value })}
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label htmlFor={`ve-form-field-values-${fieldIndex}`} className="inline-flex items-center">
+                                    {t("formBuilder.values")} <RequiredMark />
+                                  </Label>
+                                  <Textarea
+                                    id={`ve-form-field-values-${fieldIndex}`}
+                                    className="mono-field min-h-24 resize-y"
+                                    placeholder={"First choice\nSecond choice"}
+                                    value={field.valuesText}
+                                    onChange={(event) => updateFormFieldConfig(field.id, { valuesText: event.target.value })}
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label htmlFor="ve-replace" className="inline-flex items-center">
+                      {t("snippets.replaceContent")} <RequiredMark />
+                    </Label>
+                    <Textarea
+                      id="ve-replace"
+                      className="mono-field min-h-48 resize-y"
+                      placeholder={t("snippets.replaceContentPlaceholder")}
+                      value={editReplace}
+                      onChange={(e) => setEditReplace(e.target.value)}
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="ve-description" className="inline-flex items-center">
+                    {t("snippets.descriptionLabel")} <OptionalMark />
+                  </Label>
+                  <Input
+                    id="ve-description"
+                    placeholder={t("snippets.descriptionPlaceholder")}
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="pt-3 shrink-0 border-t mt-3">
+                <DialogFooter className={cn(snippetEditTarget && "sm:justify-between")}>
+                  {snippetEditTarget && (
+                    <Button
+                      variant="destructive"
+                      onClick={() => deleteSnippetFromYaml(snippetEditTarget)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      {t("actions.delete")}
+                    </Button>
+                  )}
+                  <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                    <Button variant="outline" onClick={() => setIsVisualEditorOpen(false)}>
+                      {t("actions.cancel")}
+                    </Button>
+                    <Button onClick={saveSnippetToYaml} disabled={isSavingSnippet}>
+                      {isSavingSnippet ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                      {snippetEditTarget ? t("actions.updateYaml") : t("actions.saveToYaml")}
+                    </Button>
+                  </div>
+                </DialogFooter>
+              </div>
+            </div>
+
+            {/* 右侧 50%: 不可编辑的 YAML 实时文件展示 */}
+            <div className="flex flex-col min-h-0 min-w-0 space-y-2">
+              <div className="flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-2">
+                  <FileCode className="h-4 w-4 text-primary" />
+                  <span className="text-xs font-semibold">{t("visualEditor.yamlPreview")}</span>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-7 gap-1.5 text-xs"
+                  onClick={() => loadVisualEditorYaml()}
+                  disabled={isLoadingVisualEditorYaml}
+                >
+                  <RefreshCw className={cn("h-3.5 w-3.5", isLoadingVisualEditorYaml && "animate-spin")} />
+                  {t("visualEditor.refresh")}
+                </Button>
+              </div>
+
+              <div className="min-h-0 flex-1 rounded-md border bg-muted/30 overflow-hidden flex flex-col font-mono text-xs">
+                <div className="min-h-0 flex-1 overflow-auto p-3">
+                  {isLoadingVisualEditorYaml ? (
+                    <div className="flex h-full items-center justify-center gap-2 text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>{t("visualEditor.loadingYaml")}</span>
+                    </div>
+                  ) : (
+                    <div className="table w-full select-text leading-relaxed">
+                      {visualEditorYamlContent.split("\n").map((line, idx) => {
+                        const lineNumber = idx + 1;
+                        const isHighlighted =
+                          highlightedLineRange &&
+                          lineNumber >= highlightedLineRange.startLine &&
+                          lineNumber <= highlightedLineRange.endLine;
+                        return (
+                          <div
+                            key={idx}
+                            id={`ve-yaml-line-${lineNumber}`}
+                            className={cn(
+                              "table-row transition-colors duration-300",
+                              isHighlighted
+                                ? "bg-amber-500/20 dark:bg-amber-400/20"
+                                : "hover:bg-muted/40",
+                            )}
+                          >
+                            <span
+                              className={cn(
+                                "table-cell pr-3 text-right select-none w-8 border-r font-mono text-[11px]",
+                                isHighlighted
+                                  ? "border-amber-500/60 bg-amber-500/30 text-amber-900 dark:text-amber-200 font-bold"
+                                  : "text-muted-foreground/40 border-border/40",
+                              )}
+                            >
+                              {lineNumber}
+                            </span>
+                            <span
+                              className={cn(
+                                "table-cell pl-3 whitespace-pre font-mono",
+                                isHighlighted
+                                  ? "text-amber-950 dark:text-amber-100 font-semibold"
+                                  : "text-foreground font-normal",
+                              )}
+                            >
+                              {line || " "}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -2380,6 +2982,7 @@ interface EspansoConfigDetailProps {
   preview: EspansoConfigPreview;
   onViewSnippet: (match: ImportedMatch, index: number) => void;
   onAddSnippet: () => void;
+  onOpenVisualEditor?: () => void;
   onOpenWarnings?: (path: string) => void;
 }
 
@@ -2387,6 +2990,7 @@ function EspansoConfigDetail({
   preview,
   onViewSnippet,
   onAddSnippet,
+  onOpenVisualEditor,
   onOpenWarnings,
 }: EspansoConfigDetailProps) {
   const { t } = useI18n();
@@ -2445,6 +3049,12 @@ function EspansoConfigDetail({
                 {formatCount(t, preview.warningCount, "counts.warning", "counts.warnings")}
               </span>
             </button>
+          )}
+          {onOpenVisualEditor && (
+            <Button size="sm" variant="outline" onClick={onOpenVisualEditor}>
+              <Columns className="h-4 w-4" />
+              {t("actions.visualEditor")}
+            </Button>
           )}
           <Button size="sm" onClick={onAddSnippet}>
             <Plus className="h-4 w-4" />
