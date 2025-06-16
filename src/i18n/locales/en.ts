@@ -195,6 +195,7 @@ export const en = {
   },
   table: {
     name: "Name",
+    type: "Type",
     keyword: "Keyword",
     snippet: "Snippet",
     details: "Details",
