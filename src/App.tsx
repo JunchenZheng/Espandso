@@ -3064,9 +3064,9 @@ function EspansoConfigDetail({
         </div>
       </div>
 
-      <div className="grid h-9 shrink-0 grid-cols-[minmax(8rem,1.1fr)_3rem_minmax(6rem,0.65fr)_minmax(12rem,2fr)_2.25rem] items-center border-b bg-secondary/40 px-3 text-xs font-semibold text-muted-foreground">
+      <div className="grid h-9 shrink-0 grid-cols-[minmax(8rem,1fr)_minmax(4.5rem,0.45fr)_minmax(6rem,0.65fr)_minmax(12rem,2fr)_2.25rem] items-center border-b bg-secondary/40 px-3 text-xs font-semibold text-muted-foreground">
         <div className="truncate">{t("table.name")}</div>
-        <div className="truncate text-center">A→</div>
+        <div className="truncate">{t("table.type")}</div>
         <div className="truncate">{t("table.keyword")}</div>
         <div className="truncate">{t("table.snippet")}</div>
         <div className="sr-only">{t("table.details")}</div>
@@ -3105,7 +3105,7 @@ function EspansoConfigDetail({
                 return (
                   <button
                     key={`${triggers.join("-")}-${index}`}
-                    className="grid h-9 w-full grid-cols-[minmax(8rem,1.1fr)_3rem_minmax(6rem,0.65fr)_minmax(12rem,2fr)_2.25rem] items-center px-3 text-left text-sm transition-colors hover:bg-secondary/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    className="grid h-9 w-full grid-cols-[minmax(8rem,1fr)_minmax(4.5rem,0.45fr)_minmax(6rem,0.65fr)_minmax(12rem,2fr)_2.25rem] items-center px-3 text-left text-sm transition-colors hover:bg-secondary/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                     onClick={() => onViewSnippet(preview.importedMatches[index] || { snippet, originalMatchIndex: index }, index)}
                     title={t("snippets.viewDetailsFor", { trigger: displayTrigger })}
                   >
@@ -3114,25 +3114,25 @@ function EspansoConfigDetail({
                         {snippet.description || displayTrigger}
                       </div>
                     </div>
-                    <div className="flex justify-center">
+                    <div className="flex items-center gap-1.5 min-w-0 pr-2">
                       <span
                         className={cn(
-                          "h-4 w-4 rounded",
-                          snippetKind === "file" && "bg-primary/70",
-                          snippetKind === "image" && "bg-purple-500/70",
-                          snippetKind === "form" && "bg-emerald-500/70",
-                          snippetKind === "text" && "bg-muted-foreground/35",
+                          "h-2.5 w-2.5 shrink-0 rounded-full",
+                          snippetKind === "file" && "bg-primary",
+                          snippetKind === "image" && "bg-purple-500",
+                          snippetKind === "form" && "bg-emerald-500",
+                          snippetKind === "text" && "bg-muted-foreground/50",
                         )}
-                        title={
-                          snippetKind === "file"
-                            ? t("snippets.externalFileSnippet")
-                            : snippetKind === "image"
-                              ? t("snippets.imageMatchSnippet")
-                              : snippetKind === "form"
-                                ? t("snippets.formSnippet")
-                                : t("snippets.inlineReplacementSnippet")
-                        }
                       />
+                      <span className="truncate text-xs font-medium text-muted-foreground">
+                        {snippetKind === "file"
+                          ? t("snippets.fileType")
+                          : snippetKind === "image"
+                            ? t("snippets.imageType")
+                            : snippetKind === "form"
+                              ? t("snippets.formType")
+                              : t("snippets.textType")}
+                      </span>
                     </div>
                     <div className="mono-field min-w-0 truncate pr-3 text-sm">{displayTrigger}</div>
                     <div className="min-w-0 truncate text-muted-foreground">

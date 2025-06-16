@@ -197,8 +197,9 @@ export const zhCN: TranslationTree = {
   },
   table: {
     name: "名称",
+    type: "类型",
     keyword: "触发词",
-    snippet: "片段",
+    snippet: "替换内容",
     details: "详情",
   },
   warnings: {
