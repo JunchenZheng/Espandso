@@ -23,6 +23,7 @@ export const en = {
     retry: "Retry",
     copyLogs: "Copy Logs",
     addSnippet: "Add Snippet",
+    batchDelete: "Delete Selected ({{count}})",
     visualEditor: "Visual Editor",
     viewLogs: "View Logs",
     viewWarnings: "View Warnings",
@@ -254,6 +255,11 @@ export const en = {
       message: "Are you sure you want to delete trigger \"{{trigger}}\" from {{file}}?",
       confirmBtn: "Delete",
     },
+    confirmBatchDelete: {
+      title: "Batch Delete Snippets",
+      message: "Are you sure you want to delete {{count}} selected snippets from {{file}}?",
+      confirmBtn: "Delete Selected",
+    },
   },
   errors: {
     genericError: "Error",
@@ -261,6 +267,7 @@ export const en = {
     invalidFileType: "Invalid File Type",
     failedToSaveSnippet: "Failed to save snippet: {{message}}",
     failedToDeleteSnippet: "Failed to delete snippet: {{message}}",
+    failedToBatchDeleteSnippets: "Failed to delete selected snippets: {{message}}",
     failedToLoadConfig: "Failed to load Espanso config: {{message}}",
     failedToReadFile: "[{{file}}] Failed to read file: {{message}}",
     triggerRequired: "Trigger is required and cannot be empty.",

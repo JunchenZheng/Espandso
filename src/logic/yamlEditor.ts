@@ -155,6 +155,24 @@ export function deleteSnippetFromYamlContent(yamlContent: string, matchIndex: nu
   return formatYamlDocument(doc);
 }
 
+export function deleteMultipleSnippetsFromYamlContent(yamlContent: string, matchIndices: number[]): string {
+  if (matchIndices.length === 0) return yamlContent;
+
+  const doc = parseYamlDocument(yamlContent);
+  const matchesNode = getMatchesNode(doc, "deleted");
+
+  // Sort indices in descending order to prevent index shifting during deletion
+  const sortedIndices = Array.from(new Set(matchIndices)).sort((a, b) => b - a);
+
+  for (const matchIndex of sortedIndices) {
+    if (matchIndex >= 0 && matchIndex < matchesNode.items.length) {
+      matchesNode.delete(matchIndex);
+    }
+  }
+
+  return formatYamlDocument(doc);
+}
+
 export interface SnippetLineRange {
   startLine: number;
   endLine: number;
