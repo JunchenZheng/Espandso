@@ -25,6 +25,7 @@ export const zhCN: TranslationTree = {
     retry: "重试",
     copyLogs: "复制日志",
     addSnippet: "添加片段",
+    batchDelete: "批量删除 ({{count}})",
     visualEditor: "可视化编辑器",
     viewLogs: "查看日志",
     viewWarnings: "查看警告",
@@ -256,6 +257,11 @@ export const zhCN: TranslationTree = {
       message: "确定要从 {{file}} 中删除触发词 \"{{trigger}}\" 吗？",
       confirmBtn: "确认删除",
     },
+    confirmBatchDelete: {
+      title: "批量删除片段",
+      message: "确定要从 {{file}} 中删除选中的 {{count}} 个片段吗？",
+      confirmBtn: "确认批量删除",
+    },
   },
   errors: {
     genericError: "错误",
@@ -263,6 +269,7 @@ export const zhCN: TranslationTree = {
     invalidFileType: "无效的文件类型",
     failedToSaveSnippet: "保存片段失败：{{message}}",
     failedToDeleteSnippet: "删除片段失败：{{message}}",
+    failedToBatchDeleteSnippets: "批量删除片段失败：{{message}}",
     failedToLoadConfig: "加载 Espanso 配置失败：{{message}}",
     failedToReadFile: "[{{file}}] 读取文件失败：{{message}}",
     triggerRequired: "触发词为必填项且不能为空。",

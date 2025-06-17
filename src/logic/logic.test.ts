@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { validate } from "./validate";
 import { importYamlContent } from "./importYaml";
-import { appendSnippetToYamlContent, deleteSnippetFromYamlContent, findSnippetLineRangeInYaml, replaceSnippetInYamlContent } from "./yamlEditor";
+import { appendSnippetToYamlContent, deleteSnippetFromYamlContent, deleteMultipleSnippetsFromYamlContent, findSnippetLineRangeInYaml, replaceSnippetInYamlContent } from "./yamlEditor";
 import { isEspansoYamlConfigFile, parseEspansoConfigDir, sortEspansoConfigFiles } from "./espansoPaths";
 import {
   getIncludeFileCandidates,
@@ -450,6 +450,24 @@ matches:
 
     expect(updated).not.toContain(":hello");
     expect(updated).toContain("trigger: :bye");
+  });
+
+  it("should delete multiple snippets by match indices in descending order", () => {
+    const yaml = `
+matches:
+  - trigger: :one
+    replace: first
+  - trigger: :two
+    replace: second
+  - trigger: :three
+    replace: third
+`;
+
+    const updated = deleteMultipleSnippetsFromYamlContent(yaml, [0, 2]);
+
+    expect(updated).not.toContain(":one");
+    expect(updated).toContain("trigger: :two");
+    expect(updated).not.toContain(":three");
   });
 });
 

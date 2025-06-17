@@ -66,7 +66,7 @@ import { Snippet, ValidationError } from "./logic/types";
 import { validate } from "./logic/validate";
 import { importYamlContent, ImportedMatch } from "./logic/importYaml";
 import { buildTriggerInput, getSnippetTriggers, isImageFilePath, normalizeTriggerLines } from "./logic/snippetUtils";
-import { appendSnippetToYamlContent, deleteSnippetFromYamlContent, findSnippetLineRangeInYaml, replaceSnippetInYamlContent, SnippetLineRange } from "./logic/yamlEditor";
+import { appendSnippetToYamlContent, deleteSnippetFromYamlContent, deleteMultipleSnippetsFromYamlContent, findSnippetLineRangeInYaml, replaceSnippetInYamlContent, SnippetLineRange } from "./logic/yamlEditor";
 import { EspansoConfigFile, EspansoDirectoryInfo, EspansoPathSource, scanEspansoConfigFiles } from "./logic/espansoPaths";
 import { getInitialYamlTemplate, normalizeYamlFileName, resolveTargetPath, validateFileName, validateFolderName } from "./logic/createFileSystem";
 import { checkIsBinaryFilePath, isBinaryDomFile } from "./logic/fileCheck";
@@ -1158,6 +1158,37 @@ function App() {
     );
   }
 
+  async function batchDeleteSnippetsFromYaml(
+    configPath: string,
+    relativePath: string,
+    matchIndices: number[],
+    onComplete?: () => void
+  ) {
+    if (matchIndices.length === 0) return;
+
+    showConfirm(
+      t("dialogs.confirmBatchDelete.message", { count: matchIndices.length, file: relativePath }),
+      async () => {
+        try {
+          const content = await readTextFile(configPath);
+          const updatedContent = deleteMultipleSnippetsFromYamlContent(content, matchIndices);
+          await writeTextFile(configPath, updatedContent);
+          await scanDefaultEspansoConfigDir();
+          setSelectedEspansoConfigPath(configPath);
+          if (isVisualEditorOpen) {
+            await loadVisualEditorYaml(configPath);
+          }
+          onComplete?.();
+        } catch (e: any) {
+          showAlert(t("errors.failedToBatchDeleteSnippets", { message: e?.message || e }), t("errors.genericError"));
+        }
+      },
+      t("dialogs.confirmBatchDelete.title"),
+      t("dialogs.confirmBatchDelete.confirmBtn"),
+      t("actions.cancel"),
+    );
+  }
+
   async function openYamlFileInDefaultApp(path: string) {
     try {
       await openPath(path);
@@ -1326,6 +1357,14 @@ function App() {
                         setWarningsFilterPath(path);
                         setIsWarningsDialogOpen(true);
                       }}
+                      onBatchDelete={(matchIndices, onComplete) =>
+                        batchDeleteSnippetsFromYaml(
+                          selectedEspansoPreview.config.path,
+                          selectedEspansoPreview.config.relativePath,
+                          matchIndices,
+                          onComplete
+                        )
+                      }
                     />
                   ) : selectedDirectoryNode ? (
                     <EspansoDirectoryDetail
@@ -2984,6 +3023,7 @@ interface EspansoConfigDetailProps {
   onAddSnippet: () => void;
   onOpenVisualEditor?: () => void;
   onOpenWarnings?: (path: string) => void;
+  onBatchDelete?: (matchIndices: number[], onComplete: () => void) => void;
 }
 
 function EspansoConfigDetail({
@@ -2992,6 +3032,7 @@ function EspansoConfigDetail({
   onAddSnippet,
   onOpenVisualEditor,
   onOpenWarnings,
+  onBatchDelete,
 }: EspansoConfigDetailProps) {
   const { t } = useI18n();
   const ROW_HEIGHT = 36;
@@ -3000,6 +3041,7 @@ function EspansoConfigDetail({
   const scrollRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(0);
+  const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
   const snippetCount = preview.snippets.length;
   const totalHeight = snippetCount * ROW_HEIGHT;
   const startIndex = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN_ROWS);
@@ -3024,6 +3066,7 @@ function EspansoConfigDetail({
 
   useEffect(() => {
     setScrollTop(0);
+    setSelectedIndices(new Set());
     if (scrollRef.current) {
       scrollRef.current.scrollTop = 0;
     }
@@ -3050,6 +3093,21 @@ function EspansoConfigDetail({
               </span>
             </button>
           )}
+          {selectedIndices.size > 0 && (
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => {
+                const originalIndices = Array.from(selectedIndices).map((idx) => {
+                  return preview.importedMatches[idx]?.originalMatchIndex ?? idx;
+                });
+                onBatchDelete?.(originalIndices, () => setSelectedIndices(new Set()));
+              }}
+            >
+              <Trash2 className="h-4 w-4" />
+              {t("actions.batchDelete", { count: selectedIndices.size })}
+            </Button>
+          )}
           {onOpenVisualEditor && (
             <Button size="sm" variant="outline" onClick={onOpenVisualEditor}>
               <Columns className="h-4 w-4" />
@@ -3064,7 +3122,21 @@ function EspansoConfigDetail({
         </div>
       </div>
 
-      <div className="grid h-9 shrink-0 grid-cols-[minmax(8rem,1fr)_minmax(4.5rem,0.45fr)_minmax(6rem,0.65fr)_minmax(12rem,2fr)_2.25rem] items-center border-b bg-secondary/40 px-3 text-xs font-semibold text-muted-foreground">
+      <div className="grid h-9 shrink-0 grid-cols-[2.25rem_minmax(8rem,1fr)_minmax(4.5rem,0.45fr)_minmax(6rem,0.65fr)_minmax(12rem,2fr)_2.25rem] items-center border-b bg-secondary/40 px-3 text-xs font-semibold text-muted-foreground">
+        <div className="flex items-center justify-center">
+          <input
+            type="checkbox"
+            className="h-3.5 w-3.5 rounded border-input text-primary focus:ring-primary cursor-pointer accent-primary"
+            checked={snippetCount > 0 && selectedIndices.size === snippetCount}
+            onChange={(e) => {
+              if (e.target.checked) {
+                setSelectedIndices(new Set(Array.from({ length: snippetCount }, (_, i) => i)));
+              } else {
+                setSelectedIndices(new Set());
+              }
+            }}
+          />
+        </div>
         <div className="truncate">{t("table.name")}</div>
         <div className="truncate">{t("table.type")}</div>
         <div className="truncate">{t("table.keyword")}</div>
@@ -3102,13 +3174,40 @@ function EspansoConfigDetail({
                       ? snippet.form || t("snippets.emptyForm")
                       : snippet.replace || t("snippets.emptyReplacement");
 
+                const isSelected = selectedIndices.has(index);
+
                 return (
                   <button
                     key={`${triggers.join("-")}-${index}`}
-                    className="grid h-9 w-full grid-cols-[minmax(8rem,1fr)_minmax(4.5rem,0.45fr)_minmax(6rem,0.65fr)_minmax(12rem,2fr)_2.25rem] items-center px-3 text-left text-sm transition-colors hover:bg-secondary/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    className={cn(
+                      "grid h-9 w-full grid-cols-[2.25rem_minmax(8rem,1fr)_minmax(4.5rem,0.45fr)_minmax(6rem,0.65fr)_minmax(12rem,2fr)_2.25rem] items-center px-3 text-left text-sm transition-colors hover:bg-secondary/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                      isSelected && "bg-accent/40"
+                    )}
                     onClick={() => onViewSnippet(preview.importedMatches[index] || { snippet, originalMatchIndex: index }, index)}
                     title={t("snippets.viewDetailsFor", { trigger: displayTrigger })}
                   >
+                    <div
+                      className="flex items-center justify-center"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <input
+                        type="checkbox"
+                        className="h-3.5 w-3.5 rounded border-input text-primary focus:ring-primary cursor-pointer accent-primary"
+                        checked={isSelected}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          setSelectedIndices((prev) => {
+                            const next = new Set(prev);
+                            if (e.target.checked) {
+                              next.add(index);
+                            } else {
+                              next.delete(index);
+                            }
+                            return next;
+                          });
+                        }}
+                      />
+                    </div>
                     <div className="min-w-0 pr-3">
                       <div className="truncate font-medium">
                         {snippet.description || displayTrigger}
