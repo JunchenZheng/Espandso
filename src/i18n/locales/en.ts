@@ -23,6 +23,7 @@ export const en = {
     retry: "Retry",
     copyLogs: "Copy Logs",
     addSnippet: "Add Snippet",
+    batchSelect: "Batch Delete",
     batchDelete: "Delete Selected ({{count}})",
     visualEditor: "Visual Editor",
     viewLogs: "View Logs",

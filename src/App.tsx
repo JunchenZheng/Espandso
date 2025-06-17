@@ -3041,6 +3041,7 @@ function EspansoConfigDetail({
   const scrollRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(0);
+  const [isBatchMode, setIsBatchMode] = useState(false);
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
   const snippetCount = preview.snippets.length;
   const totalHeight = snippetCount * ROW_HEIGHT;
@@ -3066,11 +3067,29 @@ function EspansoConfigDetail({
 
   useEffect(() => {
     setScrollTop(0);
+    setIsBatchMode(false);
     setSelectedIndices(new Set());
     if (scrollRef.current) {
       scrollRef.current.scrollTop = 0;
     }
   }, [preview.config.path]);
+
+  const exitBatchMode = () => {
+    setIsBatchMode(false);
+    setSelectedIndices(new Set());
+  };
+
+  const toggleSelectIndex = (index: number) => {
+    setSelectedIndices((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      return next;
+    });
+  };
 
   return (
     <>
@@ -3093,50 +3112,76 @@ function EspansoConfigDetail({
               </span>
             </button>
           )}
-          {selectedIndices.size > 0 && (
-            <Button
-              size="sm"
-              variant="destructive"
-              onClick={() => {
-                const originalIndices = Array.from(selectedIndices).map((idx) => {
-                  return preview.importedMatches[idx]?.originalMatchIndex ?? idx;
-                });
-                onBatchDelete?.(originalIndices, () => setSelectedIndices(new Set()));
-              }}
-            >
-              <Trash2 className="h-4 w-4" />
-              {t("actions.batchDelete", { count: selectedIndices.size })}
-            </Button>
+          {isBatchMode ? (
+            <>
+              <Button size="sm" variant="ghost" onClick={exitBatchMode}>
+                {t("actions.cancel")}
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                disabled={selectedIndices.size === 0}
+                onClick={() => {
+                  if (selectedIndices.size === 0) return;
+                  const originalIndices = Array.from(selectedIndices).map((idx) => {
+                    return preview.importedMatches[idx]?.originalMatchIndex ?? idx;
+                  });
+                  onBatchDelete?.(originalIndices, exitBatchMode);
+                }}
+              >
+                <Trash2 className="h-4 w-4" />
+                {t("actions.batchDelete", { count: selectedIndices.size })}
+              </Button>
+            </>
+          ) : (
+            <>
+              {onOpenVisualEditor && (
+                <Button size="sm" variant="outline" onClick={onOpenVisualEditor}>
+                  <Columns className="h-4 w-4" />
+                  {t("actions.visualEditor")}
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setIsBatchMode(true)}
+              >
+                <ListChecks className="h-4 w-4" />
+                {t("actions.batchSelect")}
+              </Button>
+              <Button size="sm" onClick={onAddSnippet}>
+                <Plus className="h-4 w-4" />
+                {t("actions.addSnippet")}
+              </Button>
+            </>
           )}
-          {onOpenVisualEditor && (
-            <Button size="sm" variant="outline" onClick={onOpenVisualEditor}>
-              <Columns className="h-4 w-4" />
-              {t("actions.visualEditor")}
-            </Button>
-          )}
-          <Button size="sm" onClick={onAddSnippet}>
-            <Plus className="h-4 w-4" />
-            {t("actions.addSnippet")}
-          </Button>
-
         </div>
       </div>
 
-      <div className="grid h-9 shrink-0 grid-cols-[2.25rem_minmax(8rem,1fr)_minmax(4.5rem,0.45fr)_minmax(6rem,0.65fr)_minmax(12rem,2fr)_2.25rem] items-center border-b bg-secondary/40 px-3 text-xs font-semibold text-muted-foreground">
-        <div className="flex items-center justify-center">
-          <input
-            type="checkbox"
-            className="h-3.5 w-3.5 rounded border-input text-primary focus:ring-primary cursor-pointer accent-primary"
-            checked={snippetCount > 0 && selectedIndices.size === snippetCount}
-            onChange={(e) => {
-              if (e.target.checked) {
-                setSelectedIndices(new Set(Array.from({ length: snippetCount }, (_, i) => i)));
-              } else {
-                setSelectedIndices(new Set());
-              }
-            }}
-          />
-        </div>
+      <div
+        className={cn(
+          "grid h-9 shrink-0 items-center border-b bg-secondary/40 px-3 text-xs font-semibold text-muted-foreground",
+          isBatchMode
+            ? "grid-cols-[2.25rem_minmax(8rem,1fr)_minmax(4.5rem,0.45fr)_minmax(6rem,0.65fr)_minmax(12rem,2fr)_2.25rem]"
+            : "grid-cols-[minmax(8rem,1fr)_minmax(4.5rem,0.45fr)_minmax(6rem,0.65fr)_minmax(12rem,2fr)_2.25rem]"
+        )}
+      >
+        {isBatchMode && (
+          <div className="flex items-center justify-center">
+            <input
+              type="checkbox"
+              className="h-3.5 w-3.5 rounded border-input text-primary focus:ring-primary cursor-pointer accent-primary"
+              checked={snippetCount > 0 && selectedIndices.size === snippetCount}
+              onChange={(e) => {
+                if (e.target.checked) {
+                  setSelectedIndices(new Set(Array.from({ length: snippetCount }, (_, i) => i)));
+                } else {
+                  setSelectedIndices(new Set());
+                }
+              }}
+            />
+          </div>
+        )}
         <div className="truncate">{t("table.name")}</div>
         <div className="truncate">{t("table.type")}</div>
         <div className="truncate">{t("table.keyword")}</div>
@@ -3180,34 +3225,47 @@ function EspansoConfigDetail({
                   <button
                     key={`${triggers.join("-")}-${index}`}
                     className={cn(
-                      "grid h-9 w-full grid-cols-[2.25rem_minmax(8rem,1fr)_minmax(4.5rem,0.45fr)_minmax(6rem,0.65fr)_minmax(12rem,2fr)_2.25rem] items-center px-3 text-left text-sm transition-colors hover:bg-secondary/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                      "grid h-9 w-full items-center px-3 text-left text-sm transition-colors hover:bg-secondary/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                      isBatchMode
+                        ? "grid-cols-[2.25rem_minmax(8rem,1fr)_minmax(4.5rem,0.45fr)_minmax(6rem,0.65fr)_minmax(12rem,2fr)_2.25rem]"
+                        : "grid-cols-[minmax(8rem,1fr)_minmax(4.5rem,0.45fr)_minmax(6rem,0.65fr)_minmax(12rem,2fr)_2.25rem]",
                       isSelected && "bg-accent/40"
                     )}
-                    onClick={() => onViewSnippet(preview.importedMatches[index] || { snippet, originalMatchIndex: index }, index)}
-                    title={t("snippets.viewDetailsFor", { trigger: displayTrigger })}
+                    onClick={() => {
+                      if (isBatchMode) {
+                        toggleSelectIndex(index);
+                      } else {
+                        onViewSnippet(
+                          preview.importedMatches[index] || { snippet, originalMatchIndex: index },
+                          index
+                        );
+                      }
+                    }}
+                    title={
+                      isBatchMode
+                        ? displayTrigger
+                        : t("snippets.viewDetailsFor", { trigger: displayTrigger })
+                    }
                   >
-                    <div
-                      className="flex items-center justify-center"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <input
-                        type="checkbox"
-                        className="h-3.5 w-3.5 rounded border-input text-primary focus:ring-primary cursor-pointer accent-primary"
-                        checked={isSelected}
-                        onChange={(e) => {
+                    {isBatchMode && (
+                      <div
+                        className="flex items-center justify-center"
+                        onClick={(e) => {
                           e.stopPropagation();
-                          setSelectedIndices((prev) => {
-                            const next = new Set(prev);
-                            if (e.target.checked) {
-                              next.add(index);
-                            } else {
-                              next.delete(index);
-                            }
-                            return next;
-                          });
+                          toggleSelectIndex(index);
                         }}
-                      />
-                    </div>
+                      >
+                        <input
+                          type="checkbox"
+                          className="h-3.5 w-3.5 rounded border-input text-primary focus:ring-primary cursor-pointer accent-primary"
+                          checked={isSelected}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            toggleSelectIndex(index);
+                          }}
+                        />
+                      </div>
+                    )}
                     <div className="min-w-0 pr-3">
                       <div className="truncate font-medium">
                         {snippet.description || displayTrigger}
