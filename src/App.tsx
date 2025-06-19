@@ -3170,7 +3170,7 @@ function EspansoConfigDetail({
           <div className="flex items-center justify-center">
             <input
               type="checkbox"
-              className="h-3.5 w-3.5 rounded border-input text-primary focus:ring-primary cursor-pointer accent-primary"
+              className="h-3.5 w-3.5 rounded border-emerald-500/50 text-emerald-600 focus:ring-emerald-500 cursor-pointer accent-emerald-600"
               checked={snippetCount > 0 && selectedIndices.size === snippetCount}
               onChange={(e) => {
                 if (e.target.checked) {
@@ -3229,7 +3229,7 @@ function EspansoConfigDetail({
                       isBatchMode
                         ? "grid-cols-[2.25rem_minmax(8rem,1fr)_minmax(4.5rem,0.45fr)_minmax(6rem,0.65fr)_minmax(12rem,2fr)_2.25rem]"
                         : "grid-cols-[minmax(8rem,1fr)_minmax(4.5rem,0.45fr)_minmax(6rem,0.65fr)_minmax(12rem,2fr)_2.25rem]",
-                      isSelected && "bg-accent/40"
+                      isSelected && "bg-emerald-500/15 hover:bg-emerald-500/20 border-l-2 border-l-emerald-500"
                     )}
                     onClick={() => {
                       if (isBatchMode) {
@@ -3248,21 +3248,12 @@ function EspansoConfigDetail({
                     }
                   >
                     {isBatchMode && (
-                      <div
-                        className="flex items-center justify-center"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleSelectIndex(index);
-                        }}
-                      >
+                      <div className="flex items-center justify-center pointer-events-none">
                         <input
                           type="checkbox"
-                          className="h-3.5 w-3.5 rounded border-input text-primary focus:ring-primary cursor-pointer accent-primary"
+                          readOnly
+                          className="h-3.5 w-3.5 rounded border-emerald-500/50 text-emerald-600 focus:ring-emerald-500 accent-emerald-600"
                           checked={isSelected}
-                          onChange={(e) => {
-                            e.stopPropagation();
-                            toggleSelectIndex(index);
-                          }}
                         />
                       </div>
                     )}
