@@ -303,6 +303,15 @@ export const en = {
     yamlPreview: "YAML Source Preview (Read-only)",
     refresh: "Refresh YAML",
     loadingYaml: "Loading YAML content...",
+    modeAdd: "Add Mode",
+    modeDelete: "Delete Mode",
+    deletePreview: "Delete Preview",
+    noMatchesInYaml: "No matches found in this YAML file",
+    pendingDeletion: "Marked for Deletion",
+    undoDelete: "Undo Delete",
+    resetAll: "Reset",
+    markedCount: "{{count}} marked for deletion",
+    searchSnippetPlaceholder: "Search trigger or content...",
   },
 } as const;
 
