@@ -2624,6 +2624,7 @@ function App() {
                           highlightedLineRange &&
                           lineNumber >= highlightedLineRange.startLine &&
                           lineNumber <= highlightedLineRange.endLine;
+                        const isDeleteMode = visualEditorMode === "delete";
                         return (
                           <div
                             key={idx}
@@ -2631,7 +2632,9 @@ function App() {
                             className={cn(
                               "table-row transition-colors duration-300",
                               isHighlighted
-                                ? "bg-amber-500/20 dark:bg-amber-400/20"
+                                ? isDeleteMode
+                                  ? "bg-destructive/15 dark:bg-destructive/25"
+                                  : "bg-amber-500/20 dark:bg-amber-400/20"
                                 : "hover:bg-muted/40",
                             )}
                           >
@@ -2639,7 +2642,9 @@ function App() {
                               className={cn(
                                 "table-cell pr-3 text-right select-none w-8 border-r font-mono text-[11px]",
                                 isHighlighted
-                                  ? "border-amber-500/60 bg-amber-500/30 text-amber-900 dark:text-amber-200 font-bold"
+                                  ? isDeleteMode
+                                    ? "border-destructive/60 bg-destructive/20 text-destructive dark:text-red-300 font-bold"
+                                    : "border-amber-500/60 bg-amber-500/30 text-amber-900 dark:text-amber-200 font-bold"
                                   : "text-muted-foreground/40 border-border/40",
                               )}
                             >
@@ -2649,7 +2654,9 @@ function App() {
                               className={cn(
                                 "table-cell pl-3 whitespace-pre font-mono",
                                 isHighlighted
-                                  ? "text-amber-950 dark:text-amber-100 font-semibold"
+                                  ? isDeleteMode
+                                    ? "text-destructive dark:text-red-300 line-through decoration-destructive decoration-2 font-medium"
+                                    : "text-amber-950 dark:text-amber-100 font-semibold"
                                   : "text-foreground font-normal",
                               )}
                             >
