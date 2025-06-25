@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { validate } from "./validate";
 import { importYamlContent } from "./importYaml";
-import { appendSnippetToYamlContent, deleteSnippetFromYamlContent, deleteMultipleSnippetsFromYamlContent, findSnippetLineRangeInYaml, replaceSnippetInYamlContent } from "./yamlEditor";
+import { appendSnippetToYamlContent, deleteSnippetFromYamlContent, deleteMultipleSnippetsFromYamlContent, findSnippetLineRangeInYaml, findSnippetLineRangesInYaml, replaceSnippetInYamlContent } from "./yamlEditor";
 import { isEspansoYamlConfigFile, parseEspansoConfigDir, sortEspansoConfigFiles } from "./espansoPaths";
 import {
   getIncludeFileCandidates,
@@ -332,6 +332,25 @@ matches:
     expect(range0?.startLine).toBe(2);
     expect(range1).not.toBeNull();
     expect(range1?.startLine).toBe(4);
+  });
+
+  it("should calculate delete preview line ranges from original match indices", () => {
+    const yaml = `matches:
+  - trigger: :one
+    replace: first
+  - trigger: :two
+    replace: second
+  - trigger: :three
+    replace: third
+`;
+
+    const deletedYaml = deleteMultipleSnippetsFromYamlContent(yaml, [2]);
+    const previewRanges = findSnippetLineRangesInYaml(yaml, [2]);
+    const oldShiftedRange = findSnippetLineRangeInYaml(deletedYaml, 1);
+
+    expect(previewRanges).toEqual([{ startLine: 6, endLine: 7 }]);
+    expect(oldShiftedRange).toEqual({ startLine: 5, endLine: 6 });
+    expect(oldShiftedRange).not.toEqual(previewRanges[0]);
   });
 
   it("should append a file snippet using Espanso shell vars", () => {

@@ -66,7 +66,7 @@ import { Snippet, ValidationError } from "./logic/types";
 import { validate } from "./logic/validate";
 import { importYamlContent, ImportedMatch } from "./logic/importYaml";
 import { buildTriggerInput, getSnippetTriggers, isImageFilePath, normalizeTriggerLines } from "./logic/snippetUtils";
-import { appendSnippetToYamlContent, deleteSnippetFromYamlContent, deleteMultipleSnippetsFromYamlContent, findSnippetLineRangeInYaml, replaceSnippetInYamlContent, SnippetLineRange } from "./logic/yamlEditor";
+import { appendSnippetToYamlContent, deleteSnippetFromYamlContent, deleteMultipleSnippetsFromYamlContent, findSnippetLineRangeInYaml, findSnippetLineRangesInYaml, replaceSnippetInYamlContent, SnippetLineRange } from "./logic/yamlEditor";
 import { EspansoConfigFile, EspansoDirectoryInfo, EspansoPathSource, scanEspansoConfigFiles } from "./logic/espansoPaths";
 import { getInitialYamlTemplate, normalizeYamlFileName, resolveTargetPath, validateFileName, validateFolderName } from "./logic/createFileSystem";
 import { checkIsBinaryFilePath, isBinaryDomFile } from "./logic/fileCheck";
@@ -895,7 +895,7 @@ function App() {
     setVisualEditorYamlContent(updatedYaml);
 
     if (!pendingDeletedIndices.includes(matchIndex)) {
-      const range = findSnippetLineRangeInYaml(updatedYaml, Math.max(0, matchIndex - 1));
+      const range = findSnippetLineRangeInYaml(visualEditorOriginalYaml, matchIndex);
       setHighlightedLineRange(range);
     } else {
       setHighlightedLineRange(null);
@@ -923,6 +923,25 @@ function App() {
     const res = importYamlContent(visualEditorOriginalYaml, relPath);
     return res.importedMatches;
   }, [visualEditorOriginalYaml, snippetEditTarget, selectedEspansoPreview]);
+
+  const visualEditorPreviewYamlContent = visualEditorMode === "delete"
+    ? visualEditorOriginalYaml
+    : visualEditorYamlContent;
+
+  const pendingDeletedLineNumbers = useMemo(() => {
+    if (visualEditorMode !== "delete" || pendingDeletedIndices.length === 0) {
+      return new Set<number>();
+    }
+
+    const ranges = findSnippetLineRangesInYaml(visualEditorOriginalYaml, pendingDeletedIndices);
+    const lineNumbers = new Set<number>();
+    for (const range of ranges) {
+      for (let lineNumber = range.startLine; lineNumber <= range.endLine; lineNumber++) {
+        lineNumbers.add(lineNumber);
+      }
+    }
+    return lineNumbers;
+  }, [visualEditorMode, visualEditorOriginalYaml, pendingDeletedIndices]);
 
   function openVisualEditorDialog() {
     if (!selectedEspansoPreview) {
@@ -2618,13 +2637,17 @@ function App() {
                     </div>
                   ) : (
                     <div className="table w-full select-text leading-relaxed">
-                      {visualEditorYamlContent.split("\n").map((line, idx) => {
+                      {visualEditorPreviewYamlContent.split("\n").map((line, idx) => {
                         const lineNumber = idx + 1;
-                        const isHighlighted =
-                          highlightedLineRange &&
-                          lineNumber >= highlightedLineRange.startLine &&
-                          lineNumber <= highlightedLineRange.endLine;
                         const isDeleteMode = visualEditorMode === "delete";
+                        const isPendingDeletedLine = isDeleteMode && pendingDeletedLineNumbers.has(lineNumber);
+                        const isHighlighted =
+                          isPendingDeletedLine ||
+                          (
+                            highlightedLineRange &&
+                            lineNumber >= highlightedLineRange.startLine &&
+                            lineNumber <= highlightedLineRange.endLine
+                          );
                         return (
                           <div
                             key={idx}
