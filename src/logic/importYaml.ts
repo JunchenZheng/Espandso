@@ -5,6 +5,7 @@ export interface ImportedMatch {
   snippet: Snippet;
   originalSnippet?: Snippet;
   originalMatchIndex: number;
+  triggerIndex: number;
   resourcePath?: string; // Path of the resource file to be copied
   resourceName?: string; // New filename of the resource file
 }
@@ -118,7 +119,7 @@ export function parseYamlMatch(
       originalSnippet.description = match.description;
     }
 
-    const matches: ImportedMatch[] = triggers.map((trigger) => {
+    const matches: ImportedMatch[] = triggers.map((trigger, triggerIndex) => {
       const snippet: Snippet = {
         trigger,
         include_file: resourceFilename,
@@ -130,6 +131,7 @@ export function parseYamlMatch(
         snippet,
         originalSnippet,
         originalMatchIndex,
+        triggerIndex,
         resourcePath: catPath,
         resourceName: resourceFilename,
       };
@@ -147,7 +149,7 @@ export function parseYamlMatch(
       originalSnippet.description = match.description;
     }
 
-    const matches: ImportedMatch[] = triggers.map((trigger) => {
+    const matches: ImportedMatch[] = triggers.map((trigger, triggerIndex) => {
       const snippet: Snippet = {
         trigger,
         image_path: String(imagePath),
@@ -155,7 +157,7 @@ export function parseYamlMatch(
       if (match.description) {
         snippet.description = match.description;
       }
-      return { snippet, originalSnippet, originalMatchIndex };
+      return { snippet, originalSnippet, originalMatchIndex, triggerIndex };
     });
 
     return { matches, warnings };
@@ -171,7 +173,7 @@ export function parseYamlMatch(
       originalSnippet.description = match.description;
     }
 
-    const matches: ImportedMatch[] = triggers.map((trigger) => {
+    const matches: ImportedMatch[] = triggers.map((trigger, triggerIndex) => {
       const snippet: Snippet = {
         trigger,
         form: String(form),
@@ -180,7 +182,7 @@ export function parseYamlMatch(
       if (match.description) {
         snippet.description = match.description;
       }
-      return { snippet, originalSnippet, originalMatchIndex };
+      return { snippet, originalSnippet, originalMatchIndex, triggerIndex };
     });
 
     return { matches, warnings };
@@ -201,7 +203,7 @@ export function parseYamlMatch(
     originalSnippet.description = match.description;
   }
 
-  const matches: ImportedMatch[] = triggers.map((trigger) => {
+  const matches: ImportedMatch[] = triggers.map((trigger, triggerIndex) => {
     const snippet: Snippet = {
       trigger,
       replace: String(replace),
@@ -209,7 +211,7 @@ export function parseYamlMatch(
     if (match.description) {
       snippet.description = match.description;
     }
-    return { snippet, originalSnippet, originalMatchIndex };
+    return { snippet, originalSnippet, originalMatchIndex, triggerIndex };
   });
 
   return { matches, warnings };

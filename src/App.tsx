@@ -66,7 +66,7 @@ import { Snippet, ValidationError } from "./logic/types";
 import { validate } from "./logic/validate";
 import { importYamlContent, ImportedMatch } from "./logic/importYaml";
 import { buildTriggerInput, getSnippetTriggers, isImageFilePath, normalizeTriggerLines } from "./logic/snippetUtils";
-import { appendSnippetToYamlContent, deleteSnippetFromYamlContent, deleteMultipleSnippetsFromYamlContent, findSnippetLineRangeInYaml, findSnippetLineRangesInYaml, replaceSnippetInYamlContent, SnippetLineRange } from "./logic/yamlEditor";
+import { appendSnippetToYamlContent, deleteSnippetFromYamlContent, deleteMultipleSnippetsFromYamlContent, deleteSelectedTriggersFromYamlContent, findSnippetLineRangeInYaml, findDeleteSelectionLineRangesInYaml, replaceSnippetInYamlContent, DeleteTriggerSelection, SnippetLineRange } from "./logic/yamlEditor";
 import { EspansoConfigFile, EspansoDirectoryInfo, EspansoPathSource, scanEspansoConfigFiles } from "./logic/espansoPaths";
 import { getInitialYamlTemplate, normalizeYamlFileName, resolveTargetPath, validateFileName, validateFolderName } from "./logic/createFileSystem";
 import { checkIsBinaryFilePath, isBinaryDomFile } from "./logic/fileCheck";
@@ -327,7 +327,7 @@ function App() {
 
   const [visualEditorMode, setVisualEditorMode] = useState<"add" | "delete">("add");
   const [visualEditorOriginalYaml, setVisualEditorOriginalYaml] = useState<string>("");
-  const [pendingDeletedIndices, setPendingDeletedIndices] = useState<number[]>([]);
+  const [pendingDeleteSelections, setPendingDeleteSelections] = useState<DeleteTriggerSelection[]>([]);
   const [deleteSearchQuery, setDeleteSearchQuery] = useState<string>("");
 
   const [enableExperimentalYamlWarnings, setEnableExperimentalYamlWarnings] = useState<boolean>(() =>
@@ -861,7 +861,7 @@ function App() {
       const content = await readTextFile(targetPath);
       setVisualEditorOriginalYaml(content);
       setVisualEditorYamlContent(content);
-      setPendingDeletedIndices([]);
+      setPendingDeleteSelections([]);
       if (typeof matchIndexToHighlight === "number" && matchIndexToHighlight >= 0) {
         const range = findSnippetLineRangeInYaml(content, matchIndexToHighlight);
         setHighlightedLineRange(range);
@@ -876,26 +876,30 @@ function App() {
     }
   }, [selectedEspansoPreview, snippetEditTarget, t]);
 
-  const applyPendingDeletionsToYaml = useCallback((originalContent: string, deletedIndices: number[]) => {
-    if (deletedIndices.length === 0) {
+  const applyPendingDeletionsToYaml = useCallback((originalContent: string, selections: DeleteTriggerSelection[]) => {
+    if (selections.length === 0) {
       return originalContent;
     }
-    return deleteMultipleSnippetsFromYamlContent(originalContent, deletedIndices);
+    return deleteSelectedTriggersFromYamlContent(originalContent, selections);
   }, []);
 
-  const toggleDeleteMatchIndex = (matchIndex: number) => {
-    let nextIndices: number[];
-    if (pendingDeletedIndices.includes(matchIndex)) {
-      nextIndices = pendingDeletedIndices.filter((idx) => idx !== matchIndex);
+  const getDeleteSelectionKey = (selection: DeleteTriggerSelection) => `${selection.matchIndex}:${selection.triggerIndex}`;
+
+  const toggleDeleteSelection = (selection: DeleteTriggerSelection) => {
+    const selectionKey = getDeleteSelectionKey(selection);
+    let nextSelections: DeleteTriggerSelection[];
+    if (pendingDeleteSelections.some((item) => getDeleteSelectionKey(item) === selectionKey)) {
+      nextSelections = pendingDeleteSelections.filter((item) => getDeleteSelectionKey(item) !== selectionKey);
     } else {
-      nextIndices = [...pendingDeletedIndices, matchIndex];
+      nextSelections = [...pendingDeleteSelections, selection];
     }
-    setPendingDeletedIndices(nextIndices);
-    const updatedYaml = applyPendingDeletionsToYaml(visualEditorOriginalYaml, nextIndices);
+    setPendingDeleteSelections(nextSelections);
+    const updatedYaml = applyPendingDeletionsToYaml(visualEditorOriginalYaml, nextSelections);
     setVisualEditorYamlContent(updatedYaml);
 
-    if (!pendingDeletedIndices.includes(matchIndex)) {
-      const range = findSnippetLineRangeInYaml(visualEditorOriginalYaml, matchIndex);
+    if (!pendingDeleteSelections.some((item) => getDeleteSelectionKey(item) === selectionKey)) {
+      const range = findDeleteSelectionLineRangesInYaml(visualEditorOriginalYaml, [selection])[0]
+        || findSnippetLineRangeInYaml(visualEditorOriginalYaml, selection.matchIndex);
       setHighlightedLineRange(range);
     } else {
       setHighlightedLineRange(null);
@@ -903,16 +907,16 @@ function App() {
   };
 
   const handleUndoLastDelete = () => {
-    if (pendingDeletedIndices.length === 0) return;
-    const nextIndices = pendingDeletedIndices.slice(0, -1);
-    setPendingDeletedIndices(nextIndices);
-    const updatedYaml = applyPendingDeletionsToYaml(visualEditorOriginalYaml, nextIndices);
+    if (pendingDeleteSelections.length === 0) return;
+    const nextSelections = pendingDeleteSelections.slice(0, -1);
+    setPendingDeleteSelections(nextSelections);
+    const updatedYaml = applyPendingDeletionsToYaml(visualEditorOriginalYaml, nextSelections);
     setVisualEditorYamlContent(updatedYaml);
     setHighlightedLineRange(null);
   };
 
   const handleResetDeletions = () => {
-    setPendingDeletedIndices([]);
+    setPendingDeleteSelections([]);
     setVisualEditorYamlContent(visualEditorOriginalYaml);
     setHighlightedLineRange(null);
   };
@@ -929,11 +933,11 @@ function App() {
     : visualEditorYamlContent;
 
   const pendingDeletedLineNumbers = useMemo(() => {
-    if (visualEditorMode !== "delete" || pendingDeletedIndices.length === 0) {
+    if (visualEditorMode !== "delete" || pendingDeleteSelections.length === 0) {
       return new Set<number>();
     }
 
-    const ranges = findSnippetLineRangesInYaml(visualEditorOriginalYaml, pendingDeletedIndices);
+    const ranges = findDeleteSelectionLineRangesInYaml(visualEditorOriginalYaml, pendingDeleteSelections);
     const lineNumbers = new Set<number>();
     for (const range of ranges) {
       for (let lineNumber = range.startLine; lineNumber <= range.endLine; lineNumber++) {
@@ -941,7 +945,7 @@ function App() {
       }
     }
     return lineNumbers;
-  }, [visualEditorMode, visualEditorOriginalYaml, pendingDeletedIndices]);
+  }, [visualEditorMode, visualEditorOriginalYaml, pendingDeleteSelections]);
 
   function openVisualEditorDialog() {
     if (!selectedEspansoPreview) {
@@ -952,7 +956,7 @@ function App() {
     resetSnippetForm();
     setHighlightedLineRange(null);
     setVisualEditorMode("add");
-    setPendingDeletedIndices([]);
+    setPendingDeleteSelections([]);
     setDeleteSearchQuery("");
     setIsVisualEditorOpen(true);
     loadVisualEditorYaml(selectedEspansoPreview.config.path);
@@ -1148,7 +1152,7 @@ function App() {
       const targetPath = snippetEditTarget?.preview.config.path || selectedEspansoPreview?.config.path;
       if (!targetPath) return;
 
-      if (pendingDeletedIndices.length === 0) {
+      if (pendingDeleteSelections.length === 0) {
         setIsVisualEditorOpen(false);
         return;
       }
@@ -1156,7 +1160,7 @@ function App() {
       setIsSavingSnippet(true);
       try {
         await writeTextFile(targetPath, visualEditorYamlContent);
-        setPendingDeletedIndices([]);
+        setPendingDeleteSelections([]);
         await scanDefaultEspansoConfigDir();
         setSelectedEspansoConfigPath(targetPath);
         setIsVisualEditorOpen(false);
@@ -2033,9 +2037,9 @@ function App() {
                   </label>
                 </div>
 
-                {visualEditorMode === "delete" && pendingDeletedIndices.length > 0 && (
+                {visualEditorMode === "delete" && pendingDeleteSelections.length > 0 && (
                   <span className="inline-flex items-center rounded-full bg-destructive/15 px-2.5 py-0.5 text-xs font-semibold text-destructive">
-                    {t("visualEditor.markedCount", { count: pendingDeletedIndices.length })}
+                    {t("visualEditor.markedCount", { count: pendingDeleteSelections.length })}
                   </span>
                 )}
               </div>
@@ -2059,7 +2063,7 @@ function App() {
                       variant="outline"
                       className="h-9 gap-1.5 text-xs shrink-0"
                       onClick={handleUndoLastDelete}
-                      disabled={pendingDeletedIndices.length === 0}
+                      disabled={pendingDeleteSelections.length === 0}
                       title={t("visualEditor.undoDelete")}
                     >
                       <RotateCcw className="h-3.5 w-3.5" />
@@ -2071,7 +2075,7 @@ function App() {
                       variant="outline"
                       className="h-9 gap-1.5 text-xs shrink-0 text-muted-foreground hover:text-foreground"
                       onClick={handleResetDeletions}
-                      disabled={pendingDeletedIndices.length === 0}
+                      disabled={pendingDeleteSelections.length === 0}
                     >
                       <span>{t("visualEditor.resetAll")}</span>
                     </Button>
@@ -2095,14 +2099,18 @@ function App() {
                         })
                         .map((item) => {
                           const matchIdx = item.originalMatchIndex;
-                          const isMarked = pendingDeletedIndices.includes(matchIdx);
+                          const triggerIndex = item.triggerIndex ?? 0;
+                          const selection = { matchIndex: matchIdx, triggerIndex };
+                          const isMarked = pendingDeleteSelections.some(
+                            (pendingSelection) => getDeleteSelectionKey(pendingSelection) === getDeleteSelectionKey(selection),
+                          );
                           const triggers = getSnippetTriggers(item.snippet);
                           const triggerText = triggers.length > 0 ? triggers.join(", ") : `Snippet #${matchIdx + 1}`;
                           const summaryContent = item.snippet.replace || item.snippet.include_file || item.snippet.image_path || (item.snippet.form ? t("snippets.typeForm") : "");
 
                           return (
                             <div
-                              key={`match-item-${matchIdx}`}
+                              key={`match-item-${matchIdx}-${triggerIndex}`}
                               className={cn(
                                 "flex items-start justify-between gap-3 rounded-lg border p-3 text-xs transition-all duration-200",
                                 isMarked
@@ -2139,7 +2147,7 @@ function App() {
                                   "h-8 shrink-0 gap-1.5 text-xs",
                                   !isMarked && "text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                                 )}
-                                onClick={() => toggleDeleteMatchIndex(matchIdx)}
+                                onClick={() => toggleDeleteSelection(selection)}
                               >
                                 {isMarked ? (
                                   <>
