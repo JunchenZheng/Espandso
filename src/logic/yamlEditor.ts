@@ -173,6 +173,64 @@ export function deleteMultipleSnippetsFromYamlContent(yamlContent: string, match
   return formatYamlDocument(doc);
 }
 
+export interface DeleteTriggerSelection {
+  matchIndex: number;
+  triggerIndex: number;
+}
+
+function getSelectedTriggerIndicesByMatch(selections: DeleteTriggerSelection[]): Map<number, Set<number>> {
+  const selectedByMatch = new Map<number, Set<number>>();
+
+  for (const selection of selections) {
+    if (selection.matchIndex < 0 || selection.triggerIndex < 0) continue;
+    const current = selectedByMatch.get(selection.matchIndex) || new Set<number>();
+    current.add(selection.triggerIndex);
+    selectedByMatch.set(selection.matchIndex, current);
+  }
+
+  return selectedByMatch;
+}
+
+export function deleteSelectedTriggersFromYamlContent(
+  yamlContent: string,
+  selections: DeleteTriggerSelection[],
+): string {
+  if (selections.length === 0) return yamlContent;
+
+  const doc = parseYamlDocument(yamlContent);
+  const matchesNode = getMatchesNode(doc, "deleted");
+  const selectedByMatch = getSelectedTriggerIndicesByMatch(selections);
+  const matchIndices = Array.from(selectedByMatch.keys()).sort((a, b) => b - a);
+
+  for (const matchIndex of matchIndices) {
+    if (matchIndex < 0 || matchIndex >= matchesNode.items.length) continue;
+
+    const selectedTriggerIndices = selectedByMatch.get(matchIndex);
+    if (!selectedTriggerIndices || selectedTriggerIndices.size === 0) continue;
+
+    const matchNode = matchesNode.items[matchIndex] as any;
+    const triggersNode = matchNode?.get?.("triggers", true);
+    if (!isSeq(triggersNode)) {
+      matchesNode.delete(matchIndex);
+      continue;
+    }
+
+    if (selectedTriggerIndices.size >= triggersNode.items.length) {
+      matchesNode.delete(matchIndex);
+      continue;
+    }
+
+    const triggerIndices = Array.from(selectedTriggerIndices).sort((a, b) => b - a);
+    for (const triggerIndex of triggerIndices) {
+      if (triggerIndex >= 0 && triggerIndex < triggersNode.items.length) {
+        triggersNode.delete(triggerIndex);
+      }
+    }
+  }
+
+  return formatYamlDocument(doc);
+}
+
 export interface SnippetLineRange {
   startLine: number;
   endLine: number;
@@ -184,19 +242,23 @@ function collectSnippetLineRangesInYaml(yamlContent: string): Array<SnippetLineR
   if (!isSeq(matchesNode) || matchesNode.items.length === 0) return [];
 
   return matchesNode.items.map((item: any) => {
-    if (!item || !item.range) return null;
-
-    const [startOffset, endOffset] = item.range;
-    const startLine = yamlContent.slice(0, startOffset).split("\n").length;
-    const validEndOffset = Math.min(endOffset, yamlContent.length);
-    let endLine = yamlContent.slice(0, validEndOffset).split("\n").length;
-
-    if (endLine > startLine && yamlContent[validEndOffset - 1] === "\n") {
-      endLine = Math.max(startLine, endLine - 1);
-    }
-
-    return { startLine, endLine };
+    return getNodeLineRange(yamlContent, item);
   });
+}
+
+function getNodeLineRange(yamlContent: string, node: any): SnippetLineRange | null {
+  if (!node || !node.range) return null;
+
+  const [startOffset, endOffset] = node.range;
+  const startLine = yamlContent.slice(0, startOffset).split("\n").length;
+  const validEndOffset = Math.min(endOffset, yamlContent.length);
+  let endLine = yamlContent.slice(0, validEndOffset).split("\n").length;
+
+  if (endLine > startLine && yamlContent[validEndOffset - 1] === "\n") {
+    endLine = Math.max(startLine, endLine - 1);
+  }
+
+  return { startLine, endLine };
 }
 
 export function findSnippetLineRangeInYaml(yamlContent: string, matchIndex: number): SnippetLineRange | null {
@@ -221,6 +283,45 @@ export function findSnippetLineRangesInYaml(yamlContent: string, matchIndices: n
     return uniqueIndices
       .map((matchIndex) => ranges[matchIndex])
       .filter((range): range is SnippetLineRange => Boolean(range));
+  } catch {
+    return [];
+  }
+}
+
+export function findDeleteSelectionLineRangesInYaml(
+  yamlContent: string,
+  selections: DeleteTriggerSelection[],
+): SnippetLineRange[] {
+  try {
+    if (!yamlContent || selections.length === 0) return [];
+
+    const doc = YAML.parseDocument(yamlContent);
+    const matchesNode = doc.get("matches", true);
+    if (!isSeq(matchesNode) || matchesNode.items.length === 0) return [];
+
+    const selectedByMatch = getSelectedTriggerIndicesByMatch(selections);
+    const ranges: SnippetLineRange[] = [];
+
+    for (const [matchIndex, selectedTriggerIndices] of selectedByMatch) {
+      if (matchIndex < 0 || matchIndex >= matchesNode.items.length) continue;
+
+      const matchNode = matchesNode.items[matchIndex] as any;
+      const triggersNode = matchNode?.get?.("triggers", true);
+
+      if (!isSeq(triggersNode) || selectedTriggerIndices.size >= triggersNode.items.length) {
+        const matchRange = getNodeLineRange(yamlContent, matchNode);
+        if (matchRange) ranges.push(matchRange);
+        continue;
+      }
+
+      for (const triggerIndex of Array.from(selectedTriggerIndices).sort((a, b) => a - b)) {
+        if (triggerIndex < 0 || triggerIndex >= triggersNode.items.length) continue;
+        const triggerRange = getNodeLineRange(yamlContent, triggersNode.items[triggerIndex]);
+        if (triggerRange) ranges.push(triggerRange);
+      }
+    }
+
+    return ranges;
   } catch {
     return [];
   }
