@@ -23,6 +23,8 @@ export const en = {
     retry: "Retry",
     copyLogs: "Copy Logs",
     addSnippet: "Add Snippet",
+    batchSelect: "Batch Delete",
+    batchDelete: "Delete Selected ({{count}})",
     visualEditor: "Visual Editor",
     viewLogs: "View Logs",
     viewWarnings: "View Warnings",
@@ -195,6 +197,7 @@ export const en = {
   },
   table: {
     name: "Name",
+    type: "Type",
     keyword: "Keyword",
     snippet: "Snippet",
     details: "Details",
@@ -253,6 +256,11 @@ export const en = {
       message: "Are you sure you want to delete trigger \"{{trigger}}\" from {{file}}?",
       confirmBtn: "Delete",
     },
+    confirmBatchDelete: {
+      title: "Batch Delete Snippets",
+      message: "Are you sure you want to delete {{count}} selected snippets from {{file}}?",
+      confirmBtn: "Delete Selected",
+    },
   },
   errors: {
     genericError: "Error",
@@ -260,6 +268,7 @@ export const en = {
     invalidFileType: "Invalid File Type",
     failedToSaveSnippet: "Failed to save snippet: {{message}}",
     failedToDeleteSnippet: "Failed to delete snippet: {{message}}",
+    failedToBatchDeleteSnippets: "Failed to delete selected snippets: {{message}}",
     failedToLoadConfig: "Failed to load Espanso config: {{message}}",
     failedToReadFile: "[{{file}}] Failed to read file: {{message}}",
     triggerRequired: "Trigger is required and cannot be empty.",
@@ -294,6 +303,15 @@ export const en = {
     yamlPreview: "YAML Source Preview (Read-only)",
     refresh: "Refresh YAML",
     loadingYaml: "Loading YAML content...",
+    modeAdd: "Add Mode",
+    modeDelete: "Delete Mode",
+    deletePreview: "Delete Preview",
+    noMatchesInYaml: "No matches found in this YAML file",
+    pendingDeletion: "Marked for Deletion",
+    undoDelete: "Undo Delete",
+    resetAll: "Reset",
+    markedCount: "{{count}} marked for deletion",
+    searchSnippetPlaceholder: "Search trigger or content...",
   },
 } as const;
 

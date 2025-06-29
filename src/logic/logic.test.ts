@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { validate } from "./validate";
 import { importYamlContent } from "./importYaml";
-import { appendSnippetToYamlContent, deleteSnippetFromYamlContent, findSnippetLineRangeInYaml, replaceSnippetInYamlContent } from "./yamlEditor";
+import { appendSnippetToYamlContent, deleteSnippetFromYamlContent, deleteMultipleSnippetsFromYamlContent, deleteSelectedTriggersFromYamlContent, findSnippetLineRangeInYaml, findSnippetLineRangesInYaml, findDeleteSelectionLineRangesInYaml, replaceSnippetInYamlContent } from "./yamlEditor";
 import { isEspansoYamlConfigFile, parseEspansoConfigDir, sortEspansoConfigFiles } from "./espansoPaths";
 import {
   getIncludeFileCandidates,
@@ -175,6 +175,9 @@ matches:
     expect(res.snippets[2]).toEqual({ trigger: ":hey", replace: "greeting" });
     expect(res.snippets[3]).toEqual({ trigger: ":cat", image_path: "/path/to/cat.png", description: "cat image" });
     expect(res.importedMatches[1].originalMatchIndex).toBe(1);
+    expect(res.importedMatches[1].triggerIndex).toBe(0);
+    expect(res.importedMatches[2].originalMatchIndex).toBe(1);
+    expect(res.importedMatches[2].triggerIndex).toBe(1);
     expect(res.importedMatches[1].originalSnippet).toEqual({ triggers: [":hi", ":hey"], replace: "greeting" });
   });
 
@@ -334,6 +337,25 @@ matches:
     expect(range1?.startLine).toBe(4);
   });
 
+  it("should calculate delete preview line ranges from original match indices", () => {
+    const yaml = `matches:
+  - trigger: :one
+    replace: first
+  - trigger: :two
+    replace: second
+  - trigger: :three
+    replace: third
+`;
+
+    const deletedYaml = deleteMultipleSnippetsFromYamlContent(yaml, [2]);
+    const previewRanges = findSnippetLineRangesInYaml(yaml, [2]);
+    const oldShiftedRange = findSnippetLineRangeInYaml(deletedYaml, 1);
+
+    expect(previewRanges).toEqual([{ startLine: 6, endLine: 7 }]);
+    expect(oldShiftedRange).toEqual({ startLine: 5, endLine: 6 });
+    expect(oldShiftedRange).not.toEqual(previewRanges[0]);
+  });
+
   it("should append a file snippet using Espanso shell vars", () => {
     const updated = appendSnippetToYamlContent("matches: []\n", {
       trigger: ":file",
@@ -450,6 +472,89 @@ matches:
 
     expect(updated).not.toContain(":hello");
     expect(updated).toContain("trigger: :bye");
+  });
+
+  it("should delete multiple snippets by match indices in descending order", () => {
+    const yaml = `
+matches:
+  - trigger: :one
+    replace: first
+  - trigger: :two
+    replace: second
+  - trigger: :three
+    replace: third
+`;
+
+    const updated = deleteMultipleSnippetsFromYamlContent(yaml, [0, 2]);
+
+    expect(updated).not.toContain(":one");
+    expect(updated).toContain("trigger: :two");
+    expect(updated).not.toContain(":three");
+  });
+
+  it("should delete one trigger from a multi-trigger match without deleting the match", () => {
+    const yaml = `matches:
+  - triggers:
+      - non-im
+      - -non
+      - :non
+    replace: shared
+`;
+
+    const updated = deleteSelectedTriggersFromYamlContent(yaml, [
+      { matchIndex: 0, triggerIndex: 1 },
+    ]);
+
+    expect(updated).toContain("- non-im");
+    expect(updated).not.toContain("- -non");
+    expect(updated).toContain("- :non");
+    expect(updated).toContain("replace: shared");
+  });
+
+  it("should delete the whole match when every trigger in a multi-trigger match is selected", () => {
+    const yaml = `matches:
+  - triggers:
+      - non-im
+      - -non
+      - :non
+    replace: shared
+  - trigger: :keep
+    replace: keep
+`;
+
+    const updated = deleteSelectedTriggersFromYamlContent(yaml, [
+      { matchIndex: 0, triggerIndex: 0 },
+      { matchIndex: 0, triggerIndex: 1 },
+      { matchIndex: 0, triggerIndex: 2 },
+    ]);
+
+    expect(updated).not.toContain("non-im");
+    expect(updated).not.toContain("-non");
+    expect(updated).not.toContain(":non");
+    expect(updated).not.toContain("replace: shared");
+    expect(updated).toContain("trigger: :keep");
+  });
+
+  it("should preview a single selected trigger line until the full group is selected", () => {
+    const yaml = `matches:
+  - triggers:
+      - non-im
+      - -non
+      - :non
+    replace: shared
+`;
+
+    const partialRanges = findDeleteSelectionLineRangesInYaml(yaml, [
+      { matchIndex: 0, triggerIndex: 1 },
+    ]);
+    const fullRanges = findDeleteSelectionLineRangesInYaml(yaml, [
+      { matchIndex: 0, triggerIndex: 0 },
+      { matchIndex: 0, triggerIndex: 1 },
+      { matchIndex: 0, triggerIndex: 2 },
+    ]);
+
+    expect(partialRanges).toEqual([{ startLine: 4, endLine: 4 }]);
+    expect(fullRanges).toEqual([{ startLine: 2, endLine: 6 }]);
   });
 });
 
