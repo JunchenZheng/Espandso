@@ -1309,14 +1309,14 @@ function App() {
         <div className="drag-overlay">
               <div className="drag-zone">
                 <Upload className="mb-5 h-12 w-12" />
-                <div className="text-xl font-semibold">
+                <div className="text-2xl font-semibold">
                   {isAddSnippetOpen && addSnippetKind === "file"
                     ? t("drag.dropFileHere")
                     : isAddSnippetOpen && addSnippetKind === "image"
                       ? t("drag.dropImageFileHere")
                       : t("drag.dropYamlFileHere")}
                 </div>
-                <div className="mt-2 text-sm text-muted-foreground">
+                <div className="mt-2 text-base text-muted-foreground">
                   {isAddSnippetOpen && addSnippetKind === "file"
                     ? t("drag.fileSourceDescription")
                     : isAddSnippetOpen && addSnippetKind === "image"
@@ -1332,7 +1332,7 @@ function App() {
           {espansoConfigs.length > 0 ? (
             <div className="flex min-h-0 flex-1 flex-col gap-3">
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-background p-3">
-                <div className="flex flex-wrap gap-3 text-sm">
+                <div className="flex flex-wrap gap-3 text-base">
                   <span className="font-semibold">
                     {formatCount(t, espansoConfigs.length, "counts.yamlFile", "counts.yamlFiles")}
                   </span>
@@ -1405,7 +1405,7 @@ function App() {
               <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden rounded-md border bg-background md:grid-cols-[18rem_1fr]">
                 <aside className="flex min-h-0 flex-col border-b bg-secondary/30 md:border-b-0 md:border-r">
                   <div className="flex h-10 shrink-0 items-center justify-between border-b px-3">
-                    <h2 className="text-sm font-semibold">{t("navigation.collection")}</h2>
+                    <h2 className="text-lg font-semibold">{t("navigation.collection")}</h2>
                     <div className="flex items-center gap-1">
                       <Button
                         size="sm"
@@ -1425,7 +1425,7 @@ function App() {
                       >
                         <FilePlus className="h-4 w-4" />
                       </Button>
-                      <span className="ml-1 text-xs text-muted-foreground">{espansoPreviewList.length}</span>
+                      <span className="ml-1 text-[11px] font-medium text-muted-foreground">{espansoPreviewList.length}</span>
                     </div>
                   </div>
                   <ScrollArea className="min-h-0 flex-1">
@@ -1492,8 +1492,8 @@ function App() {
           ) : (
             <div className="flex flex-col items-center justify-center p-8 text-center rounded-lg border border-dashed my-auto bg-background/50">
               <FolderOpen className="h-12 w-12 text-muted-foreground/60 mb-3" />
-              <h3 className="text-lg font-semibold mb-1">{t("empty.noYamlFilesTitle")}</h3>
-              <p className="text-sm text-muted-foreground max-w-md mb-6">
+              <h3 className="text-2xl font-semibold mb-1">{t("empty.noYamlFilesTitle")}</h3>
+              <p className="text-base text-muted-foreground max-w-md mb-6">
                 {isScanningEspanso
                   ? t("status.scanningEspansoConfigs")
                   : espansoScanMessage || t("empty.noYamlFilesMessage")}
@@ -1991,11 +1991,11 @@ function App() {
       }}>
         <DialogContent className="max-w-[95vw] w-[95vw] h-[92vh] max-h-[92vh] grid grid-rows-[auto_minmax(0,1fr)] overflow-hidden p-6 gap-4">
           <DialogHeader className="shrink-0">
-            <DialogTitle className="flex items-center gap-2 text-base">
+            <DialogTitle className="flex items-center gap-2 text-xl font-bold">
               <Columns className="h-5 w-5 text-primary" />
               <span>{t("visualEditor.title")}</span>
             </DialogTitle>
-            <DialogDescription className="break-all text-xs">
+            <DialogDescription className="break-all text-sm text-muted-foreground">
               {snippetEditTarget?.preview.config.relativePath || selectedEspansoPreview?.config.relativePath || t("snippets.selectYamlFile")}
               {snippetEditTarget ? ` · ${t("snippets.snippetNumber", { number: snippetEditTarget.displayIndex + 1 })}` : ""}
             </DialogDescription>
@@ -2007,7 +2007,7 @@ function App() {
               {/* RadioButton 模式选择头部 */}
               <div className="flex items-center justify-between border-b pb-3 mb-4 shrink-0">
                 <div className="flex items-center gap-6">
-                  <label className="flex items-center gap-2 cursor-pointer text-sm font-semibold select-none">
+                  <label className="flex items-center gap-2 cursor-pointer text-base font-semibold select-none">
                     <input
                       type="radio"
                       name="ve-editor-mode"
@@ -2021,7 +2021,7 @@ function App() {
                     <Plus className="h-4 w-4 text-primary" />
                     <span>{t("visualEditor.modeAdd")}</span>
                   </label>
-                  <label className="flex items-center gap-2 cursor-pointer text-sm font-semibold select-none">
+                  <label className="flex items-center gap-2 cursor-pointer text-base font-semibold select-none">
                     <input
                       type="radio"
                       name="ve-editor-mode"
@@ -2038,7 +2038,7 @@ function App() {
                 </div>
 
                 {visualEditorMode === "delete" && pendingDeleteSelections.length > 0 && (
-                  <span className="inline-flex items-center rounded-full bg-destructive/15 px-2.5 py-0.5 text-xs font-semibold text-destructive">
+                  <span className="inline-flex items-center rounded-full bg-destructive/15 px-2.5 py-0.5 text-[11px] font-semibold text-destructive">
                     {t("visualEditor.markedCount", { count: pendingDeleteSelections.length })}
                   </span>
                 )}
@@ -3385,8 +3385,8 @@ function EspansoConfigDetail({
     <>
       <div className="flex h-14 shrink-0 items-center justify-between gap-3 border-b px-3">
         <div className="min-w-0 flex-1">
-          <h2 className="truncate text-sm font-semibold">{preview.config.relativePath}</h2>
-          <p className="mt-1 truncate text-xs text-muted-foreground">{preview.config.path}</p>
+          <h2 className="truncate text-xl font-bold">{preview.config.relativePath}</h2>
+          <p className="mt-1 truncate text-sm text-muted-foreground">{preview.config.path}</p>
         </div>
         <div className="flex items-center gap-2">
           {preview.warningCount > 0 && (
