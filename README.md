@@ -57,6 +57,10 @@ Install to a custom directory:
 
 macOS builds still require Rust/Cargo and Apple Command Line Tools because Tauri produces a native macOS app bundle.
 
+## Documentation & UI Guidelines
+
+For details about our UI components, typography hierarchy, and design tokens, see the [UI Design System](file:///Volumes/Sandisk2TB/CodeProject/Espanso_yaml_to_json/docs/DESIGN_SYSTEM.md).
+
 ## Current Editing Model
 
 Expandso treats existing Espanso YAML files as the source of truth and writes changes directly to the selected match file.

@@ -60,6 +60,9 @@ Espanso YAML
 Important directories:
 
 ```text
+docs/
+  DESIGN_SYSTEM.md           UI Design System & Typography Hierarchy Guidelines
+
 src/
   App.tsx                    Main React application and workflow orchestration
   components/ui/             shadcn/ui-style primitives used by the app
