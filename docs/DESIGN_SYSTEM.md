@@ -26,6 +26,20 @@ The baseline font size is `16px = 1rem`. The system is divided into 7 standardiz
 | **Caption / Help** | 12px | 0.75rem | `text-xs` | Regular (400) | Help text, input validation error messages, timestamps, tags, terminal logs |
 | **Micro Badge** | 10px ~ 11px | 0.625rem | `text-[11px]` / `text-[10px]` | Medium (500) / SemiBold (600) | Badge counts, numerical indicators, micro tags (use sparingly) |
 
+### 2.1 Font Color Palette & Opacity Standards
+
+The color hierarchy ensures maximum contrast, legibility, and compliance with WCAG AAA accessibility standards:
+
+| Level / Component | Recommended HEX | RGB / CSS Variable | Dark Mode Opacity (on pure black base) | Rationale & Visual Weight |
+| --- | --- | --- | --- | --- |
+| **Hero Title (H1)** | `#111827` / `#1A1A1A` | `rgb(17, 24, 39)` / `var(--text-h1-rgb)` | 90% ~ 95% | Near pure black, maximum contrast to anchor visual focus firmly. |
+| **Section Title (H2)** | `#1F2937` / `#262626` | `rgb(31, 41, 55)` / `var(--text-h2-rgb)` | 85% ~ 90% | High contrast with slight visual step-down from H1. |
+| **Subtitle / Group (H3)** | `#374151` / `#434343` | `rgb(55, 65, 81)` / `var(--text-h3-rgb)` | 80% ~ 85% | Calm & grounded; clearly demarcates component / card level titles. |
+| **Body / Base** | `#374151` / `#262626` | `rgb(55, 65, 81)` / `var(--text-body-rgb)` | 80% ~ 85% | Baseline reading color: glare-free for long reading while passing WCAG AAA. |
+| **Body Small** | `#4B5563` / `#595959` | `rgb(75, 85, 99)` / `var(--text-small-rgb)` | 60% ~ 70% | Reduced visual weight for tabular data, descriptions, and labels. |
+| **Caption / Help** | `#6B7280` / `#8C8C8C` | `rgb(107, 114, 128)` / `var(--text-caption-rgb)` | 45% ~ 50% | De-emphasized; guides users when seeking help, timestamps, or hints. |
+| **Micro Badge** | `#9CA3AF` / `#BFBFBF` | `rgb(156, 163, 175)` / `var(--text-micro-rgb)` | 30% ~ 40% | Weakest visual tier for badges, disabled states, or micro footer text. |
+
 ---
 
 ## 3. Component-Level Typography Mapping
