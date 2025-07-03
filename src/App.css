@@ -24,6 +24,25 @@
     --input: 214 18% 84%;
     --ring: 173 80% 28%;
     --radius: 0.5rem;
+
+    /* Typography Color Palette Standard */
+    --text-h1-rgb: 17 24 39;
+    --text-h2-rgb: 31 41 55;
+    --text-h3-rgb: 55 65 81;
+    --text-body-rgb: 55 65 81;
+    --text-small-rgb: 75 85 99;
+    --text-caption-rgb: 107 114 128;
+    --text-micro-rgb: 156 163 175;
+  }
+
+  .dark {
+    --text-h1-rgb: 249 250 251;
+    --text-h2-rgb: 243 244 246;
+    --text-h3-rgb: 229 231 235;
+    --text-body-rgb: 229 231 235;
+    --text-small-rgb: 209 213 219;
+    --text-caption-rgb: 156 163 175;
+    --text-micro-rgb: 107 114 128;
   }
 
   * {
