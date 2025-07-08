@@ -1989,7 +1989,7 @@ function App() {
           setSnippetEditTarget(null);
         }
       }}>
-        <DialogContent className="max-w-[95vw] w-[95vw] h-[92vh] max-h-[92vh] grid grid-rows-[auto_minmax(0,1fr)] overflow-hidden p-6 gap-4">
+        <DialogContent className="fixed inset-0 top-0 left-0 translate-x-0 translate-y-0 w-full max-w-none h-full max-h-none rounded-none border-none grid grid-rows-[auto_minmax(0,1fr)] overflow-hidden p-6 gap-4">
           <DialogHeader className="shrink-0">
             <DialogTitle className="flex items-center gap-2 text-xl font-bold">
               <Columns className="h-5 w-5 text-primary" />
