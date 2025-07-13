@@ -1528,14 +1528,9 @@ function App() {
         }
       }}>
         <DialogContent
-          className={cn(
-            "grid max-h-[calc(100vh-2rem)] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden",
-            snippetEditTarget
-              ? "h-[min(50rem,calc(100vh-2rem))] w-[50vw] min-w-[min(42rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)]"
-              : "h-[min(50rem,calc(100vh-2rem))] max-w-2xl",
-          )}
+          className="grid h-[calc(100vh-3rem)] max-h-[calc(100vh-3rem)] w-[50vw] min-w-[min(36rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden"
         >
-          <DialogHeader>
+          <DialogHeader className="shrink-0">
             <DialogTitle>{snippetDialogTitle}</DialogTitle>
             <DialogDescription className="break-all">
               {snippetEditTarget?.preview.config.relativePath || selectedEspansoPreview?.config.relativePath || t("snippets.selectYamlFile")}
@@ -1543,11 +1538,11 @@ function App() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="min-h-0 space-y-5 overflow-auto pr-1">
+          <div className="min-h-0 flex-1 flex flex-col space-y-4 overflow-y-auto pr-1">
             {(addErrors.length > 0 || (isYamlWarningsEnabled && addWarnings.length > 0)) && (
               <div
                 className={cn(
-                  "space-y-2 rounded-lg border p-4 text-sm",
+                  "space-y-2 rounded-lg border p-4 text-sm shrink-0",
                   addErrors.length > 0
                     ? "border-destructive/30 bg-destructive/10 text-destructive"
                     : "border-amber-300 bg-amber-50 text-amber-800",
@@ -1569,7 +1564,7 @@ function App() {
               </div>
             )}
 
-            <div className="space-y-2">
+            <div className="space-y-2 shrink-0">
               <Label htmlFor="trigger-0" className="inline-flex items-center">
                 {t("snippets.trigger")} <RequiredMark />
               </Label>
@@ -1614,7 +1609,7 @@ function App() {
               </div>
             </div>
 
-            <div className="grid grid-cols-4 rounded-md border bg-secondary/60 p-1">
+            <div className="grid grid-cols-4 rounded-md border bg-secondary/60 p-1 shrink-0">
               <Button
                 type="button"
                 variant={activeSnippetKind === "text" ? "secondary" : "ghost"}
@@ -1666,7 +1661,7 @@ function App() {
             </div>
 
             {activeSnippetKind === "file" ? (
-              <div className="space-y-3">
+              <div className="space-y-3 shrink-0">
                 <Label htmlFor="include-file" className="inline-flex items-center">
                   {t("snippets.file")} <RequiredMark />
                 </Label>
@@ -1715,7 +1710,7 @@ function App() {
                 )}
               </div>
             ) : activeSnippetKind === "image" ? (
-              <div className="space-y-3">
+              <div className="space-y-3 shrink-0">
                 <Label htmlFor="image-path" className="inline-flex items-center">
                   {t("snippets.imagePath")} <RequiredMark />
                 </Label>
@@ -1748,15 +1743,15 @@ function App() {
                 </div>
               </div>
             ) : activeSnippetKind === "form" ? (
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="form" className="inline-flex items-center">
+              <div className="flex-1 flex flex-col min-h-0 space-y-4">
+                <div className="flex-1 flex flex-col space-y-2 min-h-[120px]">
+                  <Label htmlFor="form" className="inline-flex items-center shrink-0">
                     {t("snippets.formLayout")} <RequiredMark />
                   </Label>
                   <Textarea
                     id="form"
                     ref={formTextareaRef}
-                    className="mono-field min-h-44 resize-y"
+                    className="mono-field flex-1 h-full min-h-[120px] resize-y"
                     placeholder={"=== Ticket ===\nTitle: title\nCategory: category\n\nDescription:\ndescription"}
                     value={editForm}
                     onChange={(e) => {
@@ -1779,38 +1774,38 @@ function App() {
                       captureFormSelection(event.currentTarget);
                     }}
                   />
-                  <div className="space-y-2 rounded-md border bg-secondary/25 p-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <Label>{t("formBuilder.selectedTextAction")}</Label>
-                      <span className="max-w-full truncate text-xs text-muted-foreground">
-                        {formSelection ? formSelection.text.trim() : t("formBuilder.selectTextHint")}
-                      </span>
-                    </div>
-                    <div className="grid gap-2 sm:grid-cols-4">
-                      {([
-                        ["text", t("formBuilder.singleLineText"), Type],
-                        ["multiline", t("formBuilder.multilineText"), AlignLeft],
-                        ["choice", t("formBuilder.choiceBox"), ListChecks],
-                        ["list", t("formBuilder.listBox"), List],
-                      ] as const).map(([control, label, Icon]) => (
-                        <Button
-                          key={control}
-                          type="button"
-                          variant="outline"
-                          disabled={!formSelection}
-                          className="justify-start"
-                          onMouseDown={(event) => event.preventDefault()}
-                          onClick={() => configureSelectedFormField(control)}
-                        >
-                          <Icon className="h-4 w-4" />
-                          {label}
-                        </Button>
-                      ))}
-                    </div>
+                </div>
+                <div className="space-y-2 rounded-md border bg-secondary/25 p-3 shrink-0">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <Label>{t("formBuilder.selectedTextAction")}</Label>
+                    <span className="max-w-full truncate text-xs text-muted-foreground">
+                      {formSelection ? formSelection.text.trim() : t("formBuilder.selectTextHint")}
+                    </span>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-4">
+                    {([
+                      ["text", t("formBuilder.singleLineText"), Type],
+                      ["multiline", t("formBuilder.multilineText"), AlignLeft],
+                      ["choice", t("formBuilder.choiceBox"), ListChecks],
+                      ["list", t("formBuilder.listBox"), List],
+                    ] as const).map(([control, label, Icon]) => (
+                      <Button
+                        key={control}
+                        type="button"
+                        variant="outline"
+                        disabled={!formSelection}
+                        className="justify-start"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => configureSelectedFormField(control)}
+                      >
+                        <Icon className="h-4 w-4" />
+                        {label}
+                      </Button>
+                    ))}
                   </div>
                 </div>
                 {editFormFieldConfigs.length > 0 && (
-                  <div className="space-y-3">
+                  <div className="space-y-3 shrink-0">
                     <Label>{t("formBuilder.fields")}</Label>
                     {editFormFieldConfigs.map((field, fieldIndex) => (
                       <div key={field.id} className="space-y-3 rounded-md border bg-secondary/25 p-3">
@@ -1932,13 +1927,13 @@ function App() {
                 )}
               </div>
             ) : (
-              <div className="space-y-2">
-                <Label htmlFor="replace" className="inline-flex items-center">
+              <div className="flex-1 flex flex-col space-y-2 min-h-[120px]">
+                <Label htmlFor="replace" className="inline-flex items-center shrink-0">
                   {t("snippets.replaceContent")} <RequiredMark />
                 </Label>
                 <Textarea
                   id="replace"
-                  className="mono-field min-h-48 resize-y"
+                  className="mono-field flex-1 h-full min-h-[120px] resize-y"
                   placeholder={t("snippets.replaceContentPlaceholder")}
                   value={editReplace}
                   onChange={(e) => setEditReplace(e.target.value)}
@@ -1946,7 +1941,7 @@ function App() {
               </div>
             )}
 
-            <div className="space-y-2">
+            <div className="space-y-2 shrink-0">
               <Label htmlFor="description" className="inline-flex items-center">
                 {t("snippets.descriptionLabel")} <OptionalMark />
               </Label>
