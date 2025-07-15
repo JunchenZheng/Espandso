@@ -84,4 +84,14 @@
   .drag-zone {
     @apply flex h-full w-full flex-col items-center justify-center rounded-lg border-2 border-dashed border-primary/60 bg-primary/5 text-center text-primary shadow-inner;
   }
+
+  .home-split {
+    grid-template-columns: 1fr;
+  }
+
+  @media (min-width: 768px) {
+    .home-split {
+      grid-template-columns: minmax(12rem, var(--collection-pane-width, 20%)) 0.5rem minmax(0, 1fr);
+    }
+  }
 }

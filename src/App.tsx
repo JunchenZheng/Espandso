@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { memo, type CSSProperties, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { mkdir, readFile, readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import { listen } from "@tauri-apps/api/event";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
@@ -126,6 +126,10 @@ interface FormFieldConfig {
 }
 
 type TranslateFn = ReturnType<typeof useI18n>["t"];
+
+const DEFAULT_COLLECTION_PANE_WIDTH = 20;
+const MIN_COLLECTION_PANE_WIDTH = 14;
+const MAX_COLLECTION_PANE_WIDTH = 40;
 
 function snippetKindLabel(kind: AddSnippetKind, t: TranslateFn): string {
   if (kind === "file") return t("snippets.typeFileShort");
@@ -293,6 +297,9 @@ function OptionalMark() {
 function App() {
   const { t, locale, setLocale } = useI18n();
   const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [collectionPaneWidth, setCollectionPaneWidth] = useState<number>(DEFAULT_COLLECTION_PANE_WIDTH);
+  const [isCollectionResizing, setIsCollectionResizing] = useState<boolean>(false);
+  const mainSplitRef = useRef<HTMLDivElement | null>(null);
 
   const [espansoMatchDir, setEspansoMatchDir] = useState<string>("");
   const [espansoPathSource, setEspansoPathSource] = useState<EspansoPathSource | "">("");
@@ -343,6 +350,50 @@ function App() {
     setEnableExperimentalYamlWarnings(checked);
     setExperimentalYamlWarningsEnabled(checked);
   };
+
+  const updateCollectionPaneWidth = useCallback((clientX: number) => {
+    const split = mainSplitRef.current;
+    if (!split) return;
+
+    const rect = split.getBoundingClientRect();
+    if (rect.width <= 0) return;
+
+    const nextWidth = ((clientX - rect.left) / rect.width) * 100;
+    setCollectionPaneWidth(Math.min(MAX_COLLECTION_PANE_WIDTH, Math.max(MIN_COLLECTION_PANE_WIDTH, nextWidth)));
+  }, []);
+
+  const startCollectionResize = useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setIsCollectionResizing(true);
+    updateCollectionPaneWidth(event.clientX);
+  }, [updateCollectionPaneWidth]);
+
+  const handleCollectionResizeMove = useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
+    if (!isCollectionResizing) return;
+    updateCollectionPaneWidth(event.clientX);
+  }, [isCollectionResizing, updateCollectionPaneWidth]);
+
+  const stopCollectionResize = useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    setIsCollectionResizing(false);
+  }, []);
+
+  useEffect(() => {
+    if (!isCollectionResizing) return;
+
+    const previousCursor = document.body.style.cursor;
+    const previousUserSelect = document.body.style.userSelect;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    return () => {
+      document.body.style.cursor = previousCursor;
+      document.body.style.userSelect = previousUserSelect;
+    };
+  }, [isCollectionResizing]);
 
   useEffect(() => {
     if (isVisualEditorOpen && highlightedLineRange) {
@@ -1402,8 +1453,12 @@ function App() {
                 </div>
               </div>
 
-              <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden rounded-md border bg-background md:grid-cols-[18rem_1fr]">
-                <aside className="flex min-h-0 flex-col border-b bg-secondary/30 md:border-b-0 md:border-r">
+              <div
+                ref={mainSplitRef}
+                className="home-split grid min-h-0 flex-1 overflow-hidden rounded-md border bg-background"
+                style={{ "--collection-pane-width": `${collectionPaneWidth}%` } as CSSProperties}
+              >
+                <aside className="flex min-h-0 flex-col border-b bg-secondary/30 md:border-b-0">
                   <div className="flex h-10 shrink-0 items-center justify-between border-b px-3">
                     <h2 className="text-lg font-semibold">{t("navigation.collection")}</h2>
                     <div className="flex items-center gap-1">
@@ -1445,6 +1500,20 @@ function App() {
                     </div>
                   </ScrollArea>
                 </aside>
+
+                <button
+                  type="button"
+                  className={cn(
+                    "hidden cursor-col-resize border-x bg-border/40 transition-colors hover:bg-primary/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:block",
+                    isCollectionResizing && "bg-primary/40",
+                  )}
+                  aria-label={t("navigation.resizeCollectionPane")}
+                  title={t("navigation.resizeCollectionPane")}
+                  onPointerDown={startCollectionResize}
+                  onPointerMove={handleCollectionResizeMove}
+                  onPointerUp={stopCollectionResize}
+                  onPointerCancel={stopCollectionResize}
+                />
 
                 <section className="flex min-h-0 min-w-0 flex-col">
                   {selectedEspansoPreview ? (

@@ -58,6 +58,7 @@ export const zhCN: TranslationTree = {
   },
   navigation: {
     collection: "集合",
+    resizeCollectionPane: "调整集合面板宽度",
   },
   settings: {
     title: "设置",

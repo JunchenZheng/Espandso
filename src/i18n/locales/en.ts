@@ -56,6 +56,7 @@ export const en = {
   },
   navigation: {
     collection: "Collection",
+    resizeCollectionPane: "Resize collection pane",
   },
   settings: {
     title: "Settings",
