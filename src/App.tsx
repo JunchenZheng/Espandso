@@ -3284,13 +3284,6 @@ const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-semibold tracking-tight">{node.name}</div>
             </div>
-            {node.fileCount === 0 ? (
-              <span className="mr-1 text-[10px] font-normal text-muted-foreground/70">{t("filesystem.emptyFolderBadge")}</span>
-            ) : (
-              <span className="mr-1 rounded-full bg-muted/60 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                {node.fileCount}
-              </span>
-            )}
           </button>
           <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
             <button
