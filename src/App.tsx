@@ -1480,7 +1480,6 @@ function App() {
                       >
                         <FilePlus className="h-4 w-4" />
                       </Button>
-                      <span className="ml-1 text-[11px] font-medium text-muted-foreground">{espansoPreviewList.length}</span>
                     </div>
                   </div>
                   <ScrollArea className="min-h-0 flex-1">
@@ -3509,8 +3508,8 @@ function EspansoConfigDetail({
         className={cn(
           "grid h-9 shrink-0 items-center border-b bg-secondary/40 px-3 text-xs font-semibold text-muted-foreground",
           isBatchMode
-            ? "grid-cols-[2.25rem_minmax(8rem,1fr)_minmax(4.5rem,0.45fr)_minmax(6rem,0.65fr)_minmax(12rem,2fr)_2.25rem]"
-            : "grid-cols-[minmax(8rem,1fr)_minmax(4.5rem,0.45fr)_minmax(6rem,0.65fr)_minmax(12rem,2fr)_2.25rem]"
+            ? "grid-cols-[2.25rem_minmax(8rem,1fr)_minmax(4.5rem,0.45fr)_minmax(6rem,0.65fr)_minmax(12rem,2fr)]"
+            : "grid-cols-[minmax(8rem,1fr)_minmax(4.5rem,0.45fr)_minmax(6rem,0.65fr)_minmax(12rem,2fr)]"
         )}
       >
         {isBatchMode && (
@@ -3533,7 +3532,6 @@ function EspansoConfigDetail({
         <div className="truncate">{t("table.type")}</div>
         <div className="truncate">{t("table.keyword")}</div>
         <div className="truncate">{t("table.snippet")}</div>
-        <div className="sr-only">{t("table.details")}</div>
       </div>
 
       <div
@@ -3574,8 +3572,8 @@ function EspansoConfigDetail({
                     className={cn(
                       "grid h-9 w-full items-center px-3 text-left text-sm transition-colors hover:bg-secondary/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
                       isBatchMode
-                        ? "grid-cols-[2.25rem_minmax(8rem,1fr)_minmax(4.5rem,0.45fr)_minmax(6rem,0.65fr)_minmax(12rem,2fr)_2.25rem]"
-                        : "grid-cols-[minmax(8rem,1fr)_minmax(4.5rem,0.45fr)_minmax(6rem,0.65fr)_minmax(12rem,2fr)_2.25rem]",
+                        ? "grid-cols-[2.25rem_minmax(8rem,1fr)_minmax(4.5rem,0.45fr)_minmax(6rem,0.65fr)_minmax(12rem,2fr)]"
+                        : "grid-cols-[minmax(8rem,1fr)_minmax(4.5rem,0.45fr)_minmax(6rem,0.65fr)_minmax(12rem,2fr)]",
                       isSelected && "bg-emerald-500/15 hover:bg-emerald-500/20 border-l-2 border-l-emerald-500"
                     )}
                     onClick={() => {
@@ -3632,9 +3630,6 @@ function EspansoConfigDetail({
                     <div className="mono-field min-w-0 truncate pr-3 text-sm">{displayTrigger}</div>
                     <div className="min-w-0 truncate text-muted-foreground">
                       {snippetPreview}
-                    </div>
-                    <div className="flex justify-end text-muted-foreground">
-                      <SquareArrowOutUpRight className="h-4 w-4" />
                     </div>
                   </button>
                 );
