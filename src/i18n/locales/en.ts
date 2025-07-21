@@ -197,10 +197,10 @@ export const en = {
     folderReserved: "'{{name}}' is a reserved Espanso directory name and cannot be used.",
   },
   table: {
-    name: "Name",
+    trigger: "Trigger",
     type: "Type",
-    keyword: "Keyword",
-    snippet: "Snippet",
+    description: "Description",
+    content: "Content",
     details: "Details",
   },
   warnings: {

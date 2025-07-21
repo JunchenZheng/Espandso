@@ -199,10 +199,10 @@ export const zhCN: TranslationTree = {
     folderReserved: "\"{{name}}\" 是 Espanso 保留目录名，不能使用。",
   },
   table: {
-    name: "名称",
+    trigger: "触发词",
     type: "类型",
-    keyword: "触发词",
-    snippet: "替换内容",
+    description: "描述",
+    content: "内容",
     details: "详情",
   },
   warnings: {

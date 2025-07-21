@@ -3508,8 +3508,8 @@ function EspansoConfigDetail({
         className={cn(
           "grid h-9 shrink-0 items-center border-b bg-secondary/40 px-3 text-xs font-semibold text-muted-foreground",
           isBatchMode
-            ? "grid-cols-[2.25rem_minmax(8rem,1fr)_minmax(4.5rem,0.45fr)_minmax(6rem,0.65fr)_minmax(12rem,2fr)]"
-            : "grid-cols-[minmax(8rem,1fr)_minmax(4.5rem,0.45fr)_minmax(6rem,0.65fr)_minmax(12rem,2fr)]"
+            ? "grid-cols-[2.25rem_minmax(7rem,0.8fr)_minmax(4.5rem,0.45fr)_minmax(8rem,1fr)_minmax(12rem,2fr)]"
+            : "grid-cols-[minmax(7rem,0.8fr)_minmax(4.5rem,0.45fr)_minmax(8rem,1fr)_minmax(12rem,2fr)]"
         )}
       >
         {isBatchMode && (
@@ -3528,10 +3528,10 @@ function EspansoConfigDetail({
             />
           </div>
         )}
-        <div className="truncate">{t("table.name")}</div>
+        <div className="truncate">{t("table.trigger")}</div>
         <div className="truncate">{t("table.type")}</div>
-        <div className="truncate">{t("table.keyword")}</div>
-        <div className="truncate">{t("table.snippet")}</div>
+        <div className="truncate">{t("table.description")}</div>
+        <div className="truncate">{t("table.content")}</div>
       </div>
 
       <div
@@ -3572,8 +3572,8 @@ function EspansoConfigDetail({
                     className={cn(
                       "grid h-9 w-full items-center px-3 text-left text-sm transition-colors hover:bg-secondary/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
                       isBatchMode
-                        ? "grid-cols-[2.25rem_minmax(8rem,1fr)_minmax(4.5rem,0.45fr)_minmax(6rem,0.65fr)_minmax(12rem,2fr)]"
-                        : "grid-cols-[minmax(8rem,1fr)_minmax(4.5rem,0.45fr)_minmax(6rem,0.65fr)_minmax(12rem,2fr)]",
+                        ? "grid-cols-[2.25rem_minmax(7rem,0.8fr)_minmax(4.5rem,0.45fr)_minmax(8rem,1fr)_minmax(12rem,2fr)]"
+                        : "grid-cols-[minmax(7rem,0.8fr)_minmax(4.5rem,0.45fr)_minmax(8rem,1fr)_minmax(12rem,2fr)]",
                       isSelected && "bg-emerald-500/15 hover:bg-emerald-500/20 border-l-2 border-l-emerald-500"
                     )}
                     onClick={() => {
@@ -3602,11 +3602,7 @@ function EspansoConfigDetail({
                         />
                       </div>
                     )}
-                    <div className="min-w-0 pr-3">
-                      <div className="truncate font-medium">
-                        {snippet.description || displayTrigger}
-                      </div>
-                    </div>
+                    <div className="mono-field min-w-0 truncate pr-3 text-sm font-medium">{displayTrigger}</div>
                     <div className="flex items-center gap-1.5 min-w-0 pr-2">
                       <span
                         className={cn(
@@ -3627,7 +3623,11 @@ function EspansoConfigDetail({
                               : t("snippets.textType")}
                       </span>
                     </div>
-                    <div className="mono-field min-w-0 truncate pr-3 text-sm">{displayTrigger}</div>
+                    <div className="min-w-0 pr-3">
+                      <div className="truncate text-muted-foreground">
+                        {snippet.description || ""}
+                      </div>
+                    </div>
                     <div className="min-w-0 truncate text-muted-foreground">
                       {snippetPreview}
                     </div>
