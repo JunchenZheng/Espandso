@@ -181,7 +181,7 @@ matches:
     expect(res.importedMatches[1].originalSnippet).toEqual({ triggers: [":hi", ":hey"], replace: "greeting" });
   });
 
-  it("should import include_file snippets (both single shell var and legacy echo+shell) and warn about unsupported stuff", () => {
+  it("should import include_file snippets and snippets with custom vars (like date) with replace block", () => {
     const yaml = `
 matches:
   - trigger: :inc_legacy
@@ -202,8 +202,8 @@ matches:
         type: shell
         params:
           cmd: cat "/path/to/single_resource.json"
-  - trigger: :unsupported
-    replace: "{{bad}}"
+  - trigger: :custom_var
+    replace: "ISO date: {{bad}}"
     vars:
       - name: bad
         type: date
@@ -211,10 +211,11 @@ matches:
           format: "%Y"
 `;
     const res = importYamlContent(yaml, "test.yml");
-    expect(res.snippets).toHaveLength(2);
+    expect(res.snippets).toHaveLength(3);
     expect(res.snippets[0]).toEqual({ trigger: ":inc_legacy", include_file: "resource_data.json" });
     expect(res.snippets[1]).toEqual({ trigger: ":inc_single", include_file: "single_resource_data.json" });
-    expect(res.warnings).toContain("[test.yml] Snippet for :unsupported has unsupported var type(s) [date], skipping");
+    expect(res.snippets[2]).toEqual({ trigger: ":custom_var", replace: "ISO date: {{bad}}" });
+    expect(res.warnings).toHaveLength(0);
   });
 
   it("should import empty or comment-only YAML files without warnings", () => {
@@ -247,6 +248,59 @@ matches:
       form: "Hey [[name]],\n[[message]]\n",
       form_fields: { message: { multiline: true } },
       description: "greeting form",
+    });
+  });
+
+  it("should import all snippet types including date vars, forms, images, and cat shell vars from ad-block-rules.yml format", () => {
+    const yaml = `
+matches:
+  - trigger: :adblock
+    replace: "rule1"
+  - trigger: :ad-block
+    replace: "rule2"
+  - triggers:
+      - non-im
+      - -non
+    replace: "rule3"
+  - trigger: :plan
+    replace: "test plan"
+  - trigger: ":form1"
+    form: "Hello [[name]]"
+  - trigger: :pic
+    image_path: /path/to/img.png
+  - trigger: :file
+    replace: "{{output}}"
+    vars:
+      - name: output
+        type: shell
+        params:
+          cmd: cat "/path/to/script.py"
+  - trigger: ":date1"
+    replace: "ISO date: {{mydate}}"
+    vars:
+      - name: mydate
+        type: date
+        params:
+          format: "%Y-%m-%d"
+`;
+    const res = importYamlContent(yaml, "ad-block-rules.yml");
+    expect(res.warnings).toHaveLength(0);
+    // 1 (adblock) + 1 (ad-block) + 2 (non-im, -non) + 1 (plan) + 1 (form1) + 1 (pic) + 1 (file) + 1 (date1) = 9 snippets imported
+    expect(res.snippets).toHaveLength(9);
+    expect(res.snippets.map((s) => s.trigger)).toEqual([
+      ":adblock",
+      ":ad-block",
+      "non-im",
+      "-non",
+      ":plan",
+      ":form1",
+      ":pic",
+      ":file",
+      ":date1",
+    ]);
+    expect(res.snippets[8]).toEqual({
+      trigger: ":date1",
+      replace: "ISO date: {{mydate}}",
     });
   });
 });

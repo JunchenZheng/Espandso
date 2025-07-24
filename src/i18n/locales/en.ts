@@ -18,6 +18,8 @@ export const en = {
     clear: "Clear",
     search: "Search",
     copy: "Copy",
+    copyAbsolutePath: "Copy absolute path",
+    copied: "Copied",
     confirm: "Confirm",
     back: "Back",
     retry: "Retry",

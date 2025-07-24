@@ -20,6 +20,8 @@ export const zhCN: TranslationTree = {
     clear: "清除",
     search: "搜索",
     copy: "复制",
+    copyAbsolutePath: "复制文件绝对路径",
+    copied: "已复制",
     confirm: "确认",
     back: "返回",
     retry: "重试",

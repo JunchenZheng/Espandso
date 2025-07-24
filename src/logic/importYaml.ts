@@ -85,59 +85,42 @@ export function parseYamlMatch(
   const varsBlock = match.vars || [];
 
   if (varsBlock.length > 0) {
-    if (!onlyCatVarTypes(varsBlock)) {
-      const bad = varsBlock
-        .map((v: any) => v?.type)
-        .filter((t: string) => t !== "echo" && t !== "shell");
-      return {
-        matches: [],
-        warnings: [
-          `[${fileName}] Snippet for ${triggers.join(", ")} has unsupported var type(s) [${bad.join(", ")}], skipping`,
-        ],
-      };
-    }
+    if (onlyCatVarTypes(varsBlock)) {
+      const catPath = extractCatPath(varsBlock);
+      if (catPath) {
+        // Extract file name
+        const parts = catPath.split(/[/\\]/);
+        const originalName = parts[parts.length - 1];
+        const resourceFilename = getResourceFilename(originalName);
 
-    const catPath = extractCatPath(varsBlock);
-    if (!catPath) {
-      return {
-        matches: [],
-        warnings: [
-          `[${fileName}] Snippet for ${triggers.join(", ")} has shell vars but no cat/echo path, skipping`,
-        ],
-      };
-    }
+        const originalSnippet: Snippet = triggers.length > 1
+          ? { triggers, include_file: resourceFilename }
+          : { trigger: triggers[0], include_file: resourceFilename };
+        if (match.description) {
+          originalSnippet.description = match.description;
+        }
 
-    // Extract file name
-    const parts = catPath.split(/[/\\]/);
-    const originalName = parts[parts.length - 1];
-    const resourceFilename = getResourceFilename(originalName);
+        const matches: ImportedMatch[] = triggers.map((trigger, triggerIndex) => {
+          const snippet: Snippet = {
+            trigger,
+            include_file: resourceFilename,
+          };
+          if (match.description) {
+            snippet.description = match.description;
+          }
+          return {
+            snippet,
+            originalSnippet,
+            originalMatchIndex,
+            triggerIndex,
+            resourcePath: catPath,
+            resourceName: resourceFilename,
+          };
+        });
 
-    const originalSnippet: Snippet = triggers.length > 1
-      ? { triggers, include_file: resourceFilename }
-      : { trigger: triggers[0], include_file: resourceFilename };
-    if (match.description) {
-      originalSnippet.description = match.description;
-    }
-
-    const matches: ImportedMatch[] = triggers.map((trigger, triggerIndex) => {
-      const snippet: Snippet = {
-        trigger,
-        include_file: resourceFilename,
-      };
-      if (match.description) {
-        snippet.description = match.description;
+        return { matches, warnings };
       }
-      return {
-        snippet,
-        originalSnippet,
-        originalMatchIndex,
-        triggerIndex,
-        resourcePath: catPath,
-        resourceName: resourceFilename,
-      };
-    });
-
-    return { matches, warnings };
+    }
   }
 
   const imagePath = match.image_path;

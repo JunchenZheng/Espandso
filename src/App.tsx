@@ -6,9 +6,11 @@ import { openPath } from "@tauri-apps/plugin-opener";
 import {
   AlertTriangle,
   AlignLeft,
+  Check,
   ChevronDown,
   ChevronRight,
   Columns,
+  Copy,
   FileCode,
   FilePlus,
   FileSearch,
@@ -3389,12 +3391,24 @@ function EspansoConfigDetail({
   const [viewportHeight, setViewportHeight] = useState(0);
   const [isBatchMode, setIsBatchMode] = useState(false);
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
+  const [copied, setCopied] = useState(false);
   const snippetCount = preview.snippets.length;
   const totalHeight = snippetCount * ROW_HEIGHT;
   const startIndex = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN_ROWS);
   const visibleRowCount = Math.ceil(viewportHeight / ROW_HEIGHT) + OVERSCAN_ROWS * 2;
   const endIndex = Math.min(snippetCount, startIndex + visibleRowCount);
   const visibleSnippets = preview.snippets.slice(startIndex, endIndex);
+
+  const handleCopyPath = useCallback(() => {
+    if (!preview.config.path) return;
+    navigator.clipboard
+      .writeText(preview.config.path)
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      })
+      .catch(() => {});
+  }, [preview.config.path]);
 
   useLayoutEffect(() => {
     const viewport = scrollRef.current;
@@ -3415,6 +3429,7 @@ function EspansoConfigDetail({
     setScrollTop(0);
     setIsBatchMode(false);
     setSelectedIndices(new Set());
+    setCopied(false);
     if (scrollRef.current) {
       scrollRef.current.scrollTop = 0;
     }
@@ -3442,7 +3457,21 @@ function EspansoConfigDetail({
       <div className="flex h-14 shrink-0 items-center justify-between gap-3 border-b px-3">
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-xl font-bold">{preview.config.relativePath}</h2>
-          <p className="mt-1 truncate text-sm text-muted-foreground">{preview.config.path}</p>
+          <div className="mt-1 flex items-center gap-1.5 min-w-0">
+            <p className="truncate text-sm text-muted-foreground">{preview.config.path}</p>
+            <button
+              type="button"
+              onClick={handleCopyPath}
+              className="shrink-0 rounded p-1 text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors cursor-pointer"
+              title={copied ? t("actions.copied") : t("actions.copyAbsolutePath")}
+            >
+              {copied ? (
+                <Check className="h-3.5 w-3.5 text-emerald-500" />
+              ) : (
+                <Copy className="h-3.5 w-3.5 text-muted-foreground/80 hover:text-foreground" />
+              )}
+            </button>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {preview.warningCount > 0 && (
