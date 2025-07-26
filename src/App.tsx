@@ -269,9 +269,6 @@ function DateInsertMenu({ onSelect }: { onSelect: (option: DateFormatOption) => 
               >
                 <div className="flex items-center justify-between font-medium">
                   <span>{t(opt.labelKey as any)}</span>
-                  <span className="font-mono text-[10px] text-muted-foreground group-hover:text-accent-foreground opacity-80">
-                    {opt.format}
-                  </span>
                 </div>
                 <div className="text-[11px] text-muted-foreground/80 font-mono">
                   {opt.example}
@@ -2137,7 +2134,6 @@ function App() {
                         className="inline-flex items-center gap-1 rounded bg-muted/80 px-2 py-0.5 text-xs font-mono text-foreground border border-border/50"
                       >
                         <span className="text-primary font-medium">{`{{${v.name}}}`}</span>
-                        <span className="text-[11px] text-muted-foreground">{`(${v.params?.format || ""})`}</span>
                         <button
                           type="button"
                           onClick={() => handleRemoveDateVar(v.name)}
@@ -2792,7 +2788,6 @@ function App() {
                               className="inline-flex items-center gap-1 rounded bg-muted/80 px-2 py-0.5 text-xs font-mono text-foreground border border-border/50"
                             >
                               <span className="text-primary font-medium">{`{{${v.name}}}`}</span>
-                              <span className="text-[11px] text-muted-foreground">{`(${v.params?.format || ""})`}</span>
                               <button
                                 type="button"
                                 onClick={() => handleRemoveDateVar(v.name)}
