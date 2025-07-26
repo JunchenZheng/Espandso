@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { validate } from "./validate";
 import { importYamlContent } from "./importYaml";
-import { appendSnippetToYamlContent, deleteSnippetFromYamlContent, deleteMultipleSnippetsFromYamlContent, deleteSelectedTriggersFromYamlContent, findSnippetLineRangeInYaml, findSnippetLineRangesInYaml, findDeleteSelectionLineRangesInYaml, replaceSnippetInYamlContent } from "./yamlEditor";
+import { appendSnippetToYamlContent, deleteSnippetFromYamlContent, deleteMultipleSnippetsFromYamlContent, deleteSelectedTriggersFromYamlContent, findSnippetLineRangeInYaml, findSnippetLineRangesInYaml, findDeleteSelectionLineRangesInYaml, replaceSnippetInYamlContent, snippetToYamlMatch } from "./yamlEditor";
 import { isEspansoYamlConfigFile, parseEspansoConfigDir, sortEspansoConfigFiles } from "./espansoPaths";
 import {
   getIncludeFileCandidates,
@@ -214,7 +214,17 @@ matches:
     expect(res.snippets).toHaveLength(3);
     expect(res.snippets[0]).toEqual({ trigger: ":inc_legacy", include_file: "resource_data.json" });
     expect(res.snippets[1]).toEqual({ trigger: ":inc_single", include_file: "single_resource_data.json" });
-    expect(res.snippets[2]).toEqual({ trigger: ":custom_var", replace: "ISO date: {{bad}}" });
+    expect(res.snippets[2]).toEqual({
+      trigger: ":custom_var",
+      replace: "ISO date: {{bad}}",
+      vars: [
+        {
+          name: "bad",
+          type: "date",
+          params: { format: "%Y" },
+        },
+      ],
+    });
     expect(res.warnings).toHaveLength(0);
   });
 
@@ -301,6 +311,13 @@ matches:
     expect(res.snippets[8]).toEqual({
       trigger: ":date1",
       replace: "ISO date: {{mydate}}",
+      vars: [
+        {
+          name: "mydate",
+          type: "date",
+          params: { format: "%Y-%m-%d" },
+        },
+      ],
     });
   });
 });
@@ -609,6 +626,37 @@ matches:
 
     expect(partialRanges).toEqual([{ startLine: 4, endLine: 4 }]);
     expect(fullRanges).toEqual([{ startLine: 2, endLine: 6 }]);
+  });
+
+  it("should parse and format date vars in YAML content", () => {
+    const yamlInput = `matches:
+  - trigger: ":date1"
+    replace: "ISO date: {{mydate}}"
+    vars:
+      - name: mydate
+        type: date
+        params:
+          format: "%Y-%m-%d"
+`;
+
+    const imported = importYamlContent(yamlInput, "test.yml");
+    expect(imported.snippets.length).toBe(1);
+    expect(imported.snippets[0].vars).toEqual([
+      {
+        name: "mydate",
+        type: "date",
+        params: { format: "%Y-%m-%d" },
+      },
+    ]);
+
+    const formattedYaml = snippetToYamlMatch(imported.snippets[0]);
+    expect(formattedYaml.vars).toEqual([
+      {
+        name: "mydate",
+        type: "date",
+        params: { format: "%Y-%m-%d" },
+      },
+    ]);
   });
 });
 

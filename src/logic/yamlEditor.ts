@@ -30,6 +30,9 @@ export function snippetToYamlMatch(snippet: Snippet): Record<string, any> {
     }
   } else {
     match.replace = snippet.replace || "";
+    if (snippet.vars && snippet.vars.length > 0) {
+      match.vars = snippet.vars;
+    }
   }
 
   if (snippet.description) {

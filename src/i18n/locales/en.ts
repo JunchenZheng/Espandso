@@ -143,6 +143,17 @@ export const en = {
     formSnippet: "Form snippet",
     inlineReplacementSnippet: "Inline replacement snippet",
   },
+  dateFormats: {
+    addDate: "Insert Date",
+    iso8601: "ISO 8601 (YYYY-MM-DD)",
+    slashUs: "Slash Format (US MM/DD/YYYY)",
+    slashUk: "Slash Format (UK DD/MM/YYYY)",
+    dotEu: "Dot Separated (EU DD.MM.YYYY)",
+    textUs: "Long Text (US Jun 18, 2025)",
+    textUk: "Long Text (UK 18 Jun 2025)",
+    cjkLocal: "CJK Localized (YYYY年MM月DD日)",
+    associatedDateVars: "Associated Date Variables:",
+  },
   formBuilder: {
     selectedTextAction: "Selected Text Action",
     selectTextHint: "Select text in the form layout",
