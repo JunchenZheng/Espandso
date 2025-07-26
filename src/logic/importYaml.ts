@@ -185,6 +185,9 @@ export function parseYamlMatch(
   if (match.description) {
     originalSnippet.description = match.description;
   }
+  if (Array.isArray(match.vars) && match.vars.length > 0) {
+    originalSnippet.vars = match.vars;
+  }
 
   const matches: ImportedMatch[] = triggers.map((trigger, triggerIndex) => {
     const snippet: Snippet = {
@@ -193,6 +196,9 @@ export function parseYamlMatch(
     };
     if (match.description) {
       snippet.description = match.description;
+    }
+    if (Array.isArray(match.vars) && match.vars.length > 0) {
+      snippet.vars = match.vars;
     }
     return { snippet, originalSnippet, originalMatchIndex, triggerIndex };
   });

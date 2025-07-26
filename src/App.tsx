@@ -6,6 +6,7 @@ import { openPath } from "@tauri-apps/plugin-opener";
 import {
   AlertTriangle,
   AlignLeft,
+  Calendar,
   Check,
   ChevronDown,
   ChevronRight,
@@ -35,6 +36,7 @@ import {
   Trash2,
   Type,
   Upload,
+  X,
   XCircle,
 } from "lucide-react";
 import "./App.css";
@@ -64,7 +66,8 @@ import {
   setExperimentalYamlWarningsEnabled,
   isYamlWarningsActive,
 } from "./logic/features";
-import { Snippet, ValidationError } from "./logic/types";
+import { Snippet, SnippetVar, ValidationError } from "./logic/types";
+import { DATE_FORMAT_OPTIONS, DateFormatOption, generateUniqueVarName, getReferencedVars } from "./logic/dateFormats";
 import { validate } from "./logic/validate";
 import { importYamlContent, ImportedMatch } from "./logic/importYaml";
 import { buildTriggerInput, getSnippetTriggers, isImageFilePath, normalizeTriggerLines } from "./logic/snippetUtils";
@@ -217,6 +220,71 @@ function getTextFieldMode(field: FormFieldConfig): TextFieldMode {
   return field.control === "multiline" ? "multiline" : "single";
 }
 
+function DateInsertMenu({ onSelect }: { onSelect: (option: DateFormatOption) => void }) {
+  const { t } = useI18n();
+  const [isOpen, setIsOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    if (isOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isOpen]);
+
+  return (
+    <div className="relative inline-block text-left" ref={menuRef}>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="h-7 gap-1 px-2 text-xs font-normal border-dashed text-muted-foreground hover:text-foreground hover:bg-accent"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <Calendar className="h-3.5 w-3.5 text-primary" />
+        <span>{t("dateFormats.addDate")}</span>
+        <ChevronDown className="h-3 w-3 opacity-60" />
+      </Button>
+
+      {isOpen && (
+        <div className="absolute right-0 z-50 mt-1 w-72 origin-top-right rounded-md bg-popover p-1.5 shadow-lg border border-border text-popover-foreground animate-in fade-in-80 zoom-in-95">
+          <div className="px-2 py-1 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider border-b border-border/50 mb-1">
+            {t("dateFormats.addDate")}
+          </div>
+          <div className="max-h-64 overflow-y-auto space-y-0.5">
+            {DATE_FORMAT_OPTIONS.map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                className="w-full text-left px-2 py-1.5 rounded text-xs hover:bg-accent hover:text-accent-foreground transition-colors flex flex-col gap-0.5 group"
+                onClick={() => {
+                  onSelect(opt);
+                  setIsOpen(false);
+                }}
+              >
+                <div className="flex items-center justify-between font-medium">
+                  <span>{t(opt.labelKey as any)}</span>
+                  <span className="font-mono text-[10px] text-muted-foreground group-hover:text-accent-foreground opacity-80">
+                    {opt.format}
+                  </span>
+                </div>
+                <div className="text-[11px] text-muted-foreground/80 font-mono">
+                  {opt.example}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function formFieldsToConfigs(formFields: Record<string, any> | undefined): FormFieldConfig[] {
   if (!formFields) return [];
 
@@ -323,6 +391,9 @@ function App() {
   const [addSnippetKind, setAddSnippetKind] = useState<AddSnippetKind>("text");
   const [editTriggersText, setEditTriggersText] = useState<string>("");
   const [editReplace, setEditReplace] = useState<string>("");
+  const [editVars, setEditVars] = useState<SnippetVar[]>([]);
+  const replaceTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const visualEditorReplaceTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [editIncludeFile, setEditIncludeFile] = useState<string>("");
   const [editImagePath, setEditImagePath] = useState<string>("");
   const [editForm, setEditForm] = useState<string>("");
@@ -896,6 +967,7 @@ function App() {
     setAddSnippetKind("text");
     setEditTriggersText("");
     setEditReplace("");
+    setEditVars([]);
     setEditIncludeFile("");
     setEditImagePath("");
     setEditForm("");
@@ -1040,6 +1112,7 @@ function App() {
     );
     setEditTriggersText(triggerInput.multiline);
     setEditReplace(editableSnippet.replace || "");
+    setEditVars(editableSnippet.vars ? [...editableSnippet.vars] : []);
     setEditIncludeFile(target.match.resourcePath || editableSnippet.include_file || "");
     setEditImagePath(editableSnippet.image_path || "");
     setEditForm(editableSnippet.form || "");
@@ -1073,6 +1146,10 @@ function App() {
       }
     } else {
       snippet.replace = editReplace;
+      const referencedVars = getReferencedVars(editReplace, editVars);
+      if (referencedVars.length > 0) {
+        snippet.vars = referencedVars;
+      }
     }
 
     if (editDescription.trim()) {
@@ -1080,6 +1157,42 @@ function App() {
     }
 
     return snippet;
+  }
+
+  function handleInsertDateVariable(option: DateFormatOption, isVisualEditor = false) {
+    const varName = generateUniqueVarName(editVars, option.defaultVarName);
+    const newVar: SnippetVar = {
+      name: varName,
+      type: "date",
+      params: {
+        format: option.format,
+      },
+    };
+    setEditVars((prev) => [...prev, newVar]);
+
+    const tagToInsert = `{{${varName}}}`;
+    const targetRef = isVisualEditor ? visualEditorReplaceTextareaRef : replaceTextareaRef;
+    const textarea = targetRef.current;
+
+    if (textarea) {
+      const start = textarea.selectionStart || 0;
+      const end = textarea.selectionEnd || 0;
+      const currentVal = editReplace;
+      const nextVal = currentVal.substring(0, start) + tagToInsert + currentVal.substring(end);
+      setEditReplace(nextVal);
+
+      requestAnimationFrame(() => {
+        textarea.focus();
+        const newPos = start + tagToInsert.length;
+        textarea.setSelectionRange(newPos, newPos);
+      });
+    } else {
+      setEditReplace((prev) => (prev ? `${prev} ${tagToInsert}` : tagToInsert));
+    }
+  }
+
+  function handleRemoveDateVar(varName: string) {
+    setEditVars((prev) => prev.filter((v) => v.name !== varName));
   }
 
   function updateFormFieldConfig(id: string, patch: Partial<FormFieldConfig>) {
@@ -1998,16 +2111,45 @@ function App() {
               </div>
             ) : (
               <div className="flex-1 flex flex-col space-y-2 min-h-[120px]">
-                <Label htmlFor="replace" className="inline-flex items-center shrink-0">
-                  {t("snippets.replaceContent")} <RequiredMark />
-                </Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="replace" className="inline-flex items-center shrink-0">
+                    {t("snippets.replaceContent")} <RequiredMark />
+                  </Label>
+                  <DateInsertMenu onSelect={(opt) => handleInsertDateVariable(opt, false)} />
+                </div>
                 <Textarea
                   id="replace"
+                  ref={replaceTextareaRef}
                   className="mono-field flex-1 h-full min-h-[120px] resize-y"
                   placeholder={t("snippets.replaceContentPlaceholder")}
                   value={editReplace}
                   onChange={(e) => setEditReplace(e.target.value)}
                 />
+                {editVars.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                    <span className="text-xs font-medium text-muted-foreground shrink-0 inline-flex items-center gap-1">
+                      <Calendar className="h-3 w-3 text-primary" />
+                      {t("dateFormats.associatedDateVars")}
+                    </span>
+                    {editVars.map((v) => (
+                      <span
+                        key={v.name}
+                        className="inline-flex items-center gap-1 rounded bg-muted/80 px-2 py-0.5 text-xs font-mono text-foreground border border-border/50"
+                      >
+                        <span className="text-primary font-medium">{`{{${v.name}}}`}</span>
+                        <span className="text-[11px] text-muted-foreground">{`(${v.params?.format || ""})`}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveDateVar(v.name)}
+                          className="ml-0.5 text-muted-foreground hover:text-destructive rounded p-0.5 transition-colors"
+                          title="Remove variable"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -2624,16 +2766,45 @@ function App() {
                     </div>
                   ) : (
                     <div className="flex-1 flex flex-col space-y-2 min-h-[120px]">
-                      <Label htmlFor="ve-replace" className="inline-flex items-center shrink-0">
-                        {t("snippets.replaceContent")} <RequiredMark />
-                      </Label>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="ve-replace" className="inline-flex items-center shrink-0">
+                          {t("snippets.replaceContent")} <RequiredMark />
+                        </Label>
+                        <DateInsertMenu onSelect={(opt) => handleInsertDateVariable(opt, true)} />
+                      </div>
                       <Textarea
                         id="ve-replace"
+                        ref={visualEditorReplaceTextareaRef}
                         className="mono-field flex-1 h-full min-h-[120px] resize-y"
                         placeholder={t("snippets.replaceContentPlaceholder")}
                         value={editReplace}
                         onChange={(e) => setEditReplace(e.target.value)}
                       />
+                      {editVars.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                          <span className="text-xs font-medium text-muted-foreground shrink-0 inline-flex items-center gap-1">
+                            <Calendar className="h-3 w-3 text-primary" />
+                            {t("dateFormats.associatedDateVars")}
+                          </span>
+                          {editVars.map((v) => (
+                            <span
+                              key={v.name}
+                              className="inline-flex items-center gap-1 rounded bg-muted/80 px-2 py-0.5 text-xs font-mono text-foreground border border-border/50"
+                            >
+                              <span className="text-primary font-medium">{`{{${v.name}}}`}</span>
+                              <span className="text-[11px] text-muted-foreground">{`(${v.params?.format || ""})`}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveDateVar(v.name)}
+                                className="ml-0.5 text-muted-foreground hover:text-destructive rounded p-0.5 transition-colors"
+                                title="Remove variable"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
 
