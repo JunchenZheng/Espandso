@@ -282,6 +282,36 @@ function DateInsertMenu({ onSelect }: { onSelect: (option: DateFormatOption) => 
   );
 }
 
+function DateVariableList({ vars, onRemove }: { vars: SnippetVar[]; onRemove: (varName: string) => void }) {
+  const { t } = useI18n();
+  if (vars.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 pt-1">
+      <span className="text-xs font-medium text-muted-foreground shrink-0 inline-flex items-center gap-1">
+        <Calendar className="h-3 w-3 text-primary" />
+        {t("dateFormats.associatedDateVars")}
+      </span>
+      {vars.map((v) => (
+        <span
+          key={v.name}
+          className="inline-flex items-center gap-1 rounded bg-muted/80 px-2 py-0.5 text-xs font-mono text-foreground border border-border/50"
+        >
+          <span className="text-primary font-medium">{`{{${v.name}}}`}</span>
+          <button
+            type="button"
+            onClick={() => onRemove(v.name)}
+            className="ml-0.5 text-muted-foreground hover:text-destructive rounded p-0.5 transition-colors"
+            title={t("dateFormats.removeVariable")}
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function formFieldsToConfigs(formFields: Record<string, any> | undefined): FormFieldConfig[] {
   if (!formFields) return [];
 
@@ -1141,6 +1171,10 @@ function App() {
       if (formFields) {
         snippet.form_fields = formFields;
       }
+      const referencedVars = getReferencedVars(editForm, editVars);
+      if (referencedVars.length > 0) {
+        snippet.vars = referencedVars;
+      }
     } else {
       snippet.replace = editReplace;
       const referencedVars = getReferencedVars(editReplace, editVars);
@@ -1156,7 +1190,7 @@ function App() {
     return snippet;
   }
 
-  function handleInsertDateVariable(option: DateFormatOption, isVisualEditor = false) {
+  function handleInsertDateVariable(option: DateFormatOption, target: "replace" | "visualReplace" | "form" = "replace") {
     const varName = generateUniqueVarName(editVars, option.defaultVarName);
     const newVar: SnippetVar = {
       name: varName,
@@ -1168,15 +1202,23 @@ function App() {
     setEditVars((prev) => [...prev, newVar]);
 
     const tagToInsert = `{{${varName}}}`;
-    const targetRef = isVisualEditor ? visualEditorReplaceTextareaRef : replaceTextareaRef;
+    const targetRef = target === "form"
+      ? formTextareaRef
+      : target === "visualReplace"
+        ? visualEditorReplaceTextareaRef
+        : replaceTextareaRef;
     const textarea = targetRef.current;
 
     if (textarea) {
       const start = textarea.selectionStart || 0;
       const end = textarea.selectionEnd || 0;
-      const currentVal = editReplace;
+      const currentVal = target === "form" ? editForm : editReplace;
       const nextVal = currentVal.substring(0, start) + tagToInsert + currentVal.substring(end);
-      setEditReplace(nextVal);
+      if (target === "form") {
+        setEditForm(nextVal);
+      } else {
+        setEditReplace(nextVal);
+      }
 
       requestAnimationFrame(() => {
         textarea.focus();
@@ -1184,7 +1226,11 @@ function App() {
         textarea.setSelectionRange(newPos, newPos);
       });
     } else {
-      setEditReplace((prev) => (prev ? `${prev} ${tagToInsert}` : tagToInsert));
+      if (target === "form") {
+        setEditForm((prev) => (prev ? `${prev} ${tagToInsert}` : tagToInsert));
+      } else {
+        setEditReplace((prev) => (prev ? `${prev} ${tagToInsert}` : tagToInsert));
+      }
     }
   }
 
@@ -1925,9 +1971,12 @@ function App() {
             ) : activeSnippetKind === "form" ? (
               <div className="flex-1 flex flex-col min-h-0 space-y-4">
                 <div className="flex-1 flex flex-col space-y-2 min-h-[120px]">
-                  <Label htmlFor="form" className="inline-flex items-center shrink-0">
-                    {t("snippets.formLayout")} <RequiredMark />
-                  </Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="form" className="inline-flex items-center shrink-0">
+                      {t("snippets.formLayout")} <RequiredMark />
+                    </Label>
+                    <DateInsertMenu onSelect={(opt) => handleInsertDateVariable(opt, "form")} />
+                  </div>
                   <Textarea
                     id="form"
                     ref={formTextareaRef}
@@ -1955,6 +2004,7 @@ function App() {
                     }}
                   />
                 </div>
+                <DateVariableList vars={editVars} onRemove={handleRemoveDateVar} />
                 <div className="space-y-2 rounded-md border bg-secondary/25 p-3 shrink-0">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <Label>{t("formBuilder.selectedTextAction")}</Label>
@@ -2112,7 +2162,7 @@ function App() {
                   <Label htmlFor="replace" className="inline-flex items-center shrink-0">
                     {t("snippets.replaceContent")} <RequiredMark />
                   </Label>
-                  <DateInsertMenu onSelect={(opt) => handleInsertDateVariable(opt, false)} />
+                  <DateInsertMenu onSelect={(opt) => handleInsertDateVariable(opt, "replace")} />
                 </div>
                 <Textarea
                   id="replace"
@@ -2122,30 +2172,7 @@ function App() {
                   value={editReplace}
                   onChange={(e) => setEditReplace(e.target.value)}
                 />
-                {editVars.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                    <span className="text-xs font-medium text-muted-foreground shrink-0 inline-flex items-center gap-1">
-                      <Calendar className="h-3 w-3 text-primary" />
-                      {t("dateFormats.associatedDateVars")}
-                    </span>
-                    {editVars.map((v) => (
-                      <span
-                        key={v.name}
-                        className="inline-flex items-center gap-1 rounded bg-muted/80 px-2 py-0.5 text-xs font-mono text-foreground border border-border/50"
-                      >
-                        <span className="text-primary font-medium">{`{{${v.name}}}`}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveDateVar(v.name)}
-                          className="ml-0.5 text-muted-foreground hover:text-destructive rounded p-0.5 transition-colors"
-                          title="Remove variable"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
+                <DateVariableList vars={editVars} onRemove={handleRemoveDateVar} />
               </div>
             )}
 
@@ -2579,9 +2606,12 @@ function App() {
                   ) : activeSnippetKind === "form" ? (
                     <div className="flex-1 flex flex-col min-h-0 space-y-4">
                       <div className="flex-1 flex flex-col space-y-2 min-h-[120px]">
-                        <Label htmlFor="ve-form" className="inline-flex items-center shrink-0">
-                          {t("snippets.formLayout")} <RequiredMark />
-                        </Label>
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="ve-form" className="inline-flex items-center shrink-0">
+                            {t("snippets.formLayout")} <RequiredMark />
+                          </Label>
+                          <DateInsertMenu onSelect={(opt) => handleInsertDateVariable(opt, "form")} />
+                        </div>
                         <Textarea
                           id="ve-form"
                           ref={formTextareaRef}
@@ -2609,6 +2639,7 @@ function App() {
                           }}
                         />
                       </div>
+                      <DateVariableList vars={editVars} onRemove={handleRemoveDateVar} />
                       <div className="space-y-2 rounded-md border bg-secondary/25 p-3 shrink-0">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <Label>{t("formBuilder.selectedTextAction")}</Label>
@@ -2766,7 +2797,7 @@ function App() {
                         <Label htmlFor="ve-replace" className="inline-flex items-center shrink-0">
                           {t("snippets.replaceContent")} <RequiredMark />
                         </Label>
-                        <DateInsertMenu onSelect={(opt) => handleInsertDateVariable(opt, true)} />
+                        <DateInsertMenu onSelect={(opt) => handleInsertDateVariable(opt, "visualReplace")} />
                       </div>
                       <Textarea
                         id="ve-replace"
@@ -2776,30 +2807,7 @@ function App() {
                         value={editReplace}
                         onChange={(e) => setEditReplace(e.target.value)}
                       />
-                      {editVars.length > 0 && (
-                        <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                          <span className="text-xs font-medium text-muted-foreground shrink-0 inline-flex items-center gap-1">
-                            <Calendar className="h-3 w-3 text-primary" />
-                            {t("dateFormats.associatedDateVars")}
-                          </span>
-                          {editVars.map((v) => (
-                            <span
-                              key={v.name}
-                              className="inline-flex items-center gap-1 rounded bg-muted/80 px-2 py-0.5 text-xs font-mono text-foreground border border-border/50"
-                            >
-                              <span className="text-primary font-medium">{`{{${v.name}}}`}</span>
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveDateVar(v.name)}
-                                className="ml-0.5 text-muted-foreground hover:text-destructive rounded p-0.5 transition-colors"
-                                title="Remove variable"
-                              >
-                                <X className="h-3 w-3" />
-                              </button>
-                            </span>
-                          ))}
-                        </div>
-                      )}
+                      <DateVariableList vars={editVars} onRemove={handleRemoveDateVar} />
                     </div>
                   )}
 

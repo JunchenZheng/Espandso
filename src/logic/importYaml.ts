@@ -64,6 +64,14 @@ function isPlainObject(value: any): value is Record<string, any> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
+function getVerboseFormVar(varsBlock: any[]): any | null {
+  return varsBlock.find((v) => v?.type === "form" && isPlainObject(v?.params) && v.params.layout !== undefined) || null;
+}
+
+function getSupportedFormCompanionVars(varsBlock: any[], formVar: any): any[] {
+  return varsBlock.filter((v) => v !== formVar && v?.type === "date");
+}
+
 export function parseYamlMatch(
   match: any,
   fileName: string,
@@ -120,6 +128,38 @@ export function parseYamlMatch(
 
         return { matches, warnings };
       }
+    }
+
+    const formVar = getVerboseFormVar(varsBlock);
+    if (formVar) {
+      const companionVars = getSupportedFormCompanionVars(varsBlock, formVar);
+      const fields = isPlainObject(formVar.params.fields) ? { form_fields: formVar.params.fields } : {};
+      const vars = companionVars.length > 0 ? { vars: companionVars } : {};
+      const formSnippet = {
+        form: String(formVar.params.layout),
+        ...fields,
+        ...vars,
+      };
+
+      const originalSnippet: Snippet = triggers.length > 1
+        ? { triggers, ...formSnippet }
+        : { trigger: triggers[0], ...formSnippet };
+      if (match.description) {
+        originalSnippet.description = match.description;
+      }
+
+      const matches: ImportedMatch[] = triggers.map((trigger, triggerIndex) => {
+        const snippet: Snippet = {
+          trigger,
+          ...formSnippet,
+        };
+        if (match.description) {
+          snippet.description = match.description;
+        }
+        return { snippet, originalSnippet, originalMatchIndex, triggerIndex };
+      });
+
+      return { matches, warnings };
     }
   }
 

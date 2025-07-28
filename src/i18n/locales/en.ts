@@ -153,6 +153,7 @@ export const en = {
     textUk: "Long Text (UK 18 Jun 2025)",
     cjkLocal: "CJK Localized (YYYY年MM月DD日)",
     associatedDateVars: "Associated Date Variables:",
+    removeVariable: "Remove variable",
   },
   formBuilder: {
     selectedTextAction: "Selected Text Action",
