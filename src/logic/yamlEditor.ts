@@ -1,5 +1,29 @@
 import YAML, { Document, isScalar, isSeq, visit } from "yaml";
-import { Snippet } from "./types";
+import { Snippet, SnippetVar } from "./types";
+
+const FORM_VAR_NAME = "form1";
+
+function formLayoutToReplacement(form: string): string {
+  return form.replace(/\[\[([^\][\n]+)\]\]/g, (_placeholder, fieldName) => (
+    `{{${FORM_VAR_NAME}.${String(fieldName).trim()}}}`
+  ));
+}
+
+function buildFormVar(snippet: Snippet): SnippetVar {
+  const params: Record<string, any> = {
+    layout: snippet.form || "",
+  };
+
+  if (snippet.form_fields && Object.keys(snippet.form_fields).length > 0) {
+    params.fields = snippet.form_fields;
+  }
+
+  return {
+    name: FORM_VAR_NAME,
+    type: "form",
+    params,
+  };
+}
 
 export function snippetToYamlMatch(snippet: Snippet): Record<string, any> {
   const match: Record<string, any> = {};
@@ -24,9 +48,18 @@ export function snippetToYamlMatch(snippet: Snippet): Record<string, any> {
   } else if (snippet.image_path !== undefined) {
     match.image_path = snippet.image_path;
   } else if (snippet.form !== undefined) {
-    match.form = snippet.form;
-    if (snippet.form_fields && Object.keys(snippet.form_fields).length > 0) {
-      match.form_fields = snippet.form_fields;
+    const formDateVars = snippet.vars || [];
+    if (formDateVars.length > 0) {
+      match.replace = formLayoutToReplacement(snippet.form);
+      match.vars = [
+        ...formDateVars,
+        buildFormVar(snippet),
+      ];
+    } else {
+      match.form = snippet.form;
+      if (snippet.form_fields && Object.keys(snippet.form_fields).length > 0) {
+        match.form_fields = snippet.form_fields;
+      }
     }
   } else {
     match.replace = snippet.replace || "";

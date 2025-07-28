@@ -155,6 +155,7 @@ export const zhCN: TranslationTree = {
     textUk: "文本长格式 (英式 18 Jun 2025)",
     cjkLocal: "中日韩本地化 (YYYY年MM月DD日)",
     associatedDateVars: "关联日期变量：",
+    removeVariable: "移除变量",
   },
   formBuilder: {
     selectedTextAction: "选中文本操作",

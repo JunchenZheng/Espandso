@@ -261,6 +261,46 @@ matches:
     });
   });
 
+  it("should import verbose form snippets with date variables", () => {
+    const yaml = `
+matches:
+  - trigger: :dated-form
+    replace: |
+      Date: {{mydate}}
+      Name: {{form1.name}}
+    vars:
+      - name: mydate
+        type: date
+        params:
+          format: "%Y-%m-%d"
+      - name: form1
+        type: form
+        params:
+          layout: |
+            Date: {{mydate}}
+            Name: [[name]]
+          fields:
+            name:
+              default: Ada
+`;
+
+    const res = importYamlContent(yaml, "verbose-form.yml");
+
+    expect(res.snippets).toHaveLength(1);
+    expect(res.snippets[0]).toEqual({
+      trigger: ":dated-form",
+      form: "Date: {{mydate}}\nName: [[name]]\n",
+      form_fields: { name: { default: "Ada" } },
+      vars: [
+        {
+          name: "mydate",
+          type: "date",
+          params: { format: "%Y-%m-%d" },
+        },
+      ],
+    });
+  });
+
   it("should import all snippet types including date vars, forms, images, and cat shell vars from ad-block-rules.yml format", () => {
     const yaml = `
 matches:
@@ -477,6 +517,36 @@ matches:
     expect(updated).toContain("type: choice");
     expect(updated).toContain("- Apples");
     expect(updated).toContain("description: greeting form");
+  });
+
+  it("should append a form snippet with date vars using verbose form syntax", () => {
+    const updated = appendSnippetToYamlContent("matches: []\n", {
+      trigger: ":dated-form",
+      form: "Date: {{mydate}}\nName: [[name]]",
+      form_fields: {
+        name: {
+          default: "Ada",
+        },
+      },
+      vars: [
+        {
+          name: "mydate",
+          type: "date",
+          params: { format: "%Y-%m-%d" },
+        },
+      ],
+    });
+
+    expect(updated).toContain("trigger: :dated-form");
+    expect(updated).toContain("replace: |-\n      Date: {{mydate}}\n      Name: {{form1.name}}");
+    expect(updated).toContain("vars:");
+    expect(updated).toContain("name: mydate");
+    expect(updated).toContain("type: date");
+    expect(updated).toContain("name: form1");
+    expect(updated).toContain("type: form");
+    expect(updated).toContain("layout: |-\n            Date: {{mydate}}\n            Name: [[name]]");
+    expect(updated).toContain("fields:");
+    expect(updated).not.toContain("form_fields:");
   });
 
   it("should replace an existing snippet with a file snippet by match index", () => {
