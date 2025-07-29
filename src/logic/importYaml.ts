@@ -64,6 +64,14 @@ function isPlainObject(value: any): value is Record<string, any> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
+function getVerboseFormVar(varsBlock: any[]): any | null {
+  return varsBlock.find((v) => v?.type === "form" && isPlainObject(v?.params) && v.params.layout !== undefined) || null;
+}
+
+function getSupportedFormCompanionVars(varsBlock: any[], formVar: any): any[] {
+  return varsBlock.filter((v) => v !== formVar && v?.type === "date");
+}
+
 export function parseYamlMatch(
   match: any,
   fileName: string,
@@ -85,59 +93,74 @@ export function parseYamlMatch(
   const varsBlock = match.vars || [];
 
   if (varsBlock.length > 0) {
-    if (!onlyCatVarTypes(varsBlock)) {
-      const bad = varsBlock
-        .map((v: any) => v?.type)
-        .filter((t: string) => t !== "echo" && t !== "shell");
-      return {
-        matches: [],
-        warnings: [
-          `[${fileName}] Snippet for ${triggers.join(", ")} has unsupported var type(s) [${bad.join(", ")}], skipping`,
-        ],
-      };
-    }
+    if (onlyCatVarTypes(varsBlock)) {
+      const catPath = extractCatPath(varsBlock);
+      if (catPath) {
+        // Extract file name
+        const parts = catPath.split(/[/\\]/);
+        const originalName = parts[parts.length - 1];
+        const resourceFilename = getResourceFilename(originalName);
 
-    const catPath = extractCatPath(varsBlock);
-    if (!catPath) {
-      return {
-        matches: [],
-        warnings: [
-          `[${fileName}] Snippet for ${triggers.join(", ")} has shell vars but no cat/echo path, skipping`,
-        ],
-      };
-    }
+        const originalSnippet: Snippet = triggers.length > 1
+          ? { triggers, include_file: resourceFilename }
+          : { trigger: triggers[0], include_file: resourceFilename };
+        if (match.description) {
+          originalSnippet.description = match.description;
+        }
 
-    // Extract file name
-    const parts = catPath.split(/[/\\]/);
-    const originalName = parts[parts.length - 1];
-    const resourceFilename = getResourceFilename(originalName);
+        const matches: ImportedMatch[] = triggers.map((trigger, triggerIndex) => {
+          const snippet: Snippet = {
+            trigger,
+            include_file: resourceFilename,
+          };
+          if (match.description) {
+            snippet.description = match.description;
+          }
+          return {
+            snippet,
+            originalSnippet,
+            originalMatchIndex,
+            triggerIndex,
+            resourcePath: catPath,
+            resourceName: resourceFilename,
+          };
+        });
 
-    const originalSnippet: Snippet = triggers.length > 1
-      ? { triggers, include_file: resourceFilename }
-      : { trigger: triggers[0], include_file: resourceFilename };
-    if (match.description) {
-      originalSnippet.description = match.description;
-    }
-
-    const matches: ImportedMatch[] = triggers.map((trigger, triggerIndex) => {
-      const snippet: Snippet = {
-        trigger,
-        include_file: resourceFilename,
-      };
-      if (match.description) {
-        snippet.description = match.description;
+        return { matches, warnings };
       }
-      return {
-        snippet,
-        originalSnippet,
-        originalMatchIndex,
-        triggerIndex,
-        resourcePath: catPath,
-        resourceName: resourceFilename,
-      };
-    });
+    }
 
-    return { matches, warnings };
+    const formVar = getVerboseFormVar(varsBlock);
+    if (formVar) {
+      const companionVars = getSupportedFormCompanionVars(varsBlock, formVar);
+      const fields = isPlainObject(formVar.params.fields) ? { form_fields: formVar.params.fields } : {};
+      const vars = companionVars.length > 0 ? { vars: companionVars } : {};
+      const formSnippet = {
+        form: String(formVar.params.layout),
+        ...fields,
+        ...vars,
+      };
+
+      const originalSnippet: Snippet = triggers.length > 1
+        ? { triggers, ...formSnippet }
+        : { trigger: triggers[0], ...formSnippet };
+      if (match.description) {
+        originalSnippet.description = match.description;
+      }
+
+      const matches: ImportedMatch[] = triggers.map((trigger, triggerIndex) => {
+        const snippet: Snippet = {
+          trigger,
+          ...formSnippet,
+        };
+        if (match.description) {
+          snippet.description = match.description;
+        }
+        return { snippet, originalSnippet, originalMatchIndex, triggerIndex };
+      });
+
+      return { matches, warnings };
+    }
   }
 
   const imagePath = match.image_path;
@@ -202,6 +225,9 @@ export function parseYamlMatch(
   if (match.description) {
     originalSnippet.description = match.description;
   }
+  if (Array.isArray(match.vars) && match.vars.length > 0) {
+    originalSnippet.vars = match.vars;
+  }
 
   const matches: ImportedMatch[] = triggers.map((trigger, triggerIndex) => {
     const snippet: Snippet = {
@@ -210,6 +236,9 @@ export function parseYamlMatch(
     };
     if (match.description) {
       snippet.description = match.description;
+    }
+    if (Array.isArray(match.vars) && match.vars.length > 0) {
+      snippet.vars = match.vars;
     }
     return { snippet, originalSnippet, originalMatchIndex, triggerIndex };
   });

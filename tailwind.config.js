@@ -38,6 +38,13 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        textH1: "rgb(var(--text-h1-rgb) / <alpha-value>)",
+        textH2: "rgb(var(--text-h2-rgb) / <alpha-value>)",
+        textH3: "rgb(var(--text-h3-rgb) / <alpha-value>)",
+        textBody: "rgb(var(--text-body-rgb) / <alpha-value>)",
+        textSmall: "rgb(var(--text-small-rgb) / <alpha-value>)",
+        textCaption: "rgb(var(--text-caption-rgb) / <alpha-value>)",
+        textMicro: "rgb(var(--text-micro-rgb) / <alpha-value>)",
       },
       borderRadius: {
         lg: "var(--radius)",

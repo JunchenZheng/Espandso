@@ -37,8 +37,8 @@ export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
               <Info className="h-5 w-5" />
             </div>
             <div>
-              <DialogTitle className="text-lg font-bold">{t("dialogs.about.title")}</DialogTitle>
-              <DialogDescription className="text-xs text-muted-foreground">
+              <DialogTitle className="text-xl font-bold">{t("dialogs.about.title")}</DialogTitle>
+              <DialogDescription className="text-sm text-muted-foreground">
                 {t("dialogs.about.description")}
               </DialogDescription>
             </div>
@@ -49,18 +49,18 @@ export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
           {/* App Info Card */}
           <div className="rounded-lg border bg-card p-3.5 text-card-foreground shadow-sm">
             <div className="flex items-center justify-between border-b pb-2">
-              <span className="font-semibold text-sm">Expandso</span>
-              <span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs font-medium">
+              <span className="font-semibold text-base">Expandso</span>
+              <span className="rounded-full bg-secondary px-2.5 py-0.5 text-sm font-medium">
                 v0.1.0
               </span>
             </div>
-            <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
+            <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
               {t("dialogs.about.builtWith")}
             </p>
           </div>
 
           {/* Open Source Acknowledgments Header */}
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+          <div className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
             <Heart className="h-3.5 w-3.5 text-rose-500 fill-rose-500" />
             <span>{t("dialogs.about.openSourceLicenses")}</span>
           </div>
@@ -75,8 +75,8 @@ export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm text-foreground">{lib.name}</span>
-                      <span className="rounded border bg-background px-1.5 py-0.2 text-[10px] font-mono text-muted-foreground">
+                      <span className="font-medium text-base text-foreground">{lib.name}</span>
+                      <span className="rounded border bg-background px-1.5 py-0.2 text-[11px] font-mono text-muted-foreground">
                         {lib.license}
                       </span>
                     </div>
@@ -91,7 +91,7 @@ export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
                       <ExternalLink className="h-3 w-3" />
                     </Button>
                   </div>
-                  <p className="mt-1.5 text-xs text-muted-foreground leading-normal">
+                  <p className="mt-1.5 text-sm text-muted-foreground leading-normal">
                     {lib.description}
                   </p>
                   {lib.usageNotice && (

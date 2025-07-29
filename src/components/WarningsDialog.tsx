@@ -57,13 +57,13 @@ export function WarningsDialog({
               <AlertTriangle className="h-5 w-5" />
             </div>
             <div>
-              <DialogTitle className="text-lg font-bold flex items-center gap-2">
+              <DialogTitle className="text-xl font-bold flex items-center gap-2">
                 <span>{t("dialogs.warnings.title")}</span>
-                <span className="rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 text-xs font-semibold">
+                <span className="rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 text-[11px] font-semibold">
                   {activeFilterPreview ? activeFilterPreview.warnings.length : totalWarningsCount}
                 </span>
               </DialogTitle>
-              <DialogDescription className="text-xs text-muted-foreground">
+              <DialogDescription className="text-sm text-muted-foreground">
                 {t("dialogs.warnings.description")}
               </DialogDescription>
             </div>
@@ -108,7 +108,7 @@ export function WarningsDialog({
                     <div className="flex items-center justify-between border-b pb-2">
                       <div className="flex items-center gap-2 min-w-0">
                         <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                        <span className="font-semibold text-xs text-foreground truncate">
+                        <span className="font-semibold text-sm text-foreground truncate">
                           {preview.config.relativePath}
                         </span>
                       </div>
