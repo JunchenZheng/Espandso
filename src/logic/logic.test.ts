@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { validate } from "./validate";
 import { importYamlContent } from "./importYaml";
-import { appendSnippetToYamlContent, deleteSnippetFromYamlContent, deleteMultipleSnippetsFromYamlContent, deleteSelectedTriggersFromYamlContent, findSnippetLineRangeInYaml, findSnippetLineRangesInYaml, findDeleteSelectionLineRangesInYaml, replaceSnippetInYamlContent } from "./yamlEditor";
+import { appendSnippetToYamlContent, deleteSnippetFromYamlContent, deleteMultipleSnippetsFromYamlContent, deleteSelectedTriggersFromYamlContent, findSnippetLineRangeInYaml, findSnippetLineRangesInYaml, findDeleteSelectionLineRangesInYaml, replaceSnippetInYamlContent, snippetToYamlMatch } from "./yamlEditor";
 import { isEspansoYamlConfigFile, parseEspansoConfigDir, sortEspansoConfigFiles } from "./espansoPaths";
 import {
   getIncludeFileCandidates,
@@ -181,7 +181,7 @@ matches:
     expect(res.importedMatches[1].originalSnippet).toEqual({ triggers: [":hi", ":hey"], replace: "greeting" });
   });
 
-  it("should import include_file snippets (both single shell var and legacy echo+shell) and warn about unsupported stuff", () => {
+  it("should import include_file snippets and snippets with custom vars (like date) with replace block", () => {
     const yaml = `
 matches:
   - trigger: :inc_legacy
@@ -202,8 +202,8 @@ matches:
         type: shell
         params:
           cmd: cat "/path/to/single_resource.json"
-  - trigger: :unsupported
-    replace: "{{bad}}"
+  - trigger: :custom_var
+    replace: "ISO date: {{bad}}"
     vars:
       - name: bad
         type: date
@@ -211,10 +211,21 @@ matches:
           format: "%Y"
 `;
     const res = importYamlContent(yaml, "test.yml");
-    expect(res.snippets).toHaveLength(2);
+    expect(res.snippets).toHaveLength(3);
     expect(res.snippets[0]).toEqual({ trigger: ":inc_legacy", include_file: "resource_data.json" });
     expect(res.snippets[1]).toEqual({ trigger: ":inc_single", include_file: "single_resource_data.json" });
-    expect(res.warnings).toContain("[test.yml] Snippet for :unsupported has unsupported var type(s) [date], skipping");
+    expect(res.snippets[2]).toEqual({
+      trigger: ":custom_var",
+      replace: "ISO date: {{bad}}",
+      vars: [
+        {
+          name: "bad",
+          type: "date",
+          params: { format: "%Y" },
+        },
+      ],
+    });
+    expect(res.warnings).toHaveLength(0);
   });
 
   it("should import empty or comment-only YAML files without warnings", () => {
@@ -247,6 +258,106 @@ matches:
       form: "Hey [[name]],\n[[message]]\n",
       form_fields: { message: { multiline: true } },
       description: "greeting form",
+    });
+  });
+
+  it("should import verbose form snippets with date variables", () => {
+    const yaml = `
+matches:
+  - trigger: :dated-form
+    replace: |
+      Date: {{mydate}}
+      Name: {{form1.name}}
+    vars:
+      - name: mydate
+        type: date
+        params:
+          format: "%Y-%m-%d"
+      - name: form1
+        type: form
+        params:
+          layout: |
+            Date: {{mydate}}
+            Name: [[name]]
+          fields:
+            name:
+              default: Ada
+`;
+
+    const res = importYamlContent(yaml, "verbose-form.yml");
+
+    expect(res.snippets).toHaveLength(1);
+    expect(res.snippets[0]).toEqual({
+      trigger: ":dated-form",
+      form: "Date: {{mydate}}\nName: [[name]]\n",
+      form_fields: { name: { default: "Ada" } },
+      vars: [
+        {
+          name: "mydate",
+          type: "date",
+          params: { format: "%Y-%m-%d" },
+        },
+      ],
+    });
+  });
+
+  it("should import all snippet types including date vars, forms, images, and cat shell vars from ad-block-rules.yml format", () => {
+    const yaml = `
+matches:
+  - trigger: :adblock
+    replace: "rule1"
+  - trigger: :ad-block
+    replace: "rule2"
+  - triggers:
+      - non-im
+      - -non
+    replace: "rule3"
+  - trigger: :plan
+    replace: "test plan"
+  - trigger: ":form1"
+    form: "Hello [[name]]"
+  - trigger: :pic
+    image_path: /path/to/img.png
+  - trigger: :file
+    replace: "{{output}}"
+    vars:
+      - name: output
+        type: shell
+        params:
+          cmd: cat "/path/to/script.py"
+  - trigger: ":date1"
+    replace: "ISO date: {{mydate}}"
+    vars:
+      - name: mydate
+        type: date
+        params:
+          format: "%Y-%m-%d"
+`;
+    const res = importYamlContent(yaml, "ad-block-rules.yml");
+    expect(res.warnings).toHaveLength(0);
+    // 1 (adblock) + 1 (ad-block) + 2 (non-im, -non) + 1 (plan) + 1 (form1) + 1 (pic) + 1 (file) + 1 (date1) = 9 snippets imported
+    expect(res.snippets).toHaveLength(9);
+    expect(res.snippets.map((s) => s.trigger)).toEqual([
+      ":adblock",
+      ":ad-block",
+      "non-im",
+      "-non",
+      ":plan",
+      ":form1",
+      ":pic",
+      ":file",
+      ":date1",
+    ]);
+    expect(res.snippets[8]).toEqual({
+      trigger: ":date1",
+      replace: "ISO date: {{mydate}}",
+      vars: [
+        {
+          name: "mydate",
+          type: "date",
+          params: { format: "%Y-%m-%d" },
+        },
+      ],
     });
   });
 });
@@ -408,6 +519,36 @@ matches:
     expect(updated).toContain("description: greeting form");
   });
 
+  it("should append a form snippet with date vars using verbose form syntax", () => {
+    const updated = appendSnippetToYamlContent("matches: []\n", {
+      trigger: ":dated-form",
+      form: "Date: {{mydate}}\nName: [[name]]",
+      form_fields: {
+        name: {
+          default: "Ada",
+        },
+      },
+      vars: [
+        {
+          name: "mydate",
+          type: "date",
+          params: { format: "%Y-%m-%d" },
+        },
+      ],
+    });
+
+    expect(updated).toContain("trigger: :dated-form");
+    expect(updated).toContain("replace: |-\n      Date: {{mydate}}\n      Name: {{form1.name}}");
+    expect(updated).toContain("vars:");
+    expect(updated).toContain("name: mydate");
+    expect(updated).toContain("type: date");
+    expect(updated).toContain("name: form1");
+    expect(updated).toContain("type: form");
+    expect(updated).toContain("layout: |-\n            Date: {{mydate}}\n            Name: [[name]]");
+    expect(updated).toContain("fields:");
+    expect(updated).not.toContain("form_fields:");
+  });
+
   it("should replace an existing snippet with a file snippet by match index", () => {
     const yaml = `
 matches:
@@ -555,6 +696,37 @@ matches:
 
     expect(partialRanges).toEqual([{ startLine: 4, endLine: 4 }]);
     expect(fullRanges).toEqual([{ startLine: 2, endLine: 6 }]);
+  });
+
+  it("should parse and format date vars in YAML content", () => {
+    const yamlInput = `matches:
+  - trigger: ":date1"
+    replace: "ISO date: {{mydate}}"
+    vars:
+      - name: mydate
+        type: date
+        params:
+          format: "%Y-%m-%d"
+`;
+
+    const imported = importYamlContent(yamlInput, "test.yml");
+    expect(imported.snippets.length).toBe(1);
+    expect(imported.snippets[0].vars).toEqual([
+      {
+        name: "mydate",
+        type: "date",
+        params: { format: "%Y-%m-%d" },
+      },
+    ]);
+
+    const formattedYaml = snippetToYamlMatch(imported.snippets[0]);
+    expect(formattedYaml.vars).toEqual([
+      {
+        name: "mydate",
+        type: "date",
+        params: { format: "%Y-%m-%d" },
+      },
+    ]);
   });
 });
 

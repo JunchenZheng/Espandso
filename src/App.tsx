@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { memo, type CSSProperties, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { mkdir, readFile, readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import { listen } from "@tauri-apps/api/event";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
@@ -6,9 +6,12 @@ import { openPath } from "@tauri-apps/plugin-opener";
 import {
   AlertTriangle,
   AlignLeft,
+  Calendar,
+  Check,
   ChevronDown,
   ChevronRight,
   Columns,
+  Copy,
   FileCode,
   FilePlus,
   FileSearch,
@@ -33,6 +36,7 @@ import {
   Trash2,
   Type,
   Upload,
+  X,
   XCircle,
 } from "lucide-react";
 import "./App.css";
@@ -62,7 +66,8 @@ import {
   setExperimentalYamlWarningsEnabled,
   isYamlWarningsActive,
 } from "./logic/features";
-import { Snippet, ValidationError } from "./logic/types";
+import { Snippet, SnippetVar, ValidationError } from "./logic/types";
+import { DATE_FORMAT_OPTIONS, DateFormatOption, generateUniqueVarName, getReferencedVars } from "./logic/dateFormats";
 import { validate } from "./logic/validate";
 import { importYamlContent, ImportedMatch } from "./logic/importYaml";
 import { buildTriggerInput, getSnippetTriggers, isImageFilePath, normalizeTriggerLines } from "./logic/snippetUtils";
@@ -126,6 +131,10 @@ interface FormFieldConfig {
 }
 
 type TranslateFn = ReturnType<typeof useI18n>["t"];
+
+const DEFAULT_COLLECTION_PANE_WIDTH = 20;
+const MIN_COLLECTION_PANE_WIDTH = 14;
+const MAX_COLLECTION_PANE_WIDTH = 40;
 
 function snippetKindLabel(kind: AddSnippetKind, t: TranslateFn): string {
   if (kind === "file") return t("snippets.typeFileShort");
@@ -211,6 +220,98 @@ function getTextFieldMode(field: FormFieldConfig): TextFieldMode {
   return field.control === "multiline" ? "multiline" : "single";
 }
 
+function DateInsertMenu({ onSelect }: { onSelect: (option: DateFormatOption) => void }) {
+  const { t } = useI18n();
+  const [isOpen, setIsOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    if (isOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isOpen]);
+
+  return (
+    <div className="relative inline-block text-left" ref={menuRef}>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="h-7 gap-1 px-2 text-xs font-normal border-dashed text-muted-foreground hover:text-foreground hover:bg-accent"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <Calendar className="h-3.5 w-3.5 text-primary" />
+        <span>{t("dateFormats.addDate")}</span>
+        <ChevronDown className="h-3 w-3 opacity-60" />
+      </Button>
+
+      {isOpen && (
+        <div className="absolute right-0 z-50 mt-1 w-72 origin-top-right rounded-md bg-popover p-1.5 shadow-lg border border-border text-popover-foreground animate-in fade-in-80 zoom-in-95">
+          <div className="px-2 py-1 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider border-b border-border/50 mb-1">
+            {t("dateFormats.addDate")}
+          </div>
+          <div className="max-h-64 overflow-y-auto space-y-0.5">
+            {DATE_FORMAT_OPTIONS.map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                className="w-full text-left px-2 py-1.5 rounded text-xs hover:bg-accent hover:text-accent-foreground transition-colors flex flex-col gap-0.5 group"
+                onClick={() => {
+                  onSelect(opt);
+                  setIsOpen(false);
+                }}
+              >
+                <div className="flex items-center justify-between font-medium">
+                  <span>{t(opt.labelKey as any)}</span>
+                </div>
+                <div className="text-[11px] text-muted-foreground/80 font-mono">
+                  {opt.example}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DateVariableList({ vars, onRemove }: { vars: SnippetVar[]; onRemove: (varName: string) => void }) {
+  const { t } = useI18n();
+  if (vars.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 pt-1">
+      <span className="text-xs font-medium text-muted-foreground shrink-0 inline-flex items-center gap-1">
+        <Calendar className="h-3 w-3 text-primary" />
+        {t("dateFormats.associatedDateVars")}
+      </span>
+      {vars.map((v) => (
+        <span
+          key={v.name}
+          className="inline-flex items-center gap-1 rounded bg-muted/80 px-2 py-0.5 text-xs font-mono text-foreground border border-border/50"
+        >
+          <span className="text-primary font-medium">{`{{${v.name}}}`}</span>
+          <button
+            type="button"
+            onClick={() => onRemove(v.name)}
+            className="ml-0.5 text-muted-foreground hover:text-destructive rounded p-0.5 transition-colors"
+            title={t("dateFormats.removeVariable")}
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function formFieldsToConfigs(formFields: Record<string, any> | undefined): FormFieldConfig[] {
   if (!formFields) return [];
 
@@ -293,6 +394,9 @@ function OptionalMark() {
 function App() {
   const { t, locale, setLocale } = useI18n();
   const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [collectionPaneWidth, setCollectionPaneWidth] = useState<number>(DEFAULT_COLLECTION_PANE_WIDTH);
+  const [isCollectionResizing, setIsCollectionResizing] = useState<boolean>(false);
+  const mainSplitRef = useRef<HTMLDivElement | null>(null);
 
   const [espansoMatchDir, setEspansoMatchDir] = useState<string>("");
   const [espansoPathSource, setEspansoPathSource] = useState<EspansoPathSource | "">("");
@@ -314,6 +418,9 @@ function App() {
   const [addSnippetKind, setAddSnippetKind] = useState<AddSnippetKind>("text");
   const [editTriggersText, setEditTriggersText] = useState<string>("");
   const [editReplace, setEditReplace] = useState<string>("");
+  const [editVars, setEditVars] = useState<SnippetVar[]>([]);
+  const replaceTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const visualEditorReplaceTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [editIncludeFile, setEditIncludeFile] = useState<string>("");
   const [editImagePath, setEditImagePath] = useState<string>("");
   const [editForm, setEditForm] = useState<string>("");
@@ -343,6 +450,50 @@ function App() {
     setEnableExperimentalYamlWarnings(checked);
     setExperimentalYamlWarningsEnabled(checked);
   };
+
+  const updateCollectionPaneWidth = useCallback((clientX: number) => {
+    const split = mainSplitRef.current;
+    if (!split) return;
+
+    const rect = split.getBoundingClientRect();
+    if (rect.width <= 0) return;
+
+    const nextWidth = ((clientX - rect.left) / rect.width) * 100;
+    setCollectionPaneWidth(Math.min(MAX_COLLECTION_PANE_WIDTH, Math.max(MIN_COLLECTION_PANE_WIDTH, nextWidth)));
+  }, []);
+
+  const startCollectionResize = useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setIsCollectionResizing(true);
+    updateCollectionPaneWidth(event.clientX);
+  }, [updateCollectionPaneWidth]);
+
+  const handleCollectionResizeMove = useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
+    if (!isCollectionResizing) return;
+    updateCollectionPaneWidth(event.clientX);
+  }, [isCollectionResizing, updateCollectionPaneWidth]);
+
+  const stopCollectionResize = useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    setIsCollectionResizing(false);
+  }, []);
+
+  useEffect(() => {
+    if (!isCollectionResizing) return;
+
+    const previousCursor = document.body.style.cursor;
+    const previousUserSelect = document.body.style.userSelect;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    return () => {
+      document.body.style.cursor = previousCursor;
+      document.body.style.userSelect = previousUserSelect;
+    };
+  }, [isCollectionResizing]);
 
   useEffect(() => {
     if (isVisualEditorOpen && highlightedLineRange) {
@@ -843,6 +994,7 @@ function App() {
     setAddSnippetKind("text");
     setEditTriggersText("");
     setEditReplace("");
+    setEditVars([]);
     setEditIncludeFile("");
     setEditImagePath("");
     setEditForm("");
@@ -987,6 +1139,7 @@ function App() {
     );
     setEditTriggersText(triggerInput.multiline);
     setEditReplace(editableSnippet.replace || "");
+    setEditVars(editableSnippet.vars ? [...editableSnippet.vars] : []);
     setEditIncludeFile(target.match.resourcePath || editableSnippet.include_file || "");
     setEditImagePath(editableSnippet.image_path || "");
     setEditForm(editableSnippet.form || "");
@@ -1018,8 +1171,16 @@ function App() {
       if (formFields) {
         snippet.form_fields = formFields;
       }
+      const referencedVars = getReferencedVars(editForm, editVars);
+      if (referencedVars.length > 0) {
+        snippet.vars = referencedVars;
+      }
     } else {
       snippet.replace = editReplace;
+      const referencedVars = getReferencedVars(editReplace, editVars);
+      if (referencedVars.length > 0) {
+        snippet.vars = referencedVars;
+      }
     }
 
     if (editDescription.trim()) {
@@ -1027,6 +1188,54 @@ function App() {
     }
 
     return snippet;
+  }
+
+  function handleInsertDateVariable(option: DateFormatOption, target: "replace" | "visualReplace" | "form" = "replace") {
+    const varName = generateUniqueVarName(editVars, option.defaultVarName);
+    const newVar: SnippetVar = {
+      name: varName,
+      type: "date",
+      params: {
+        format: option.format,
+      },
+    };
+    setEditVars((prev) => [...prev, newVar]);
+
+    const tagToInsert = `{{${varName}}}`;
+    const targetRef = target === "form"
+      ? formTextareaRef
+      : target === "visualReplace"
+        ? visualEditorReplaceTextareaRef
+        : replaceTextareaRef;
+    const textarea = targetRef.current;
+
+    if (textarea) {
+      const start = textarea.selectionStart || 0;
+      const end = textarea.selectionEnd || 0;
+      const currentVal = target === "form" ? editForm : editReplace;
+      const nextVal = currentVal.substring(0, start) + tagToInsert + currentVal.substring(end);
+      if (target === "form") {
+        setEditForm(nextVal);
+      } else {
+        setEditReplace(nextVal);
+      }
+
+      requestAnimationFrame(() => {
+        textarea.focus();
+        const newPos = start + tagToInsert.length;
+        textarea.setSelectionRange(newPos, newPos);
+      });
+    } else {
+      if (target === "form") {
+        setEditForm((prev) => (prev ? `${prev} ${tagToInsert}` : tagToInsert));
+      } else {
+        setEditReplace((prev) => (prev ? `${prev} ${tagToInsert}` : tagToInsert));
+      }
+    }
+  }
+
+  function handleRemoveDateVar(varName: string) {
+    setEditVars((prev) => prev.filter((v) => v.name !== varName));
   }
 
   function updateFormFieldConfig(id: string, patch: Partial<FormFieldConfig>) {
@@ -1309,14 +1518,14 @@ function App() {
         <div className="drag-overlay">
               <div className="drag-zone">
                 <Upload className="mb-5 h-12 w-12" />
-                <div className="text-xl font-semibold">
+                <div className="text-2xl font-semibold">
                   {isAddSnippetOpen && addSnippetKind === "file"
                     ? t("drag.dropFileHere")
                     : isAddSnippetOpen && addSnippetKind === "image"
                       ? t("drag.dropImageFileHere")
                       : t("drag.dropYamlFileHere")}
                 </div>
-                <div className="mt-2 text-sm text-muted-foreground">
+                <div className="mt-2 text-base text-muted-foreground">
                   {isAddSnippetOpen && addSnippetKind === "file"
                     ? t("drag.fileSourceDescription")
                     : isAddSnippetOpen && addSnippetKind === "image"
@@ -1332,7 +1541,7 @@ function App() {
           {espansoConfigs.length > 0 ? (
             <div className="flex min-h-0 flex-1 flex-col gap-3">
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-background p-3">
-                <div className="flex flex-wrap gap-3 text-sm">
+                <div className="flex flex-wrap gap-3 text-base">
                   <span className="font-semibold">
                     {formatCount(t, espansoConfigs.length, "counts.yamlFile", "counts.yamlFiles")}
                   </span>
@@ -1402,10 +1611,14 @@ function App() {
                 </div>
               </div>
 
-              <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden rounded-md border bg-background md:grid-cols-[18rem_1fr]">
-                <aside className="flex min-h-0 flex-col border-b bg-secondary/30 md:border-b-0 md:border-r">
+              <div
+                ref={mainSplitRef}
+                className="home-split grid min-h-0 flex-1 overflow-hidden rounded-md border bg-background"
+                style={{ "--collection-pane-width": `${collectionPaneWidth}%` } as CSSProperties}
+              >
+                <aside className="flex min-h-0 flex-col border-b bg-secondary/30 md:border-b-0">
                   <div className="flex h-10 shrink-0 items-center justify-between border-b px-3">
-                    <h2 className="text-sm font-semibold">{t("navigation.collection")}</h2>
+                    <h2 className="text-lg font-semibold">{t("navigation.collection")}</h2>
                     <div className="flex items-center gap-1">
                       <Button
                         size="sm"
@@ -1425,7 +1638,6 @@ function App() {
                       >
                         <FilePlus className="h-4 w-4" />
                       </Button>
-                      <span className="ml-1 text-xs text-muted-foreground">{espansoPreviewList.length}</span>
                     </div>
                   </div>
                   <ScrollArea className="min-h-0 flex-1">
@@ -1445,6 +1657,20 @@ function App() {
                     </div>
                   </ScrollArea>
                 </aside>
+
+                <button
+                  type="button"
+                  className={cn(
+                    "hidden cursor-col-resize border-x bg-border/40 transition-colors hover:bg-primary/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:block",
+                    isCollectionResizing && "bg-primary/40",
+                  )}
+                  aria-label={t("navigation.resizeCollectionPane")}
+                  title={t("navigation.resizeCollectionPane")}
+                  onPointerDown={startCollectionResize}
+                  onPointerMove={handleCollectionResizeMove}
+                  onPointerUp={stopCollectionResize}
+                  onPointerCancel={stopCollectionResize}
+                />
 
                 <section className="flex min-h-0 min-w-0 flex-col">
                   {selectedEspansoPreview ? (
@@ -1492,8 +1718,8 @@ function App() {
           ) : (
             <div className="flex flex-col items-center justify-center p-8 text-center rounded-lg border border-dashed my-auto bg-background/50">
               <FolderOpen className="h-12 w-12 text-muted-foreground/60 mb-3" />
-              <h3 className="text-lg font-semibold mb-1">{t("empty.noYamlFilesTitle")}</h3>
-              <p className="text-sm text-muted-foreground max-w-md mb-6">
+              <h3 className="text-2xl font-semibold mb-1">{t("empty.noYamlFilesTitle")}</h3>
+              <p className="text-base text-muted-foreground max-w-md mb-6">
                 {isScanningEspanso
                   ? t("status.scanningEspansoConfigs")
                   : espansoScanMessage || t("empty.noYamlFilesMessage")}
@@ -1528,14 +1754,9 @@ function App() {
         }
       }}>
         <DialogContent
-          className={cn(
-            "grid max-h-[calc(100vh-2rem)] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden",
-            snippetEditTarget
-              ? "h-[min(50rem,calc(100vh-2rem))] w-[50vw] min-w-[min(42rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)]"
-              : "h-[min(50rem,calc(100vh-2rem))] max-w-2xl",
-          )}
+          className="grid h-[calc(100vh-3rem)] max-h-[calc(100vh-3rem)] w-[50vw] min-w-[min(36rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden"
         >
-          <DialogHeader>
+          <DialogHeader className="shrink-0">
             <DialogTitle>{snippetDialogTitle}</DialogTitle>
             <DialogDescription className="break-all">
               {snippetEditTarget?.preview.config.relativePath || selectedEspansoPreview?.config.relativePath || t("snippets.selectYamlFile")}
@@ -1543,11 +1764,11 @@ function App() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="min-h-0 space-y-5 overflow-auto pr-1">
+          <div className="min-h-0 flex-1 flex flex-col space-y-4 overflow-y-auto pr-1">
             {(addErrors.length > 0 || (isYamlWarningsEnabled && addWarnings.length > 0)) && (
               <div
                 className={cn(
-                  "space-y-2 rounded-lg border p-4 text-sm",
+                  "space-y-2 rounded-lg border p-4 text-sm shrink-0",
                   addErrors.length > 0
                     ? "border-destructive/30 bg-destructive/10 text-destructive"
                     : "border-amber-300 bg-amber-50 text-amber-800",
@@ -1569,7 +1790,7 @@ function App() {
               </div>
             )}
 
-            <div className="space-y-2">
+            <div className="space-y-2 shrink-0">
               <Label htmlFor="trigger-0" className="inline-flex items-center">
                 {t("snippets.trigger")} <RequiredMark />
               </Label>
@@ -1614,7 +1835,7 @@ function App() {
               </div>
             </div>
 
-            <div className="grid grid-cols-4 rounded-md border bg-secondary/60 p-1">
+            <div className="grid grid-cols-4 rounded-md border bg-secondary/60 p-1 shrink-0">
               <Button
                 type="button"
                 variant={activeSnippetKind === "text" ? "secondary" : "ghost"}
@@ -1666,7 +1887,7 @@ function App() {
             </div>
 
             {activeSnippetKind === "file" ? (
-              <div className="space-y-3">
+              <div className="space-y-3 shrink-0">
                 <Label htmlFor="include-file" className="inline-flex items-center">
                   {t("snippets.file")} <RequiredMark />
                 </Label>
@@ -1715,7 +1936,7 @@ function App() {
                 )}
               </div>
             ) : activeSnippetKind === "image" ? (
-              <div className="space-y-3">
+              <div className="space-y-3 shrink-0">
                 <Label htmlFor="image-path" className="inline-flex items-center">
                   {t("snippets.imagePath")} <RequiredMark />
                 </Label>
@@ -1748,15 +1969,18 @@ function App() {
                 </div>
               </div>
             ) : activeSnippetKind === "form" ? (
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="form" className="inline-flex items-center">
-                    {t("snippets.formLayout")} <RequiredMark />
-                  </Label>
+              <div className="flex-1 flex flex-col min-h-0 space-y-4">
+                <div className="flex-1 flex flex-col space-y-2 min-h-[120px]">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="form" className="inline-flex items-center shrink-0">
+                      {t("snippets.formLayout")} <RequiredMark />
+                    </Label>
+                    <DateInsertMenu onSelect={(opt) => handleInsertDateVariable(opt, "form")} />
+                  </div>
                   <Textarea
                     id="form"
                     ref={formTextareaRef}
-                    className="mono-field min-h-44 resize-y"
+                    className="mono-field flex-1 h-full min-h-[120px] resize-y"
                     placeholder={"=== Ticket ===\nTitle: title\nCategory: category\n\nDescription:\ndescription"}
                     value={editForm}
                     onChange={(e) => {
@@ -1779,38 +2003,39 @@ function App() {
                       captureFormSelection(event.currentTarget);
                     }}
                   />
-                  <div className="space-y-2 rounded-md border bg-secondary/25 p-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <Label>{t("formBuilder.selectedTextAction")}</Label>
-                      <span className="max-w-full truncate text-xs text-muted-foreground">
-                        {formSelection ? formSelection.text.trim() : t("formBuilder.selectTextHint")}
-                      </span>
-                    </div>
-                    <div className="grid gap-2 sm:grid-cols-4">
-                      {([
-                        ["text", t("formBuilder.singleLineText"), Type],
-                        ["multiline", t("formBuilder.multilineText"), AlignLeft],
-                        ["choice", t("formBuilder.choiceBox"), ListChecks],
-                        ["list", t("formBuilder.listBox"), List],
-                      ] as const).map(([control, label, Icon]) => (
-                        <Button
-                          key={control}
-                          type="button"
-                          variant="outline"
-                          disabled={!formSelection}
-                          className="justify-start"
-                          onMouseDown={(event) => event.preventDefault()}
-                          onClick={() => configureSelectedFormField(control)}
-                        >
-                          <Icon className="h-4 w-4" />
-                          {label}
-                        </Button>
-                      ))}
-                    </div>
+                </div>
+                <DateVariableList vars={editVars} onRemove={handleRemoveDateVar} />
+                <div className="space-y-2 rounded-md border bg-secondary/25 p-3 shrink-0">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <Label>{t("formBuilder.selectedTextAction")}</Label>
+                    <span className="max-w-full truncate text-xs text-muted-foreground">
+                      {formSelection ? formSelection.text.trim() : t("formBuilder.selectTextHint")}
+                    </span>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-4">
+                    {([
+                      ["text", t("formBuilder.singleLineText"), Type],
+                      ["multiline", t("formBuilder.multilineText"), AlignLeft],
+                      ["choice", t("formBuilder.choiceBox"), ListChecks],
+                      ["list", t("formBuilder.listBox"), List],
+                    ] as const).map(([control, label, Icon]) => (
+                      <Button
+                        key={control}
+                        type="button"
+                        variant="outline"
+                        disabled={!formSelection}
+                        className="justify-start"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => configureSelectedFormField(control)}
+                      >
+                        <Icon className="h-4 w-4" />
+                        {label}
+                      </Button>
+                    ))}
                   </div>
                 </div>
                 {editFormFieldConfigs.length > 0 && (
-                  <div className="space-y-3">
+                  <div className="space-y-3 shrink-0">
                     <Label>{t("formBuilder.fields")}</Label>
                     {editFormFieldConfigs.map((field, fieldIndex) => (
                       <div key={field.id} className="space-y-3 rounded-md border bg-secondary/25 p-3">
@@ -1932,21 +2157,26 @@ function App() {
                 )}
               </div>
             ) : (
-              <div className="space-y-2">
-                <Label htmlFor="replace" className="inline-flex items-center">
-                  {t("snippets.replaceContent")} <RequiredMark />
-                </Label>
+              <div className="flex-1 flex flex-col space-y-2 min-h-[120px]">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="replace" className="inline-flex items-center shrink-0">
+                    {t("snippets.replaceContent")} <RequiredMark />
+                  </Label>
+                  <DateInsertMenu onSelect={(opt) => handleInsertDateVariable(opt, "replace")} />
+                </div>
                 <Textarea
                   id="replace"
-                  className="mono-field min-h-48 resize-y"
+                  ref={replaceTextareaRef}
+                  className="mono-field flex-1 h-full min-h-[120px] resize-y"
                   placeholder={t("snippets.replaceContentPlaceholder")}
                   value={editReplace}
                   onChange={(e) => setEditReplace(e.target.value)}
                 />
+                <DateVariableList vars={editVars} onRemove={handleRemoveDateVar} />
               </div>
             )}
 
-            <div className="space-y-2">
+            <div className="space-y-2 shrink-0">
               <Label htmlFor="description" className="inline-flex items-center">
                 {t("snippets.descriptionLabel")} <OptionalMark />
               </Label>
@@ -1989,13 +2219,13 @@ function App() {
           setSnippetEditTarget(null);
         }
       }}>
-        <DialogContent className="max-w-[95vw] w-[95vw] h-[92vh] max-h-[92vh] grid grid-rows-[auto_minmax(0,1fr)] overflow-hidden p-6 gap-4">
+        <DialogContent className="fixed inset-0 top-0 left-0 translate-x-0 translate-y-0 w-full max-w-none h-full max-h-none rounded-none border-none grid grid-rows-[auto_minmax(0,1fr)] overflow-hidden p-6 gap-4">
           <DialogHeader className="shrink-0">
-            <DialogTitle className="flex items-center gap-2 text-base">
+            <DialogTitle className="flex items-center gap-2 text-xl font-bold">
               <Columns className="h-5 w-5 text-primary" />
               <span>{t("visualEditor.title")}</span>
             </DialogTitle>
-            <DialogDescription className="break-all text-xs">
+            <DialogDescription className="break-all text-sm text-muted-foreground">
               {snippetEditTarget?.preview.config.relativePath || selectedEspansoPreview?.config.relativePath || t("snippets.selectYamlFile")}
               {snippetEditTarget ? ` · ${t("snippets.snippetNumber", { number: snippetEditTarget.displayIndex + 1 })}` : ""}
             </DialogDescription>
@@ -2007,7 +2237,7 @@ function App() {
               {/* RadioButton 模式选择头部 */}
               <div className="flex items-center justify-between border-b pb-3 mb-4 shrink-0">
                 <div className="flex items-center gap-6">
-                  <label className="flex items-center gap-2 cursor-pointer text-sm font-semibold select-none">
+                  <label className="flex items-center gap-2 cursor-pointer text-base font-semibold select-none">
                     <input
                       type="radio"
                       name="ve-editor-mode"
@@ -2021,7 +2251,7 @@ function App() {
                     <Plus className="h-4 w-4 text-primary" />
                     <span>{t("visualEditor.modeAdd")}</span>
                   </label>
-                  <label className="flex items-center gap-2 cursor-pointer text-sm font-semibold select-none">
+                  <label className="flex items-center gap-2 cursor-pointer text-base font-semibold select-none">
                     <input
                       type="radio"
                       name="ve-editor-mode"
@@ -2038,7 +2268,7 @@ function App() {
                 </div>
 
                 {visualEditorMode === "delete" && pendingDeleteSelections.length > 0 && (
-                  <span className="inline-flex items-center rounded-full bg-destructive/15 px-2.5 py-0.5 text-xs font-semibold text-destructive">
+                  <span className="inline-flex items-center rounded-full bg-destructive/15 px-2.5 py-0.5 text-[11px] font-semibold text-destructive">
                     {t("visualEditor.markedCount", { count: pendingDeleteSelections.length })}
                   </span>
                 )}
@@ -2169,11 +2399,11 @@ function App() {
                 </div>
               ) : (
                 /* 添加/编辑模式表单 */
-                <div className="min-h-0 flex-1 space-y-5 overflow-auto pr-3">
+                <div className="min-h-0 flex-1 flex flex-col space-y-4 overflow-y-auto pr-3">
                   {(addErrors.length > 0 || (isYamlWarningsEnabled && addWarnings.length > 0)) && (
                     <div
                       className={cn(
-                        "space-y-2 rounded-lg border p-4 text-sm",
+                        "space-y-2 rounded-lg border p-4 text-sm shrink-0",
                         addErrors.length > 0
                           ? "border-destructive/30 bg-destructive/10 text-destructive"
                           : "border-amber-300 bg-amber-50 text-amber-800",
@@ -2195,7 +2425,7 @@ function App() {
                     </div>
                   )}
 
-                  <div className="space-y-2">
+                  <div className="space-y-2 shrink-0">
                     <Label htmlFor="ve-trigger-0" className="inline-flex items-center">
                       {t("snippets.trigger")} <RequiredMark />
                     </Label>
@@ -2240,7 +2470,7 @@ function App() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-4 rounded-md border bg-secondary/60 p-1">
+                  <div className="grid grid-cols-4 rounded-md border bg-secondary/60 p-1 shrink-0">
                     <Button
                       type="button"
                       variant={activeSnippetKind === "text" ? "secondary" : "ghost"}
@@ -2292,7 +2522,7 @@ function App() {
                   </div>
 
                   {activeSnippetKind === "file" ? (
-                    <div className="space-y-3">
+                    <div className="space-y-3 shrink-0">
                       <Label htmlFor="ve-include-file" className="inline-flex items-center">
                         {t("snippets.file")} <RequiredMark />
                       </Label>
@@ -2341,7 +2571,7 @@ function App() {
                       )}
                     </div>
                   ) : activeSnippetKind === "image" ? (
-                    <div className="space-y-3">
+                    <div className="space-y-3 shrink-0">
                       <Label htmlFor="ve-image-path" className="inline-flex items-center">
                         {t("snippets.imagePath")} <RequiredMark />
                       </Label>
@@ -2374,15 +2604,18 @@ function App() {
                       </div>
                     </div>
                   ) : activeSnippetKind === "form" ? (
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="ve-form" className="inline-flex items-center">
-                          {t("snippets.formLayout")} <RequiredMark />
-                        </Label>
+                    <div className="flex-1 flex flex-col min-h-0 space-y-4">
+                      <div className="flex-1 flex flex-col space-y-2 min-h-[120px]">
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="ve-form" className="inline-flex items-center shrink-0">
+                            {t("snippets.formLayout")} <RequiredMark />
+                          </Label>
+                          <DateInsertMenu onSelect={(opt) => handleInsertDateVariable(opt, "form")} />
+                        </div>
                         <Textarea
                           id="ve-form"
                           ref={formTextareaRef}
-                          className="mono-field min-h-44 resize-y"
+                          className="mono-field flex-1 h-full min-h-[120px] resize-y"
                           placeholder={"=== Ticket ===\nTitle: title\nCategory: category\n\nDescription:\ndescription"}
                           value={editForm}
                           onChange={(e) => {
@@ -2405,38 +2638,39 @@ function App() {
                             captureFormSelection(event.currentTarget);
                           }}
                         />
-                        <div className="space-y-2 rounded-md border bg-secondary/25 p-3">
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <Label>{t("formBuilder.selectedTextAction")}</Label>
-                            <span className="max-w-full truncate text-xs text-muted-foreground">
-                              {formSelection ? formSelection.text.trim() : t("formBuilder.selectTextHint")}
-                            </span>
-                          </div>
-                          <div className="grid gap-2 sm:grid-cols-4">
-                            {([
-                              ["text", t("formBuilder.singleLineText"), Type],
-                              ["multiline", t("formBuilder.multilineText"), AlignLeft],
-                              ["choice", t("formBuilder.choiceBox"), ListChecks],
-                              ["list", t("formBuilder.listBox"), List],
-                            ] as const).map(([control, label, Icon]) => (
-                              <Button
-                                key={control}
-                                type="button"
-                                variant="outline"
-                                disabled={!formSelection}
-                                className="justify-start"
-                                onMouseDown={(event) => event.preventDefault()}
-                                onClick={() => configureSelectedFormField(control)}
-                              >
-                                <Icon className="h-4 w-4" />
-                                {label}
-                              </Button>
-                            ))}
-                          </div>
+                      </div>
+                      <DateVariableList vars={editVars} onRemove={handleRemoveDateVar} />
+                      <div className="space-y-2 rounded-md border bg-secondary/25 p-3 shrink-0">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <Label>{t("formBuilder.selectedTextAction")}</Label>
+                          <span className="max-w-full truncate text-xs text-muted-foreground">
+                            {formSelection ? formSelection.text.trim() : t("formBuilder.selectTextHint")}
+                          </span>
+                        </div>
+                        <div className="grid gap-2 sm:grid-cols-4">
+                          {([
+                            ["text", t("formBuilder.singleLineText"), Type],
+                            ["multiline", t("formBuilder.multilineText"), AlignLeft],
+                            ["choice", t("formBuilder.choiceBox"), ListChecks],
+                            ["list", t("formBuilder.listBox"), List],
+                          ] as const).map(([control, label, Icon]) => (
+                            <Button
+                              key={control}
+                              type="button"
+                              variant="outline"
+                              disabled={!formSelection}
+                              className="justify-start"
+                              onMouseDown={(event) => event.preventDefault()}
+                              onClick={() => configureSelectedFormField(control)}
+                            >
+                              <Icon className="h-4 w-4" />
+                              {label}
+                            </Button>
+                          ))}
                         </div>
                       </div>
                       {editFormFieldConfigs.length > 0 && (
-                        <div className="space-y-3">
+                        <div className="space-y-3 shrink-0">
                           <Label>{t("formBuilder.fields")}</Label>
                           {editFormFieldConfigs.map((field, fieldIndex) => (
                             <div key={field.id} className="space-y-3 rounded-md border bg-secondary/25 p-3">
@@ -2558,21 +2792,26 @@ function App() {
                       )}
                     </div>
                   ) : (
-                    <div className="space-y-2">
-                      <Label htmlFor="ve-replace" className="inline-flex items-center">
-                        {t("snippets.replaceContent")} <RequiredMark />
-                      </Label>
+                    <div className="flex-1 flex flex-col space-y-2 min-h-[120px]">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="ve-replace" className="inline-flex items-center shrink-0">
+                          {t("snippets.replaceContent")} <RequiredMark />
+                        </Label>
+                        <DateInsertMenu onSelect={(opt) => handleInsertDateVariable(opt, "visualReplace")} />
+                      </div>
                       <Textarea
                         id="ve-replace"
-                        className="mono-field min-h-48 resize-y"
+                        ref={visualEditorReplaceTextareaRef}
+                        className="mono-field flex-1 h-full min-h-[120px] resize-y"
                         placeholder={t("snippets.replaceContentPlaceholder")}
                         value={editReplace}
                         onChange={(e) => setEditReplace(e.target.value)}
                       />
+                      <DateVariableList vars={editVars} onRemove={handleRemoveDateVar} />
                     </div>
                   )}
 
-                  <div className="space-y-2">
+                  <div className="space-y-2 shrink-0">
                     <Label htmlFor="ve-description" className="inline-flex items-center">
                       {t("snippets.descriptionLabel")} <OptionalMark />
                     </Label>
@@ -3220,13 +3459,6 @@ const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-semibold tracking-tight">{node.name}</div>
             </div>
-            {node.fileCount === 0 ? (
-              <span className="mr-1 text-[10px] font-normal text-muted-foreground/70">{t("filesystem.emptyFolderBadge")}</span>
-            ) : (
-              <span className="mr-1 rounded-full bg-muted/60 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                {node.fileCount}
-              </span>
-            )}
           </button>
           <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
             <button
@@ -3333,12 +3565,24 @@ function EspansoConfigDetail({
   const [viewportHeight, setViewportHeight] = useState(0);
   const [isBatchMode, setIsBatchMode] = useState(false);
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
+  const [copied, setCopied] = useState(false);
   const snippetCount = preview.snippets.length;
   const totalHeight = snippetCount * ROW_HEIGHT;
   const startIndex = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN_ROWS);
   const visibleRowCount = Math.ceil(viewportHeight / ROW_HEIGHT) + OVERSCAN_ROWS * 2;
   const endIndex = Math.min(snippetCount, startIndex + visibleRowCount);
   const visibleSnippets = preview.snippets.slice(startIndex, endIndex);
+
+  const handleCopyPath = useCallback(() => {
+    if (!preview.config.path) return;
+    navigator.clipboard
+      .writeText(preview.config.path)
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      })
+      .catch(() => {});
+  }, [preview.config.path]);
 
   useLayoutEffect(() => {
     const viewport = scrollRef.current;
@@ -3359,6 +3603,7 @@ function EspansoConfigDetail({
     setScrollTop(0);
     setIsBatchMode(false);
     setSelectedIndices(new Set());
+    setCopied(false);
     if (scrollRef.current) {
       scrollRef.current.scrollTop = 0;
     }
@@ -3385,8 +3630,22 @@ function EspansoConfigDetail({
     <>
       <div className="flex h-14 shrink-0 items-center justify-between gap-3 border-b px-3">
         <div className="min-w-0 flex-1">
-          <h2 className="truncate text-sm font-semibold">{preview.config.relativePath}</h2>
-          <p className="mt-1 truncate text-xs text-muted-foreground">{preview.config.path}</p>
+          <h2 className="truncate text-xl font-bold">{preview.config.relativePath}</h2>
+          <div className="mt-1 flex items-center gap-1.5 min-w-0">
+            <p className="truncate text-sm text-muted-foreground">{preview.config.path}</p>
+            <button
+              type="button"
+              onClick={handleCopyPath}
+              className="shrink-0 rounded p-1 text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors cursor-pointer"
+              title={copied ? t("actions.copied") : t("actions.copyAbsolutePath")}
+            >
+              {copied ? (
+                <Check className="h-3.5 w-3.5 text-emerald-500" />
+              ) : (
+                <Copy className="h-3.5 w-3.5 text-muted-foreground/80 hover:text-foreground" />
+              )}
+            </button>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {preview.warningCount > 0 && (
@@ -3452,8 +3711,8 @@ function EspansoConfigDetail({
         className={cn(
           "grid h-9 shrink-0 items-center border-b bg-secondary/40 px-3 text-xs font-semibold text-muted-foreground",
           isBatchMode
-            ? "grid-cols-[2.25rem_minmax(8rem,1fr)_minmax(4.5rem,0.45fr)_minmax(6rem,0.65fr)_minmax(12rem,2fr)_2.25rem]"
-            : "grid-cols-[minmax(8rem,1fr)_minmax(4.5rem,0.45fr)_minmax(6rem,0.65fr)_minmax(12rem,2fr)_2.25rem]"
+            ? "grid-cols-[2.25rem_minmax(7rem,0.8fr)_minmax(4.5rem,0.45fr)_minmax(8rem,1fr)_minmax(12rem,2fr)]"
+            : "grid-cols-[minmax(7rem,0.8fr)_minmax(4.5rem,0.45fr)_minmax(8rem,1fr)_minmax(12rem,2fr)]"
         )}
       >
         {isBatchMode && (
@@ -3472,11 +3731,10 @@ function EspansoConfigDetail({
             />
           </div>
         )}
-        <div className="truncate">{t("table.name")}</div>
+        <div className="truncate">{t("table.trigger")}</div>
         <div className="truncate">{t("table.type")}</div>
-        <div className="truncate">{t("table.keyword")}</div>
-        <div className="truncate">{t("table.snippet")}</div>
-        <div className="sr-only">{t("table.details")}</div>
+        <div className="truncate">{t("table.description")}</div>
+        <div className="truncate">{t("table.content")}</div>
       </div>
 
       <div
@@ -3517,8 +3775,8 @@ function EspansoConfigDetail({
                     className={cn(
                       "grid h-9 w-full items-center px-3 text-left text-sm transition-colors hover:bg-secondary/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
                       isBatchMode
-                        ? "grid-cols-[2.25rem_minmax(8rem,1fr)_minmax(4.5rem,0.45fr)_minmax(6rem,0.65fr)_minmax(12rem,2fr)_2.25rem]"
-                        : "grid-cols-[minmax(8rem,1fr)_minmax(4.5rem,0.45fr)_minmax(6rem,0.65fr)_minmax(12rem,2fr)_2.25rem]",
+                        ? "grid-cols-[2.25rem_minmax(7rem,0.8fr)_minmax(4.5rem,0.45fr)_minmax(8rem,1fr)_minmax(12rem,2fr)]"
+                        : "grid-cols-[minmax(7rem,0.8fr)_minmax(4.5rem,0.45fr)_minmax(8rem,1fr)_minmax(12rem,2fr)]",
                       isSelected && "bg-emerald-500/15 hover:bg-emerald-500/20 border-l-2 border-l-emerald-500"
                     )}
                     onClick={() => {
@@ -3547,11 +3805,7 @@ function EspansoConfigDetail({
                         />
                       </div>
                     )}
-                    <div className="min-w-0 pr-3">
-                      <div className="truncate font-medium">
-                        {snippet.description || displayTrigger}
-                      </div>
-                    </div>
+                    <div className="mono-field min-w-0 truncate pr-3 text-sm font-medium">{displayTrigger}</div>
                     <div className="flex items-center gap-1.5 min-w-0 pr-2">
                       <span
                         className={cn(
@@ -3572,12 +3826,13 @@ function EspansoConfigDetail({
                               : t("snippets.textType")}
                       </span>
                     </div>
-                    <div className="mono-field min-w-0 truncate pr-3 text-sm">{displayTrigger}</div>
+                    <div className="min-w-0 pr-3">
+                      <div className="truncate text-muted-foreground">
+                        {snippet.description || ""}
+                      </div>
+                    </div>
                     <div className="min-w-0 truncate text-muted-foreground">
                       {snippetPreview}
-                    </div>
-                    <div className="flex justify-end text-muted-foreground">
-                      <SquareArrowOutUpRight className="h-4 w-4" />
                     </div>
                   </button>
                 );

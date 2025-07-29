@@ -44,6 +44,7 @@ export async function validate(
     const imagePath = snippet.image_path;
     const form = snippet.form;
     const formFields = snippet.form_fields;
+    const vars = snippet.vars;
     const description = snippet.description;
 
     const hasTrigger = trigger !== undefined && trigger !== null;
@@ -124,6 +125,19 @@ export async function validate(
         errors.push({ message: `snippet #${i}: 'form_fields' can only be used with 'form'` });
       } else if (typeof formFields !== "object" || Array.isArray(formFields)) {
         errors.push({ message: `snippet #${i}: 'form_fields' must be an object` });
+      }
+    }
+
+    if (vars !== undefined && vars !== null) {
+      if (!Array.isArray(vars)) {
+        errors.push({ message: `snippet #${i}: 'vars' must be a list` });
+      } else if (hasForm) {
+        for (const variable of vars) {
+          if (!variable || typeof variable !== "object" || variable.type !== "date") {
+            errors.push({ message: `snippet #${i}: form snippets only support date variables` });
+            break;
+          }
+        }
       }
     }
 

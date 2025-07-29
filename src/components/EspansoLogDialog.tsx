@@ -134,7 +134,7 @@ export function EspansoLogDialog({ open, onOpenChange }: EspansoLogDialogProps) 
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <DialogTitle className="text-base font-bold">{t("dialogs.logs.title")}</DialogTitle>
+                <DialogTitle className="text-xl font-bold">{t("dialogs.logs.title")}</DialogTitle>
                 {autoRefresh && (
                   <span className="flex h-2 w-2 relative" title={t("dialogs.logs.realtimePollingActive")}>
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -142,7 +142,7 @@ export function EspansoLogDialog({ open, onOpenChange }: EspansoLogDialogProps) 
                   </span>
                 )}
               </div>
-              <DialogDescription className="text-xs text-muted-foreground">
+              <DialogDescription className="text-sm text-muted-foreground">
                 {t("dialogs.logs.description")}
               </DialogDescription>
             </div>
@@ -153,7 +153,7 @@ export function EspansoLogDialog({ open, onOpenChange }: EspansoLogDialogProps) 
             <Button
               size="sm"
               variant={autoRefresh ? "secondary" : "outline"}
-              className="h-8 text-xs gap-1.5 px-2.5"
+              className="h-8 text-sm gap-1.5 px-2.5"
               onClick={() => setAutoRefresh(!autoRefresh)}
             >
               {autoRefresh ? (
@@ -172,7 +172,7 @@ export function EspansoLogDialog({ open, onOpenChange }: EspansoLogDialogProps) 
             <Button
               size="sm"
               variant={autoScroll ? "secondary" : "outline"}
-              className="h-8 text-xs gap-1.5 px-2.5"
+              className="h-8 text-sm gap-1.5 px-2.5"
               onClick={() => setAutoScroll(!autoScroll)}
             >
               <ArrowDownCircle className={`h-3.5 w-3.5 ${autoScroll ? "text-primary" : "text-muted-foreground"}`} />
@@ -182,7 +182,7 @@ export function EspansoLogDialog({ open, onOpenChange }: EspansoLogDialogProps) 
             <Button
               size="sm"
               variant="outline"
-              className="h-8 text-xs gap-1.5 px-2.5"
+              className="h-8 text-sm gap-1.5 px-2.5"
               onClick={fetchLog}
               disabled={isLoading}
             >
@@ -193,7 +193,7 @@ export function EspansoLogDialog({ open, onOpenChange }: EspansoLogDialogProps) 
             <Button
               size="sm"
               variant="outline"
-              className="h-8 text-xs gap-1.5 px-2.5"
+              className="h-8 text-sm gap-1.5 px-2.5"
               onClick={handleCopy}
               disabled={!logContent}
             >
@@ -213,7 +213,7 @@ export function EspansoLogDialog({ open, onOpenChange }: EspansoLogDialogProps) 
             <Button
               size="sm"
               variant="ghost"
-              className="h-8 text-xs gap-1.5 px-2 text-muted-foreground hover:text-destructive"
+              className="h-8 text-sm gap-1.5 px-2 text-muted-foreground hover:text-destructive"
               onClick={handleClear}
               disabled={!logContent}
             >

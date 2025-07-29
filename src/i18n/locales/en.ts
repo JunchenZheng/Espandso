@@ -18,6 +18,8 @@ export const en = {
     clear: "Clear",
     search: "Search",
     copy: "Copy",
+    copyAbsolutePath: "Copy absolute path",
+    copied: "Copied",
     confirm: "Confirm",
     back: "Back",
     retry: "Retry",
@@ -56,6 +58,7 @@ export const en = {
   },
   navigation: {
     collection: "Collection",
+    resizeCollectionPane: "Resize collection pane",
   },
   settings: {
     title: "Settings",
@@ -140,6 +143,18 @@ export const en = {
     formSnippet: "Form snippet",
     inlineReplacementSnippet: "Inline replacement snippet",
   },
+  dateFormats: {
+    addDate: "Insert Date",
+    iso8601: "ISO 8601 (YYYY-MM-DD)",
+    slashUs: "Slash Format (US MM/DD/YYYY)",
+    slashUk: "Slash Format (UK DD/MM/YYYY)",
+    dotEu: "Dot Separated (EU DD.MM.YYYY)",
+    textUs: "Long Text (US Jun 18, 2025)",
+    textUk: "Long Text (UK 18 Jun 2025)",
+    cjkLocal: "CJK Localized (YYYY年MM月DD日)",
+    associatedDateVars: "Associated Date Variables:",
+    removeVariable: "Remove variable",
+  },
   formBuilder: {
     selectedTextAction: "Selected Text Action",
     selectTextHint: "Select text in the form layout",
@@ -196,10 +211,10 @@ export const en = {
     folderReserved: "'{{name}}' is a reserved Espanso directory name and cannot be used.",
   },
   table: {
-    name: "Name",
+    trigger: "Trigger",
     type: "Type",
-    keyword: "Keyword",
-    snippet: "Snippet",
+    description: "Description",
+    content: "Content",
     details: "Details",
   },
   warnings: {

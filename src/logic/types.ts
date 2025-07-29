@@ -1,3 +1,9 @@
+export interface SnippetVar {
+  name: string;
+  type: string;
+  params?: Record<string, any>;
+}
+
 export interface Snippet {
   trigger?: string;
   triggers?: string[];
@@ -6,6 +12,7 @@ export interface Snippet {
   image_path?: string;
   form?: string;
   form_fields?: Record<string, any>;
+  vars?: SnippetVar[];
   description?: string;
 }
 
