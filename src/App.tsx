@@ -30,6 +30,7 @@ import {
   RefreshCw,
   RotateCcw,
   Save,
+  Search,
   Settings,
   SquareArrowOutUpRight,
   Terminal,
@@ -59,7 +60,9 @@ import { Switch } from "./components/ui/switch";
 import { Textarea } from "./components/ui/textarea";
 import { AboutDialog } from "./components/AboutDialog";
 import { EspansoLogDialog } from "./components/EspansoLogDialog";
+import { SearchDialog } from "./components/SearchDialog";
 import { WarningsDialog } from "./components/WarningsDialog";
+import { SearchResult } from "./logic/snippetSearch";
 import {
   IS_EXPERIMENTAL_BUILD,
   getExperimentalYamlWarningsEnabled,
@@ -406,9 +409,32 @@ function App() {
   const [selectedEspansoConfigPath, setSelectedEspansoConfigPath] = useState<string>("");
   const [isScanningEspanso, setIsScanningEspanso] = useState<boolean>(false);
   const [espansoScanMessage, setEspansoScanMessage] = useState<string>("");
+  const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
+  const [highlightedSnippetIndex, setHighlightedSnippetIndex] = useState<number | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isLogOpen, setIsLogOpen] = useState<boolean>(false);
   const [isAboutOpen, setIsAboutOpen] = useState<boolean>(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setIsSearchOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  const handleSelectSearchResult = useCallback((result: SearchResult) => {
+    setSelectedEspansoConfigPath(result.filePath);
+    setHighlightedSnippetIndex(result.snippetIndex);
+
+    // Clear highlight after 2.5 seconds
+    setTimeout(() => {
+      setHighlightedSnippetIndex((prev) => (prev === result.snippetIndex ? null : prev));
+    }, 2500);
+  }, []);
   const [isAddSnippetOpen, setIsAddSnippetOpen] = useState<boolean>(false);
   const [isVisualEditorOpen, setIsVisualEditorOpen] = useState<boolean>(false);
   const [visualEditorYamlContent, setVisualEditorYamlContent] = useState<string>("");
@@ -1579,6 +1605,20 @@ function App() {
                   <Button
                     size="sm"
                     variant="outline"
+                    onClick={() => setIsSearchOpen(true)}
+                    aria-label={t("search.openSearch")}
+                    title={t("search.openSearch")}
+                    className="gap-1.5"
+                  >
+                    <Search className="h-4 w-4 text-primary" />
+                    <span>{t("actions.search")}</span>
+                    <kbd className="pointer-events-none hidden h-5 select-none items-center gap-0.5 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100 sm:flex ml-1">
+                      ⌘K
+                    </kbd>
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
                     onClick={scanDefaultEspansoConfigDir}
                     disabled={isScanningEspanso}
                     aria-label={t("actions.refresh")}
@@ -1676,6 +1716,7 @@ function App() {
                   {selectedEspansoPreview ? (
                     <EspansoConfigDetail
                       preview={selectedEspansoPreview}
+                      highlightedIndex={highlightedSnippetIndex}
                       onViewSnippet={(match, index) =>
                         openEditSnippetDialog({
                           preview: selectedEspansoPreview,
@@ -3064,6 +3105,13 @@ function App() {
       </Dialog>
 
 
+      <SearchDialog
+        open={isSearchOpen}
+        onOpenChange={setIsSearchOpen}
+        previews={espansoConfigPreviews}
+        onSelectResult={handleSelectSearchResult}
+      />
+
       <AboutDialog open={isAboutOpen} onOpenChange={setIsAboutOpen} />
 
       <EspansoLogDialog open={isLogOpen} onOpenChange={setIsLogOpen} />
@@ -3541,6 +3589,7 @@ const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
 
 interface EspansoConfigDetailProps {
   preview: EspansoConfigPreview;
+  highlightedIndex?: number | null;
   onViewSnippet: (match: ImportedMatch, index: number) => void;
   onAddSnippet: () => void;
   onOpenVisualEditor?: () => void;
@@ -3550,6 +3599,7 @@ interface EspansoConfigDetailProps {
 
 function EspansoConfigDetail({
   preview,
+  highlightedIndex,
   onViewSnippet,
   onAddSnippet,
   onOpenVisualEditor,
@@ -3568,6 +3618,16 @@ function EspansoConfigDetail({
   const [copied, setCopied] = useState(false);
   const snippetCount = preview.snippets.length;
   const totalHeight = snippetCount * ROW_HEIGHT;
+
+  useEffect(() => {
+    if (highlightedIndex !== undefined && highlightedIndex !== null && highlightedIndex >= 0) {
+      const targetScrollTop = Math.max(0, highlightedIndex * ROW_HEIGHT - 60);
+      setScrollTop(targetScrollTop);
+      if (scrollRef.current) {
+        scrollRef.current.scrollTop = targetScrollTop;
+      }
+    }
+  }, [highlightedIndex, ROW_HEIGHT]);
   const startIndex = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN_ROWS);
   const visibleRowCount = Math.ceil(viewportHeight / ROW_HEIGHT) + OVERSCAN_ROWS * 2;
   const endIndex = Math.min(snippetCount, startIndex + visibleRowCount);
@@ -3768,16 +3828,18 @@ function EspansoConfigDetail({
                       : snippet.replace || t("snippets.emptyReplacement");
 
                 const isSelected = selectedIndices.has(index);
+                const isHighlighted = highlightedIndex === index;
 
                 return (
                   <button
                     key={`${triggers.join("-")}-${index}`}
                     className={cn(
-                      "grid h-9 w-full items-center px-3 text-left text-sm transition-colors hover:bg-secondary/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                      "grid h-9 w-full items-center px-3 text-left text-sm transition-all hover:bg-secondary/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
                       isBatchMode
                         ? "grid-cols-[2.25rem_minmax(7rem,0.8fr)_minmax(4.5rem,0.45fr)_minmax(8rem,1fr)_minmax(12rem,2fr)]"
                         : "grid-cols-[minmax(7rem,0.8fr)_minmax(4.5rem,0.45fr)_minmax(8rem,1fr)_minmax(12rem,2fr)]",
-                      isSelected && "bg-emerald-500/15 hover:bg-emerald-500/20 border-l-2 border-l-emerald-500"
+                      isSelected && "bg-emerald-500/15 hover:bg-emerald-500/20 border-l-2 border-l-emerald-500",
+                      isHighlighted && "bg-emerald-500/20 hover:bg-emerald-500/30 border-l-4 border-l-emerald-500 font-semibold ring-1 ring-emerald-500/50 animate-pulse"
                     )}
                     onClick={() => {
                       if (isBatchMode) {
