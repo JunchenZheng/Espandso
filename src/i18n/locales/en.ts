@@ -328,6 +328,19 @@ export const en = {
     markedCount: "{{count}} marked for deletion",
     searchSnippetPlaceholder: "Search trigger or content...",
   },
+  search: {
+    title: "Global Snippet Search",
+    placeholder: "Search trigger, description or content...",
+    scopeTitle: "Search Scope:",
+    scopeTrigger: "Trigger",
+    scopeDescription: "Description",
+    scopeContent: "Content",
+    noResults: "No matching snippets found",
+    resultsCount: "{{count}} matching snippets found",
+    shortcutHint: "Press Esc to close",
+    openSearch: "Search snippets... (⌘K)",
+    matchedIn: "Matched in",
+  },
 } as const;
 
 export type TranslationKeys = typeof en;

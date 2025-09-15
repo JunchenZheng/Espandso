@@ -330,4 +330,17 @@ export const zhCN: TranslationTree = {
     markedCount: "已标记删除 {{count}} 项",
     searchSnippetPlaceholder: "搜索触发词或内容...",
   },
+  search: {
+    title: "全局片段搜索",
+    placeholder: "搜索触发词、描述或替换内容...",
+    scopeTitle: "搜索范围：",
+    scopeTrigger: "触发词 (Trigger)",
+    scopeDescription: "描述 (Description)",
+    scopeContent: "内容 (Content)",
+    noResults: "未找到匹配的片段",
+    resultsCount: "共找到 {{count}} 个匹配项",
+    shortcutHint: "按 Esc 关闭",
+    openSearch: "搜索片段... (⌘K)",
+    matchedIn: "匹配于",
+  },
 };
