@@ -312,6 +312,7 @@ export const en = {
     restarting: "Restarting Espanso...",
     ready: "Ready",
     scanningEspansoConfigs: "Scanning Espanso configs...",
+    loadingYamlPreview: "Loading YAML preview...",
   },
   visualEditor: {
     title: "Visual Editor",

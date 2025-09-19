@@ -373,10 +373,6 @@ interface AlertDialogState {
   onCancel?: () => void;
 }
 
-function formatCount(t: TranslateFn, count: number, singularKey: string, pluralKey: string): string {
-  return `${count} ${t(count === 1 ? singularKey : pluralKey)}`;
-}
-
 function RequiredMark() {
   return (
     <span className="ml-1 inline-flex items-center justify-center text-destructive font-semibold align-middle leading-none translate-y-[2px]">
@@ -408,6 +404,8 @@ function App() {
   const [espansoConfigPreviews, setEspansoConfigPreviews] = useState<EspansoConfigPreview[]>([]);
   const [selectedEspansoConfigPath, setSelectedEspansoConfigPath] = useState<string>("");
   const [isScanningEspanso, setIsScanningEspanso] = useState<boolean>(false);
+  const [isLoadingSelectedPreview, setIsLoadingSelectedPreview] = useState<boolean>(false);
+  const [selectedPreviewError, setSelectedPreviewError] = useState<string>("");
   const [espansoScanMessage, setEspansoScanMessage] = useState<string>("");
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
   const [highlightedSnippetIndex, setHighlightedSnippetIndex] = useState<number | null>(null);
@@ -535,9 +533,13 @@ function App() {
 
   const espansoPreviewList = useMemo(
     () => {
-      const rawList = espansoConfigPreviews.length > 0
-        ? espansoConfigPreviews
-        : espansoConfigs.map((config) => ({
+      const loadedPreviewByPath = new Map(
+        espansoConfigPreviews.map((preview) => [preview.config.path, preview]),
+      );
+
+      return espansoConfigs.map((config) => {
+        const loadedPreview = loadedPreviewByPath.get(config.path);
+        const preview = loadedPreview || {
           config,
           snippetCount: 0,
           inlineCount: 0,
@@ -548,34 +550,20 @@ function App() {
           warnings: [],
           snippets: [],
           importedMatches: [],
-        }));
+        };
 
-      if (isYamlWarningsEnabled) {
-        return rawList;
-      }
+        if (isYamlWarningsEnabled) {
+          return preview;
+        }
 
-      return rawList.map((item) => ({
-        ...item,
-        warningCount: 0,
-        warnings: [],
-      }));
+        return {
+          ...preview,
+          warningCount: 0,
+          warnings: [],
+        };
+      });
     },
     [espansoConfigPreviews, espansoConfigs, isYamlWarningsEnabled],
-  );
-
-  const espansoPreviewTotals = useMemo(
-    () => espansoPreviewList.reduce(
-      (total, preview) => ({
-        snippets: total.snippets + preview.snippetCount,
-        inline: total.inline + preview.inlineCount,
-        resources: total.resources + preview.resourceCount,
-        images: total.images + preview.imageCount,
-        forms: total.forms + preview.formCount,
-        warnings: total.warnings + preview.warningCount,
-      }),
-      { snippets: 0, inline: 0, resources: 0, images: 0, forms: 0, warnings: 0 },
-    ),
-    [espansoPreviewList],
   );
 
   const espansoPreviewTree = useMemo(
@@ -603,6 +591,13 @@ function App() {
     }
     return espansoPreviewList[0] || null;
   }, [selectedTreeNode, espansoPreviewList, selectedEspansoConfigPath]);
+
+  const isSelectedPreviewLoaded = useMemo(
+    () => !!selectedEspansoPreview && espansoConfigPreviews.some(
+      (preview) => preview.config.path === selectedEspansoPreview.config.path,
+    ),
+    [espansoConfigPreviews, selectedEspansoPreview],
+  );
 
   const selectedDirectoryNode = useMemo(() => {
     if (selectedTreeNode && selectedTreeNode.isDir) {
@@ -704,48 +699,51 @@ function App() {
     [t],
   );
 
-  const buildEspansoConfigPreviews = useCallback(async (configs: EspansoConfigFile[]): Promise<EspansoConfigPreview[]> => {
-    const previews: EspansoConfigPreview[] = [];
+  const buildEspansoConfigPreview = useCallback(async (config: EspansoConfigFile): Promise<EspansoConfigPreview> => {
+    try {
+      const content = await readTextFile(config.path);
+      const result = importYamlContent(content, config.name);
+      const inlineCount = result.snippets.filter((snippet) => snippet.replace !== undefined).length;
+      const resourceCount = result.snippets.filter((snippet) => snippet.include_file).length;
+      const imageCount = result.snippets.filter((snippet) => snippet.image_path !== undefined).length;
+      const formCount = result.snippets.filter((snippet) => snippet.form !== undefined).length;
 
-    for (const config of configs) {
-      try {
-        const content = await readTextFile(config.path);
-        const result = importYamlContent(content, config.name);
-        const inlineCount = result.snippets.filter((snippet) => snippet.replace !== undefined).length;
-        const resourceCount = result.snippets.filter((snippet) => snippet.include_file).length;
-        const imageCount = result.snippets.filter((snippet) => snippet.image_path !== undefined).length;
-        const formCount = result.snippets.filter((snippet) => snippet.form !== undefined).length;
-
-        previews.push({
-          config,
-          snippetCount: result.snippets.length,
-          inlineCount,
-          resourceCount,
-          imageCount,
-          formCount,
-          warningCount: result.warnings.length,
-          warnings: result.warnings,
-          snippets: result.snippets,
-          importedMatches: result.importedMatches,
-        });
-      } catch (e: any) {
-        previews.push({
-          config,
-          snippetCount: 0,
-          inlineCount: 0,
-          resourceCount: 0,
-          imageCount: 0,
-          formCount: 0,
-          warningCount: 1,
-          warnings: [t("errors.failedToReadFile", { file: config.name, message: e?.message || e })],
-          snippets: [],
-          importedMatches: [],
-        });
-      }
+      return {
+        config,
+        snippetCount: result.snippets.length,
+        inlineCount,
+        resourceCount,
+        imageCount,
+        formCount,
+        warningCount: result.warnings.length,
+        warnings: result.warnings,
+        snippets: result.snippets,
+        importedMatches: result.importedMatches,
+      };
+    } catch (e: any) {
+      return {
+        config,
+        snippetCount: 0,
+        inlineCount: 0,
+        resourceCount: 0,
+        imageCount: 0,
+        formCount: 0,
+        warningCount: 1,
+        warnings: [t("errors.failedToReadFile", { file: config.name, message: e?.message || e })],
+        snippets: [],
+        importedMatches: [],
+      };
     }
-
-    return previews;
   }, [t]);
+
+  const loadEspansoConfigPreview = useCallback(async (config: EspansoConfigFile): Promise<EspansoConfigPreview> => {
+    const preview = await buildEspansoConfigPreview(config);
+    setEspansoConfigPreviews((current) => [
+      ...current.filter((item) => item.config.path !== config.path),
+      preview,
+    ]);
+    return preview;
+  }, [buildEspansoConfigPreview]);
 
 
 
@@ -776,7 +774,8 @@ function App() {
       setEspansoPathSource(result.pathSource);
       setEspansoConfigs(result.files);
       setEspansoDirectories(result.directories || []);
-      setEspansoConfigPreviews(await buildEspansoConfigPreviews(result.files));
+      setEspansoConfigPreviews([]);
+      setSelectedPreviewError("");
       setSelectedEspansoConfigPath((current) => {
         if (current && result.files.some((file) => file.path === current)) return current;
         return result.files[0]?.path || "";
@@ -794,7 +793,7 @@ function App() {
     } finally {
       setIsScanningEspanso(false);
     }
-  }, [buildEspansoConfigPreviews, t]);
+  }, [t]);
 
   const openCreateFileDialog = useCallback((defaultParentRelPath?: string) => {
     const targetParent = defaultParentRelPath !== undefined ? defaultParentRelPath : activeDirectoryRelPath;
@@ -913,6 +912,49 @@ function App() {
     scanDefaultEspansoConfigDir();
   }, [scanDefaultEspansoConfigDir]);
 
+  useEffect(() => {
+    const selectedConfig = espansoConfigs.find((config) => config.path === selectedEspansoConfigPath);
+    if (!selectedConfig) {
+      setIsLoadingSelectedPreview(false);
+      setSelectedPreviewError("");
+      return;
+    }
+
+    const hasLoadedPreview = espansoConfigPreviews.some(
+      (preview) => preview.config.path === selectedConfig.path,
+    );
+    if (hasLoadedPreview) {
+      setIsLoadingSelectedPreview(false);
+      setSelectedPreviewError("");
+      return;
+    }
+
+    let cancelled = false;
+    setIsLoadingSelectedPreview(true);
+    setSelectedPreviewError("");
+
+    loadEspansoConfigPreview(selectedConfig)
+      .then((preview) => {
+        if (cancelled) return;
+        if (preview.warnings.length > 0 && preview.snippets.length === 0) {
+          setSelectedPreviewError(preview.warnings[0]);
+        }
+      })
+      .catch((e: any) => {
+        if (cancelled) return;
+        setSelectedPreviewError(e?.message || String(e));
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoadingSelectedPreview(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [espansoConfigPreviews, espansoConfigs, loadEspansoConfigPreview, selectedEspansoConfigPath]);
+
   async function addDroppedYamlPreview(path: string) {
     if (isAddSnippetOpen) {
       if (addSnippetKind === "file") {
@@ -957,7 +999,7 @@ function App() {
 
     const nextConfigs = [config, ...espansoConfigs.filter((item) => item.path !== path)];
     setEspansoConfigs(nextConfigs);
-    setEspansoConfigPreviews(await buildEspansoConfigPreviews(nextConfigs));
+    setEspansoConfigPreviews((current) => current.filter((item) => item.config.path !== path));
     setSelectedEspansoConfigPath(path);
   }
 
@@ -1000,7 +1042,7 @@ function App() {
       active = false;
       unlisteners.forEach((unlisten) => unlisten());
     };
-  }, [addSnippetKind, buildEspansoConfigPreviews, espansoConfigs, isAddSnippetOpen, snippetEditTarget]);
+  }, [addSnippetKind, espansoConfigs, isAddSnippetOpen, snippetEditTarget]);
 
   const activeSnippetKind: AddSnippetKind = addSnippetKind;
   const detectedFormFieldNames = useMemo(() => extractFormFieldNames(editForm), [editForm]);
@@ -1396,7 +1438,10 @@ function App() {
       try {
         await writeTextFile(targetPath, visualEditorYamlContent);
         setPendingDeleteSelections([]);
-        await scanDefaultEspansoConfigDir();
+        const targetConfig = espansoConfigs.find((config) => config.path === targetPath);
+        if (targetConfig) {
+          await loadEspansoConfigPreview(targetConfig);
+        }
         setSelectedEspansoConfigPath(targetPath);
         setIsVisualEditorOpen(false);
       } catch (e: any) {
@@ -1453,7 +1498,7 @@ function App() {
         : targetPreview.snippets.length;
       resetSnippetForm();
       setSnippetEditTarget(null);
-      await scanDefaultEspansoConfigDir();
+      await loadEspansoConfigPreview(targetPreview.config);
       setSelectedEspansoConfigPath(targetPreview.config.path);
       if (isVisualEditorOpen) {
         await loadVisualEditorYaml(targetPreview.config.path, savedMatchIndex);
@@ -1482,7 +1527,7 @@ function App() {
           // while testing which edits actually require the more expensive CLI restart.
           resetSnippetForm();
           setSnippetEditTarget(null);
-          await scanDefaultEspansoConfigDir();
+          await loadEspansoConfigPreview(target.preview.config);
           setSelectedEspansoConfigPath(target.preview.config.path);
           if (isVisualEditorOpen) {
             await loadVisualEditorYaml(target.preview.config.path);
@@ -1514,7 +1559,10 @@ function App() {
           const content = await readTextFile(configPath);
           const updatedContent = deleteMultipleSnippetsFromYamlContent(content, matchIndices);
           await writeTextFile(configPath, updatedContent);
-          await scanDefaultEspansoConfigDir();
+          const targetConfig = espansoConfigs.find((config) => config.path === configPath);
+          if (targetConfig) {
+            await loadEspansoConfigPreview(targetConfig);
+          }
           setSelectedEspansoConfigPath(configPath);
           if (isVisualEditorOpen) {
             await loadVisualEditorYaml(configPath);
@@ -1567,38 +1615,10 @@ function App() {
           {espansoConfigs.length > 0 ? (
             <div className="flex min-h-0 flex-1 flex-col gap-3">
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-background p-3">
-                <div className="flex flex-wrap gap-3 text-base">
-                  <span className="font-semibold">
-                    {formatCount(t, espansoConfigs.length, "counts.yamlFile", "counts.yamlFiles")}
-                  </span>
-                  <span className="text-muted-foreground">
-                    {formatCount(t, espansoPreviewTotals.snippets, "counts.readableSnippet", "counts.readableSnippets")}
-                  </span>
-                  <span className="text-muted-foreground">
-                    {formatCount(t, espansoPreviewTotals.inline, "counts.inline", "counts.inline")}
-                  </span>
-                  <span className="text-muted-foreground">
-                    {formatCount(t, espansoPreviewTotals.resources, "counts.externalFile", "counts.externalFiles")}
-                  </span>
-                  <span className="text-muted-foreground">
-                    {formatCount(t, espansoPreviewTotals.images, "counts.image", "counts.images")}
-                  </span>
-                  <span className="text-muted-foreground">
-                    {formatCount(t, espansoPreviewTotals.forms, "counts.form", "counts.forms")}
-                  </span>
-                  {espansoPreviewTotals.warnings > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setWarningsFilterPath(null);
-                        setIsWarningsDialogOpen(true);
-                      }}
-                      className="inline-flex items-center gap-1.5 rounded bg-amber-500/10 px-2 py-0.5 text-amber-700 hover:bg-amber-500/20 text-xs font-medium cursor-pointer transition-colors"
-                      title={t("warnings.viewAllTitle")}
-                    >
-                      <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
-                      <span>{formatCount(t, espansoPreviewTotals.warnings, "counts.warning", "counts.warnings")}</span>
-                    </button>
+                <div className="min-w-0 text-base">
+                  <span className="font-semibold">{t("navigation.collection")}</span>
+                  {espansoMatchDir && (
+                    <span className="ml-3 text-sm text-muted-foreground">{espansoMatchDir}</span>
                   )}
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -1713,7 +1733,15 @@ function App() {
                 />
 
                 <section className="flex min-h-0 min-w-0 flex-col">
-                  {selectedEspansoPreview ? (
+                  {selectedEspansoPreview && (isLoadingSelectedPreview || !isSelectedPreviewLoaded) ? (
+                    <div className="flex h-full min-h-56 flex-col items-center justify-center p-6 text-center">
+                      <Loader2 className="mb-3 h-7 w-7 animate-spin text-primary" />
+                      <h3 className="text-sm font-semibold">{selectedEspansoPreview.config.relativePath}</h3>
+                      <p className="mt-2 max-w-sm text-sm text-muted-foreground">
+                        {selectedPreviewError || t("status.loadingYamlPreview")}
+                      </p>
+                    </div>
+                  ) : selectedEspansoPreview ? (
                     <EspansoConfigDetail
                       preview={selectedEspansoPreview}
                       highlightedIndex={highlightedSnippetIndex}
@@ -3712,13 +3740,10 @@ function EspansoConfigDetail({
             <button
               type="button"
               onClick={() => onOpenWarnings?.(preview.config.path)}
-              className="shrink-0 inline-flex items-center gap-1 rounded-md bg-amber-100 hover:bg-amber-200 px-2 py-1 text-xs text-amber-800 transition-colors cursor-pointer font-medium"
+              className="shrink-0 inline-flex h-8 w-8 items-center justify-center rounded-md bg-amber-100 hover:bg-amber-200 text-amber-800 transition-colors cursor-pointer"
               title={t("warnings.viewFileTitle")}
             >
               <AlertTriangle className="h-3.5 w-3.5 text-amber-700" />
-              <span>
-                {formatCount(t, preview.warningCount, "counts.warning", "counts.warnings")}
-              </span>
             </button>
           )}
           {isBatchMode ? (
@@ -3944,7 +3969,7 @@ function EspansoDirectoryDetail({
               </span>
             </div>
             <p className="text-xs text-muted-foreground mt-0.5">
-              {t("filesystem.directory")} • {formatCount(t, node.fileCount, "counts.file", "counts.files")} • {formatCount(t, node.snippetCount, "counts.snippet", "counts.snippets")}
+              {t("filesystem.directory")}
             </p>
           </div>
         </div>
@@ -4019,11 +4044,6 @@ function EspansoDirectoryDetail({
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-semibold text-foreground group-hover:text-primary transition-colors">
                         {child.name}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {child.isDir
-                          ? formatCount(t, child.fileCount, "counts.file", "counts.files")
-                          : formatCount(t, child.snippetCount, "counts.snippet", "counts.snippets")}
                       </div>
                     </div>
                   </div>
