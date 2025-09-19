@@ -314,6 +314,7 @@ export const zhCN: TranslationTree = {
     restarting: "正在重启 Espanso...",
     ready: "就绪",
     scanningEspansoConfigs: "正在扫描 Espanso 配置...",
+    loadingYamlPreview: "正在加载 YAML 预览...",
   },
   visualEditor: {
     title: "可视化编辑器",
