@@ -341,6 +341,8 @@ export const en = {
     shortcutHint: "Press Esc to close",
     openSearch: "Search snippets... (⌘K)",
     matchedIn: "Matched in",
+    indexingStatus: "Building SQLite search index...",
+    indexedReadyStatus: "SQLite Index Ready ({{files}} files, {{matches}} matches)",
   },
 } as const;
 

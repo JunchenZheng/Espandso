@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect, useRef } from "react";
-import { Search, X, FileText, Check } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Search, X, FileText, Check, Database, Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -17,11 +17,17 @@ import {
 } from "../logic/snippetSearch";
 import { getSnippetTriggers } from "../logic/snippetUtils";
 import { cn } from "../lib/utils";
+import {
+  searchSnippetIndex,
+  SearchIndexStatus,
+  SearchIndexResult,
+} from "../tauri/searchIndex";
 
 interface SearchDialogProps<T extends SearchableConfigPreview> {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   previews: T[];
+  matchDir?: string;
   onSelectResult: (result: SearchResult) => void;
 }
 
@@ -29,6 +35,7 @@ export function SearchDialog<T extends SearchableConfigPreview>({
   open,
   onOpenChange,
   previews,
+  matchDir,
   onSelectResult,
 }: SearchDialogProps<T>) {
   const { t } = useI18n();
@@ -39,6 +46,10 @@ export function SearchDialog<T extends SearchableConfigPreview>({
     content: true,
   });
 
+  const [isLoading, setIsLoading] = useState(false);
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [indexStatus, setIndexStatus] = useState<SearchIndexStatus | null>(null);
+
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -48,13 +59,13 @@ export function SearchDialog<T extends SearchableConfigPreview>({
       }, 50);
     } else {
       setQuery("");
+      setResults([]);
     }
   }, [open]);
 
   const toggleScope = (key: keyof SearchScope) => {
     setScope((prev) => {
       const next = { ...prev, [key]: !prev[key] };
-      // Prevent unchecking all scopes
       if (!next.trigger && !next.description && !next.content) {
         return prev;
       }
@@ -62,9 +73,60 @@ export function SearchDialog<T extends SearchableConfigPreview>({
     });
   };
 
-  const searchResults = useMemo(() => {
-    return searchSnippets(previews, query, scope);
-  }, [previews, query, scope]);
+  // Debounced search via SQLite index with pure TS fallback
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (!trimmed) {
+      setResults([]);
+      setIsLoading(false);
+      return;
+    }
+
+    if (!scope.trigger && !scope.description && !scope.content) {
+      setResults([]);
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    const timer = setTimeout(async () => {
+      if (matchDir) {
+        try {
+          const resp = await searchSnippetIndex({
+            matchDir,
+            query: trimmed,
+            scope,
+            limit: 100,
+            offset: 0,
+          });
+
+          setIndexStatus(resp.indexStatus);
+
+          const mapped: SearchResult[] = resp.results.map((r: SearchIndexResult) => ({
+            filePath: r.filePath,
+            fileRelativePath: r.fileRelativePath,
+            filename: r.filename,
+            snippet: r.snippet,
+            snippetIndex: r.snippetIndex,
+            matchedFields: r.matchedFields,
+          }));
+
+          setResults(mapped);
+          setIsLoading(false);
+          return;
+        } catch (e) {
+          console.warn("SQLite search failed, falling back to loaded preview search:", e);
+        }
+      }
+
+      // Fallback to pure TS search
+      const fallbackRes = searchSnippets(previews, trimmed, scope);
+      setResults(fallbackRes);
+      setIsLoading(false);
+    }, 150);
+
+    return () => clearTimeout(timer);
+  }, [query, scope, matchDir, previews]);
 
   const handleItemClick = (result: SearchResult) => {
     onSelectResult(result);
@@ -75,9 +137,19 @@ export function SearchDialog<T extends SearchableConfigPreview>({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl p-0 gap-0 overflow-hidden border border-border/80 shadow-2xl">
         <DialogHeader className="p-4 pb-3 border-b bg-secondary/30">
-          <DialogTitle className="flex items-center gap-2 text-base font-semibold">
-            <Search className="h-5 w-5 text-primary shrink-0" />
-            <span>{t("search.title")}</span>
+          <DialogTitle className="flex items-center justify-between text-base font-semibold">
+            <div className="flex items-center gap-2">
+              <Search className="h-5 w-5 text-primary shrink-0" />
+              <span>{t("search.title")}</span>
+            </div>
+            {indexStatus && (
+              <div className="flex items-center gap-1.5 text-xs font-normal text-muted-foreground bg-background/50 px-2 py-0.5 rounded border">
+                <Database className="h-3.5 w-3.5 text-primary" />
+                <span>
+                  {indexStatus.indexedFiles} files ({indexStatus.indexedMatches} matches)
+                </span>
+              </div>
+            )}
           </DialogTitle>
 
           {/* Search Input Box */}
@@ -152,12 +224,17 @@ export function SearchDialog<T extends SearchableConfigPreview>({
 
         {/* Results Body */}
         <ScrollArea className="max-h-[380px] min-h-[160px] p-2">
-          {query.trim() === "" ? (
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-10 text-center text-muted-foreground">
+              <Loader2 className="h-8 w-8 mb-2 animate-spin text-primary" />
+              <p className="text-sm">{t("search.indexingStatus")}</p>
+            </div>
+          ) : query.trim() === "" ? (
             <div className="flex flex-col items-center justify-center py-10 text-center text-muted-foreground">
               <Search className="h-10 w-10 mb-2 opacity-30 stroke-1" />
               <p className="text-sm">{t("search.placeholder")}</p>
             </div>
-          ) : searchResults.length === 0 ? (
+          ) : results.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 text-center text-muted-foreground">
               <X className="h-10 w-10 mb-2 opacity-30 stroke-1" />
               <p className="text-sm font-medium">{t("search.noResults")}</p>
@@ -165,10 +242,10 @@ export function SearchDialog<T extends SearchableConfigPreview>({
           ) : (
             <div className="space-y-1.5 p-1">
               <div className="px-2 py-1 text-xs text-muted-foreground font-medium">
-                {t("search.resultsCount", { count: searchResults.length })}
+                {t("search.resultsCount", { count: results.length })}
               </div>
 
-              {searchResults.map((res) => {
+              {results.map((res) => {
                 const triggers = getSnippetTriggers(res.snippet);
                 const displayTrigger = triggers.length > 0 ? triggers.join(", ") : `#${res.snippetIndex + 1}`;
                 const previewText = res.snippet.replace || res.snippet.form || res.snippet.image_path || res.snippet.include_file || "";

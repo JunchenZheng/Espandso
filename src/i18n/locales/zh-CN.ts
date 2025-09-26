@@ -343,5 +343,7 @@ export const zhCN: TranslationTree = {
     shortcutHint: "按 Esc 关闭",
     openSearch: "搜索片段... (⌘K)",
     matchedIn: "匹配于",
+    indexingStatus: "正在为匹配文件建立 SQLite 索引...",
+    indexedReadyStatus: "SQLite 索引已就绪（{{files}} 个文件，{{matches}} 条匹配）",
   },
 };

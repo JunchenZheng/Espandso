@@ -61,6 +61,7 @@ import { Textarea } from "./components/ui/textarea";
 import { AboutDialog } from "./components/AboutDialog";
 import { EspansoLogDialog } from "./components/EspansoLogDialog";
 import { SearchDialog } from "./components/SearchDialog";
+import { startSearchIndexSync, refreshSearchIndexFile } from "./tauri/searchIndex";
 import { WarningsDialog } from "./components/WarningsDialog";
 import { SearchResult } from "./logic/snippetSearch";
 import {
@@ -771,6 +772,11 @@ function App() {
     try {
       const result = await scanEspansoConfigFiles();
       setEspansoMatchDir(result.matchDir);
+      if (result.matchDir) {
+        startSearchIndexSync(result.matchDir).catch((err) => {
+          console.warn("Background SQLite search indexing failed:", err);
+        });
+      }
       setEspansoPathSource(result.pathSource);
       setEspansoConfigs(result.files);
       setEspansoDirectories(result.directories || []);
@@ -848,6 +854,11 @@ function App() {
 
       const template = getInitialYamlTemplate(normalizedName);
       await writeTextFile(targetAbsPath, template);
+      if (espansoMatchDir) {
+        refreshSearchIndexFile(targetAbsPath, espansoMatchDir).catch((e) =>
+          console.warn("Index refresh failed:", e)
+        );
+      }
 
       setIsCreateFileOpen(false);
       await scanDefaultEspansoConfigDir();
@@ -1437,6 +1448,11 @@ function App() {
       setIsSavingSnippet(true);
       try {
         await writeTextFile(targetPath, visualEditorYamlContent);
+        if (espansoMatchDir) {
+          refreshSearchIndexFile(targetPath, espansoMatchDir).catch((e) =>
+            console.warn("Index refresh failed:", e)
+          );
+        }
         setPendingDeleteSelections([]);
         const targetConfig = espansoConfigs.find((config) => config.path === targetPath);
         if (targetConfig) {
@@ -1491,6 +1507,11 @@ function App() {
         ? replaceSnippetInYamlContent(content, snippetEditTarget.match.originalMatchIndex, snippet)
         : appendSnippetToYamlContent(content, snippet);
       await writeTextFile(targetPreview.config.path, updatedContent);
+      if (espansoMatchDir) {
+        refreshSearchIndexFile(targetPreview.config.path, espansoMatchDir).catch((e) =>
+          console.warn("Index refresh failed:", e)
+        );
+      }
       // Espanso has its own hot-reload path for match files. Keep restart disabled
       // while testing which edits actually require the more expensive CLI restart.
       const savedMatchIndex = snippetEditTarget
@@ -1523,6 +1544,11 @@ function App() {
           const content = await readTextFile(target.preview.config.path);
           const updatedContent = deleteSnippetFromYamlContent(content, target.match.originalMatchIndex);
           await writeTextFile(target.preview.config.path, updatedContent);
+          if (espansoMatchDir) {
+            refreshSearchIndexFile(target.preview.config.path, espansoMatchDir).catch((e) =>
+              console.warn("Index refresh failed:", e)
+            );
+          }
           // Espanso has its own hot-reload path for match files. Keep restart disabled
           // while testing which edits actually require the more expensive CLI restart.
           resetSnippetForm();
@@ -1559,6 +1585,11 @@ function App() {
           const content = await readTextFile(configPath);
           const updatedContent = deleteMultipleSnippetsFromYamlContent(content, matchIndices);
           await writeTextFile(configPath, updatedContent);
+          if (espansoMatchDir) {
+            refreshSearchIndexFile(configPath, espansoMatchDir).catch((e) =>
+              console.warn("Index refresh failed:", e)
+            );
+          }
           const targetConfig = espansoConfigs.find((config) => config.path === configPath);
           if (targetConfig) {
             await loadEspansoConfigPreview(targetConfig);
@@ -3137,6 +3168,7 @@ function App() {
         open={isSearchOpen}
         onOpenChange={setIsSearchOpen}
         previews={espansoConfigPreviews}
+        matchDir={espansoMatchDir}
         onSelectResult={handleSelectSearchResult}
       />
 

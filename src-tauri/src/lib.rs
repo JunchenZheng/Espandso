@@ -1,3 +1,5 @@
+mod search_index;
+
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::Emitter;
 
@@ -168,8 +170,17 @@ pub fn run() {
                 let _ = app.emit("open-about-dialog", ());
             }
         })
-        .invoke_handler(tauri::generate_handler![greet, execute_shell_cmd, set_app_language])
+        .invoke_handler(tauri::generate_handler![
+            greet,
+            execute_shell_cmd,
+            set_app_language,
+            search_index::start_search_index_sync,
+            search_index::get_search_index_status,
+            search_index::search_snippet_index,
+            search_index::refresh_search_index_file
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
+
 
