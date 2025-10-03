@@ -154,6 +154,89 @@ pub fn open_and_init_db(db_path: &Path) -> SqlResult<Connection> {
     Ok(conn)
 }
 
+fn normalize_match_dir(match_dir: &str) -> String {
+    match_dir
+        .trim()
+        .trim_end_matches(|c| c == '/' || c == '\\')
+        .to_string()
+}
+
+fn escape_like_pattern(value: &str) -> String {
+    value
+        .replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_")
+}
+
+fn match_dir_like_pattern(match_dir: &str) -> String {
+    let normalized = normalize_match_dir(match_dir);
+    if normalized.is_empty() {
+        "%".to_string()
+    } else {
+        format!("{}/%", escape_like_pattern(&normalized))
+    }
+}
+
+fn match_dir_exact(match_dir: &str) -> String {
+    normalize_match_dir(match_dir)
+}
+
+fn write_index_state(
+    conn: &Connection,
+    state: &str,
+    match_dir: Option<&str>,
+    total_files: Option<usize>,
+    last_error: Option<&str>,
+) -> Result<(), String> {
+    conn.execute(
+        "INSERT INTO index_meta (key, value) VALUES ('state', ?1)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        params![state],
+    )
+    .map_err(|e| format!("Failed to update index state: {}", e))?;
+
+    if let Some(dir) = match_dir {
+        conn.execute(
+            "INSERT INTO index_meta (key, value) VALUES ('match_dir', ?1)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            params![normalize_match_dir(dir)],
+        )
+        .map_err(|e| format!("Failed to update index match directory: {}", e))?;
+    }
+
+    if let Some(total) = total_files {
+        conn.execute(
+            "INSERT INTO index_meta (key, value) VALUES ('total_files', ?1)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            params![total.to_string()],
+        )
+        .map_err(|e| format!("Failed to update index total files: {}", e))?;
+    }
+
+    if let Some(err) = last_error {
+        conn.execute(
+            "INSERT INTO index_meta (key, value) VALUES ('last_error', ?1)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            params![err],
+        )
+        .map_err(|e| format!("Failed to update index error: {}", e))?;
+    } else {
+        conn.execute("DELETE FROM index_meta WHERE key = 'last_error'", [])
+            .map_err(|e| format!("Failed to clear index error: {}", e))?;
+    }
+
+    Ok(())
+}
+
+fn read_meta_value(conn: &Connection, key: &str) -> Option<String> {
+    conn.query_row(
+        "SELECT value FROM index_meta WHERE key = ?1",
+        params![key],
+        |r| r.get(0),
+    )
+    .ok()
+}
+
 // Extractor logic matching importYaml.ts
 fn get_resource_filename(src_name: &str) -> String {
     let lowercase = src_name.to_lowercase();
@@ -707,6 +790,7 @@ pub fn sync_match_dir(db_path: &Path, match_dir: &str) -> Result<SearchIndexStat
     }
 
     let mut conn = open_and_init_db(db_path).map_err(|e| e.to_string())?;
+    write_index_state(&conn, "indexing", Some(match_dir), None, None)?;
 
     // Load existing indexed_files into map: file_path -> (mtime_ns, file_size)
     let mut db_files: std::collections::HashMap<String, (i64, i64)> =
@@ -732,6 +816,8 @@ pub fn sync_match_dir(db_path: &Path, match_dir: &str) -> Result<SearchIndexStat
     }
 
     let mut scanned_files: HashSet<String> = HashSet::new();
+    let mut total_files = 0usize;
+    let mut first_error: Option<String> = None;
 
     let walker = WalkDir::new(match_path).into_iter();
     for entry in walker.filter_entry(|e| {
@@ -760,6 +846,7 @@ pub fn sync_match_dir(db_path: &Path, match_dir: &str) -> Result<SearchIndexStat
         if ext != "yml" && ext != "yaml" {
             continue;
         }
+        total_files += 1;
 
         let file_path_str = path.to_string_lossy().to_string();
         scanned_files.insert(file_path_str.clone());
@@ -797,59 +884,112 @@ pub fn sync_match_dir(db_path: &Path, match_dir: &str) -> Result<SearchIndexStat
         }
 
         // File modified or new -> index single file
-        let _ = index_single_file(
+        if let Err(e) = index_single_file(
             &mut conn,
             &file_path_str,
             &relative_path,
             &filename,
             mtime_ns,
             file_size,
-        );
+        ) {
+            if first_error.is_none() {
+                first_error = Some(e);
+            }
+        }
     }
 
     // Remove deleted files from DB
     for db_file in db_files.keys() {
         if !scanned_files.contains(db_file) {
-            let _ = remove_deleted_file(&mut conn, db_file);
+            if let Err(e) = remove_deleted_file(&mut conn, db_file) {
+                if first_error.is_none() {
+                    first_error = Some(e);
+                }
+            }
         }
     }
 
-    // Return status
-    get_status_from_conn(&conn)
+    let state = if first_error.is_some() {
+        "error"
+    } else {
+        "ready"
+    };
+    write_index_state(
+        &conn,
+        state,
+        Some(match_dir),
+        Some(total_files),
+        first_error.as_deref(),
+    )?;
+    get_status_from_conn(&conn, Some(match_dir))
 }
 
-pub fn get_status_from_conn(conn: &Connection) -> Result<SearchIndexStatus, String> {
-    let indexed_files: usize = conn
-        .query_row("SELECT COUNT(*) FROM indexed_files", [], |r| r.get(0))
-        .unwrap_or(0);
+pub fn get_status_from_conn(
+    conn: &Connection,
+    match_dir: Option<&str>,
+) -> Result<SearchIndexStatus, String> {
+    let state = read_meta_value(conn, "state").unwrap_or_else(|| "idle".to_string());
+    let last_error = read_meta_value(conn, "last_error");
+    let state_match_dir = read_meta_value(conn, "match_dir");
+    let requested_match_dir = match_dir.map(normalize_match_dir);
+    let state_applies_to_match_dir = match (&requested_match_dir, &state_match_dir) {
+        (Some(requested), Some(stored)) => requested == stored,
+        (Some(_), None) => false,
+        _ => true,
+    };
+    let total_files_meta = if state_applies_to_match_dir {
+        read_meta_value(conn, "total_files").and_then(|v| v.parse().ok())
+    } else {
+        None
+    };
 
-    let indexed_matches: usize = conn
-        .query_row("SELECT COUNT(*) FROM matches", [], |r| r.get(0))
-        .unwrap_or(0);
+    let (indexed_files, indexed_matches): (usize, usize) = if let Some(dir) = match_dir {
+        let exact = match_dir_exact(dir);
+        let like = match_dir_like_pattern(dir);
+        let files = conn
+            .query_row(
+                "SELECT COUNT(*) FROM indexed_files
+                 WHERE file_path = ?1 OR file_path LIKE ?2 ESCAPE '\\'",
+                params![exact, like],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+        let matches = conn
+            .query_row(
+                "SELECT COUNT(*) FROM matches
+                 WHERE file_path = ?1 OR file_path LIKE ?2 ESCAPE '\\'",
+                params![match_dir_exact(dir), match_dir_like_pattern(dir)],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+        (files, matches)
+    } else {
+        let files = conn
+            .query_row("SELECT COUNT(*) FROM indexed_files", [], |r| r.get(0))
+            .unwrap_or(0);
+        let matches = conn
+            .query_row("SELECT COUNT(*) FROM matches", [], |r| r.get(0))
+            .unwrap_or(0);
+        (files, matches)
+    };
 
     Ok(SearchIndexStatus {
-        state: "ready".to_string(),
+        state: if state_applies_to_match_dir {
+            state
+        } else {
+            "idle".to_string()
+        },
         indexed_files,
-        total_files: indexed_files,
+        total_files: total_files_meta
+            .map(|total: usize| total.max(indexed_files))
+            .unwrap_or(indexed_files),
         indexed_matches,
-        last_error: None,
+        last_error: if state_applies_to_match_dir {
+            last_error
+        } else {
+            None
+        },
     })
-}
-
-fn escape_fts5_query(query: &str) -> String {
-    let cleaned: String = query
-        .chars()
-        .filter(|c| c.is_alphanumeric() || *c == '_' || *c == ' ')
-        .collect();
-    let words: Vec<&str> = cleaned.split_whitespace().collect();
-    if words.is_empty() {
-        return "".to_string();
-    }
-    words
-        .iter()
-        .map(|w| format!("\"{}\"*", w))
-        .collect::<Vec<_>>()
-        .join(" ")
 }
 
 pub fn query_snippet_index(
@@ -859,7 +999,7 @@ pub fn query_snippet_index(
     let trimmed = req.query.trim();
     let conn = open_and_init_db(db_path).map_err(|e| e.to_string())?;
 
-    let index_status = get_status_from_conn(&conn)?;
+    let index_status = get_status_from_conn(&conn, Some(&req.match_dir))?;
 
     if trimmed.is_empty() || (!req.scope.trigger && !req.scope.description && !req.scope.content) {
         return Ok(SearchIndexResponse {
@@ -869,120 +1009,85 @@ pub fn query_snippet_index(
         });
     }
 
-    let fts_query = escape_fts5_query(trimmed);
     let lower_query = trimmed.to_lowercase();
+    let path_exact = match_dir_exact(&req.match_dir);
+    let path_like = match_dir_like_pattern(&req.match_dir);
+    let like_param = format!("%{}%", escape_like_pattern(trimmed));
+    let trigger_scope = if req.scope.trigger { 1 } else { 0 };
+    let description_scope = if req.scope.description { 1 } else { 0 };
+    let content_scope = if req.scope.content { 1 } else { 0 };
 
-    // Query strategy: FTS5 match query first, fallback to LIKE query if symbol-heavy or no FTS results
-    let mut rows_data = Vec::new();
-
-    if !fts_query.is_empty() {
-        // Build scope columns filter for FTS5
-        let mut scope_cols = Vec::new();
-        if req.scope.trigger {
-            scope_cols.push("trigger");
-        }
-        if req.scope.description {
-            scope_cols.push("description");
-        }
-        if req.scope.content {
-            scope_cols.push("content");
-        }
-
-        let column_spec = if scope_cols.len() < 3 {
-            format!("{{{}}} : ", scope_cols.join(" "))
-        } else {
-            "".to_string()
-        };
-
-        let full_fts_match = format!("{}{}", column_spec, fts_query);
-
-        let sql = "
-            SELECT m.file_path, m.relative_path, m.filename, m.snippet_json, m.display_index, m.original_match_index, m.trigger_index, m.trigger, m.description, m.content
+    let total: usize = conn
+        .query_row(
+            "
+            SELECT COUNT(*)
             FROM matches m
-            JOIN matches_fts fts ON m.id = fts.rowid
-            WHERE matches_fts MATCH ?1
-            ORDER BY m.id ASC
-            LIMIT ?2 OFFSET ?3
-        ";
+            WHERE (m.file_path = ?1 OR m.file_path LIKE ?2 ESCAPE '\\')
+              AND (
+                (?3 = 1 AND m.trigger LIKE ?4 ESCAPE '\\')
+                OR (?5 = 1 AND m.description LIKE ?4 ESCAPE '\\')
+                OR (?6 = 1 AND m.content LIKE ?4 ESCAPE '\\')
+              )
+            ",
+            params![
+                path_exact,
+                path_like,
+                trigger_scope,
+                like_param,
+                description_scope,
+                content_scope
+            ],
+            |r| r.get(0),
+        )
+        .map_err(|e| format!("Failed to count search results: {}", e))?;
 
-        let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
-        let match_rows = stmt
-            .query_map(
-                params![full_fts_match, req.limit as i64, req.offset as i64],
-                |row| {
-                    Ok((
-                        row.get::<_, String>(0)?,
-                        row.get::<_, String>(1)?,
-                        row.get::<_, String>(2)?,
-                        row.get::<_, String>(3)?,
-                        row.get::<_, i64>(4)? as usize,
-                        row.get::<_, i64>(5)? as usize,
-                        row.get::<_, i64>(6)? as usize,
-                        row.get::<_, String>(7)?,
-                        row.get::<_, Option<String>>(8)?,
-                        row.get::<_, Option<String>>(9)?,
-                    ))
-                },
-            )
-            .map_err(|e| e.to_string())?;
+    let mut rows_data = Vec::new();
+    let sql = "
+        SELECT m.file_path, m.relative_path, m.filename, m.snippet_json, m.display_index, m.original_match_index, m.trigger_index, m.trigger, m.description, m.content
+        FROM matches m
+        WHERE (m.file_path = ?1 OR m.file_path LIKE ?2 ESCAPE '\\')
+          AND (
+            (?3 = 1 AND m.trigger LIKE ?4 ESCAPE '\\')
+            OR (?5 = 1 AND m.description LIKE ?4 ESCAPE '\\')
+            OR (?6 = 1 AND m.content LIKE ?4 ESCAPE '\\')
+          )
+        ORDER BY m.id ASC
+        LIMIT ?7 OFFSET ?8
+    ";
 
-        for r in match_rows {
-            if let Ok(data) = r {
-                rows_data.push(data);
-            }
-        }
-    }
+    let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
+    let match_rows = stmt
+        .query_map(
+            params![
+                match_dir_exact(&req.match_dir),
+                match_dir_like_pattern(&req.match_dir),
+                trigger_scope,
+                format!("%{}%", escape_like_pattern(trimmed)),
+                description_scope,
+                content_scope,
+                req.limit as i64,
+                req.offset as i64
+            ],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, i64>(4)? as usize,
+                    row.get::<_, i64>(5)? as usize,
+                    row.get::<_, i64>(6)? as usize,
+                    row.get::<_, String>(7)?,
+                    row.get::<_, Option<String>>(8)?,
+                    row.get::<_, Option<String>>(9)?,
+                ))
+            },
+        )
+        .map_err(|e| e.to_string())?;
 
-    // Fallback using LIKE if FTS gave no results or query contains non-alphanumeric (symbols like ':email')
-    if rows_data.is_empty() {
-        let like_param = format!("%{}%", trimmed);
-        let mut where_clauses = Vec::new();
-        if req.scope.trigger {
-            where_clauses.push("trigger LIKE ?1");
-        }
-        if req.scope.description {
-            where_clauses.push("description LIKE ?1");
-        }
-        if req.scope.content {
-            where_clauses.push("content LIKE ?1");
-        }
-
-        if !where_clauses.is_empty() {
-            let sql = format!(
-                "SELECT file_path, relative_path, filename, snippet_json, display_index, original_match_index, trigger_index, trigger, description, content
-                 FROM matches
-                 WHERE ({})
-                 ORDER BY id ASC
-                 LIMIT ?2 OFFSET ?3",
-                where_clauses.join(" OR ")
-            );
-
-            let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
-            let match_rows = stmt
-                .query_map(
-                    params![like_param, req.limit as i64, req.offset as i64],
-                    |row| {
-                        Ok((
-                            row.get::<_, String>(0)?,
-                            row.get::<_, String>(1)?,
-                            row.get::<_, String>(2)?,
-                            row.get::<_, String>(3)?,
-                            row.get::<_, i64>(4)? as usize,
-                            row.get::<_, i64>(5)? as usize,
-                            row.get::<_, i64>(6)? as usize,
-                            row.get::<_, String>(7)?,
-                            row.get::<_, Option<String>>(8)?,
-                            row.get::<_, Option<String>>(9)?,
-                        ))
-                    },
-                )
-                .map_err(|e| e.to_string())?;
-
-            for r in match_rows {
-                if let Ok(data) = r {
-                    rows_data.push(data);
-                }
-            }
+    for r in match_rows {
+        if let Ok(data) = r {
+            rows_data.push(data);
         }
     }
 
@@ -1037,8 +1142,6 @@ pub fn query_snippet_index(
         }
     }
 
-    let total = results.len();
-
     Ok(SearchIndexResponse {
         results,
         total,
@@ -1059,11 +1162,11 @@ pub fn start_search_index_sync(
 #[tauri::command]
 pub fn get_search_index_status(
     app_handle: tauri::AppHandle,
-    _match_dir: String,
+    match_dir: String,
 ) -> Result<SearchIndexStatus, String> {
     let db_path = resolve_db_path(&app_handle)?;
     let conn = open_and_init_db(&db_path).map_err(|e| e.to_string())?;
-    get_status_from_conn(&conn)
+    get_status_from_conn(&conn, Some(&match_dir))
 }
 
 #[tauri::command]
@@ -1088,7 +1191,10 @@ pub fn refresh_search_index_file(
     let mut conn = open_and_init_db(&db_path).map_err(|e| e.to_string())?;
 
     if !path.exists() {
-        let _ = remove_deleted_file(&mut conn, &file_path);
+        if let Err(e) = remove_deleted_file(&mut conn, &file_path) {
+            write_index_state(&conn, "error", Some(&match_dir), None, Some(&e))?;
+            return get_status_from_conn(&conn, Some(&match_dir));
+        }
     } else {
         let metadata = fs::metadata(path).map_err(|e| e.to_string())?;
         let file_size = metadata.len() as i64;
@@ -1111,17 +1217,21 @@ pub fn refresh_search_index_file(
             .to_string_lossy()
             .to_string();
 
-        let _ = index_single_file(
+        if let Err(e) = index_single_file(
             &mut conn,
             &file_path,
             &relative_path,
             &filename,
             mtime_ns,
             file_size,
-        );
+        ) {
+            write_index_state(&conn, "error", Some(&match_dir), None, Some(&e))?;
+            return get_status_from_conn(&conn, Some(&match_dir));
+        }
     }
 
-    get_status_from_conn(&conn)
+    write_index_state(&conn, "ready", Some(&match_dir), None, None)?;
+    get_status_from_conn(&conn, Some(&match_dir))
 }
 
 #[cfg(test)]
@@ -1184,5 +1294,198 @@ matches:
         assert_eq!(res.results.len(), 1);
         assert_eq!(res.results[0].snippet_index, 0);
         assert_eq!(res.results[0].matched_fields, vec!["trigger"]);
+    }
+
+    #[test]
+    fn test_yaml_parser_supported_shapes() {
+        let yaml = r#"
+matches:
+  - trigger: ':file'
+    description: 'External data'
+    vars:
+      - name: path
+        type: echo
+        params:
+          echo: '/tmp/customer.json'
+      - name: output
+        type: shell
+        params:
+          cmd: 'cat $path'
+  - trigger: ':image'
+    image_path: '/tmp/logo.png'
+    description: 'Company logo'
+  - triggers:
+      - ':form'
+      - ':form2'
+    form: 'Name: [[name]]'
+    form_fields:
+      name:
+        multiline: true
+  - trigger: ':verbose'
+    vars:
+      - name: form1
+        type: form
+        params:
+          layout: 'Date: [[date]]'
+          fields:
+            date:
+              type: text
+      - name: date
+        type: date
+        params:
+          format: '%Y-%m-%d'
+"#;
+        let parsed = parse_yaml_content(yaml, "shapes.yml");
+        assert_eq!(parsed.matches.len(), 5);
+
+        let include_snippet: serde_json::Value =
+            serde_json::from_str(&parsed.matches[0].snippet_json).unwrap();
+        assert_eq!(include_snippet["include_file"], "customer_data.json");
+        assert_eq!(
+            parsed.matches[0].resource_name.as_deref(),
+            Some("customer_data.json")
+        );
+        assert_eq!(parsed.matches[1].kind, "image_path");
+        assert_eq!(parsed.matches[2].trigger, ":form");
+        assert_eq!(parsed.matches[3].trigger, ":form2");
+        assert_eq!(parsed.matches[4].kind, "form");
+        assert!(parsed.matches[4].snippet_json.contains("form_fields"));
+        assert!(parsed.matches[4].snippet_json.contains("vars"));
+    }
+
+    #[test]
+    fn test_search_uses_substring_semantics_with_pagination_total() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("test.sqlite");
+        let match_dir = dir.path().join("match");
+        fs::create_dir_all(&match_dir).unwrap();
+
+        fs::write(
+            match_dir.join("base.yml"),
+            "matches:\n  - trigger: ':email'\n    replace: 'one'\n  - trigger: ':xemail'\n    replace: 'two'\n",
+        )
+        .unwrap();
+
+        sync_match_dir(&db_path, match_dir.to_str().unwrap()).unwrap();
+
+        let req = SearchIndexRequest {
+            match_dir: match_dir.to_str().unwrap().to_string(),
+            query: "ema".to_string(),
+            scope: SearchScope {
+                trigger: true,
+                description: false,
+                content: false,
+            },
+            limit: 1,
+            offset: 0,
+        };
+
+        let first_page = query_snippet_index(&db_path, &req).unwrap();
+        assert_eq!(first_page.total, 2);
+        assert_eq!(first_page.results.len(), 1);
+        assert_eq!(first_page.results[0].snippet_index, 0);
+
+        let second_page =
+            query_snippet_index(&db_path, &SearchIndexRequest { offset: 1, ..req }).unwrap();
+        assert_eq!(second_page.total, 2);
+        assert_eq!(second_page.results.len(), 1);
+        assert_eq!(second_page.results[0].snippet_index, 1);
+    }
+
+    #[test]
+    fn test_search_escapes_like_wildcards() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("test.sqlite");
+        let match_dir = dir.path().join("match");
+        fs::create_dir_all(&match_dir).unwrap();
+
+        fs::write(
+            match_dir.join("base.yml"),
+            "matches:\n  - trigger: ':percent'\n    replace: '100% ready'\n  - trigger: ':plain'\n    replace: 'plain text'\n",
+        )
+        .unwrap();
+
+        sync_match_dir(&db_path, match_dir.to_str().unwrap()).unwrap();
+
+        let res = query_snippet_index(
+            &db_path,
+            &SearchIndexRequest {
+                match_dir: match_dir.to_str().unwrap().to_string(),
+                query: "%".to_string(),
+                scope: SearchScope {
+                    trigger: false,
+                    description: false,
+                    content: true,
+                },
+                limit: 10,
+                offset: 0,
+            },
+        )
+        .unwrap();
+
+        assert_eq!(res.total, 1);
+        assert_eq!(res.results[0].snippet_index, 0);
+    }
+
+    #[test]
+    fn test_search_filters_by_match_dir() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("test.sqlite");
+        let match_dir_a = dir.path().join("match-a");
+        let match_dir_b = dir.path().join("match-b");
+        fs::create_dir_all(&match_dir_a).unwrap();
+        fs::create_dir_all(&match_dir_b).unwrap();
+
+        let file_a = match_dir_a.join("base.yml");
+        let file_b = match_dir_b.join("base.yml");
+        fs::write(
+            &file_a,
+            "matches:\n  - trigger: ':same'\n    replace: 'from a'\n",
+        )
+        .unwrap();
+        fs::write(
+            &file_b,
+            "matches:\n  - trigger: ':same'\n    replace: 'from b'\n",
+        )
+        .unwrap();
+
+        let mut conn = open_and_init_db(&db_path).unwrap();
+        index_single_file(
+            &mut conn,
+            file_a.to_str().unwrap(),
+            "base.yml",
+            "base.yml",
+            1,
+            1,
+        )
+        .unwrap();
+        index_single_file(
+            &mut conn,
+            file_b.to_str().unwrap(),
+            "base.yml",
+            "base.yml",
+            1,
+            1,
+        )
+        .unwrap();
+
+        let res = query_snippet_index(
+            &db_path,
+            &SearchIndexRequest {
+                match_dir: match_dir_b.to_str().unwrap().to_string(),
+                query: ":same".to_string(),
+                scope: SearchScope {
+                    trigger: true,
+                    description: false,
+                    content: false,
+                },
+                limit: 10,
+                offset: 0,
+            },
+        )
+        .unwrap();
+
+        assert_eq!(res.total, 1);
+        assert!(res.results[0].file_path.ends_with("match-b/base.yml"));
     }
 }

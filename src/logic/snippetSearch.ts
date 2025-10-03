@@ -24,6 +24,8 @@ export interface SearchResult {
   filename: string;
   snippet: Snippet;
   snippetIndex: number;
+  originalMatchIndex?: number;
+  triggerIndex?: number;
   matchedFields: MatchedField[];
 }
 

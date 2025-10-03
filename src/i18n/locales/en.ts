@@ -343,6 +343,8 @@ export const en = {
     matchedIn: "Matched in",
     indexingStatus: "Building SQLite search index...",
     indexedReadyStatus: "SQLite Index Ready ({{files}} files, {{matches}} matches)",
+    indexErrorStatus: "SQLite index needs attention",
+    loadMore: "Load more results",
   },
 } as const;
 

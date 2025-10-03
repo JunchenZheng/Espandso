@@ -345,5 +345,7 @@ export const zhCN: TranslationTree = {
     matchedIn: "匹配于",
     indexingStatus: "正在为匹配文件建立 SQLite 索引...",
     indexedReadyStatus: "SQLite 索引已就绪（{{files}} 个文件，{{matches}} 条匹配）",
+    indexErrorStatus: "SQLite 索引需要处理",
+    loadMore: "加载更多结果",
   },
 };

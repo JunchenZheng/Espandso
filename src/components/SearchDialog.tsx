@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Search, X, FileText, Check, Database, Loader2 } from "lucide-react";
 import {
   Dialog,
@@ -22,6 +22,8 @@ import {
   SearchIndexStatus,
   SearchIndexResult,
 } from "../tauri/searchIndex";
+
+const SEARCH_PAGE_SIZE = 50;
 
 interface SearchDialogProps<T extends SearchableConfigPreview> {
   open: boolean;
@@ -47,10 +49,13 @@ export function SearchDialog<T extends SearchableConfigPreview>({
   });
 
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [results, setResults] = useState<SearchResult[]>([]);
+  const [totalResults, setTotalResults] = useState(0);
   const [indexStatus, setIndexStatus] = useState<SearchIndexStatus | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const activeSearchIdRef = useRef(0);
 
   useEffect(() => {
     if (open) {
@@ -60,6 +65,9 @@ export function SearchDialog<T extends SearchableConfigPreview>({
     } else {
       setQuery("");
       setResults([]);
+      setTotalResults(0);
+      setIsLoading(false);
+      setIsLoadingMore(false);
     }
   }, [open]);
 
@@ -73,64 +81,105 @@ export function SearchDialog<T extends SearchableConfigPreview>({
     });
   };
 
-  // Debounced search via SQLite index with pure TS fallback
-  useEffect(() => {
+  const runSearch = useCallback(async (offset = 0, append = false) => {
     const trimmed = query.trim();
     if (!trimmed) {
       setResults([]);
+      setTotalResults(0);
       setIsLoading(false);
+      setIsLoadingMore(false);
       return;
     }
 
     if (!scope.trigger && !scope.description && !scope.content) {
       setResults([]);
+      setTotalResults(0);
       setIsLoading(false);
+      setIsLoadingMore(false);
       return;
     }
 
-    setIsLoading(true);
-    const timer = setTimeout(async () => {
-      if (matchDir) {
-        try {
-          const resp = await searchSnippetIndex({
-            matchDir,
-            query: trimmed,
-            scope,
-            limit: 100,
-            offset: 0,
-          });
+    const searchId = ++activeSearchIdRef.current;
+    if (append) {
+      setIsLoadingMore(true);
+    } else {
+      setIsLoading(true);
+    }
 
-          setIndexStatus(resp.indexStatus);
+    if (matchDir) {
+      try {
+        const resp = await searchSnippetIndex({
+          matchDir,
+          query: trimmed,
+          scope,
+          limit: SEARCH_PAGE_SIZE,
+          offset,
+        });
 
-          const mapped: SearchResult[] = resp.results.map((r: SearchIndexResult) => ({
-            filePath: r.filePath,
-            fileRelativePath: r.fileRelativePath,
-            filename: r.filename,
-            snippet: r.snippet,
-            snippetIndex: r.snippetIndex,
-            matchedFields: r.matchedFields,
-          }));
+        if (searchId !== activeSearchIdRef.current) return;
 
-          setResults(mapped);
-          setIsLoading(false);
-          return;
-        } catch (e) {
-          console.warn("SQLite search failed, falling back to loaded preview search:", e);
-        }
+        setIndexStatus(resp.indexStatus);
+
+        const mapped: SearchResult[] = resp.results.map((r: SearchIndexResult) => ({
+          filePath: r.filePath,
+          fileRelativePath: r.fileRelativePath,
+          filename: r.filename,
+          snippet: r.snippet,
+          snippetIndex: r.snippetIndex,
+          originalMatchIndex: r.originalMatchIndex,
+          triggerIndex: r.triggerIndex,
+          matchedFields: r.matchedFields,
+        }));
+
+        setResults((current) => (append ? [...current, ...mapped] : mapped));
+        setTotalResults(resp.total);
+        setIsLoading(false);
+        setIsLoadingMore(false);
+        return;
+      } catch (e) {
+        console.warn("SQLite search failed, falling back to loaded preview search:", e);
       }
+    }
 
-      // Fallback to pure TS search
-      const fallbackRes = searchSnippets(previews, trimmed, scope);
-      setResults(fallbackRes);
-      setIsLoading(false);
+    const fallbackRes = searchSnippets(previews, trimmed, scope);
+    if (searchId !== activeSearchIdRef.current) return;
+    setResults((current) =>
+      append
+        ? [...current, ...fallbackRes.slice(offset, offset + SEARCH_PAGE_SIZE)]
+        : fallbackRes.slice(0, SEARCH_PAGE_SIZE)
+    );
+    setTotalResults(fallbackRes.length);
+    setIsLoading(false);
+    setIsLoadingMore(false);
+  }, [matchDir, previews, query, scope]);
+
+  // Debounced search via SQLite index with pure TS fallback
+  useEffect(() => {
+    activeSearchIdRef.current += 1;
+    const timer = setTimeout(() => {
+      void runSearch(0, false);
     }, 150);
 
     return () => clearTimeout(timer);
-  }, [query, scope, matchDir, previews]);
+  }, [runSearch]);
 
   const handleItemClick = (result: SearchResult) => {
     onSelectResult(result);
     onOpenChange(false);
+  };
+
+  const getIndexStatusText = () => {
+    if (!indexStatus) return "";
+    if (indexStatus.state === "indexing") {
+      return t("search.indexingStatus");
+    }
+    if (indexStatus.state === "error") {
+      return t("search.indexErrorStatus");
+    }
+    return t("search.indexedReadyStatus", {
+      files: indexStatus.indexedFiles,
+      matches: indexStatus.indexedMatches,
+    });
   };
 
   return (
@@ -145,9 +194,7 @@ export function SearchDialog<T extends SearchableConfigPreview>({
             {indexStatus && (
               <div className="flex items-center gap-1.5 text-xs font-normal text-muted-foreground bg-background/50 px-2 py-0.5 rounded border">
                 <Database className="h-3.5 w-3.5 text-primary" />
-                <span>
-                  {indexStatus.indexedFiles} files ({indexStatus.indexedMatches} matches)
-                </span>
+                <span>{getIndexStatusText()}</span>
               </div>
             )}
           </DialogTitle>
@@ -242,7 +289,7 @@ export function SearchDialog<T extends SearchableConfigPreview>({
           ) : (
             <div className="space-y-1.5 p-1">
               <div className="px-2 py-1 text-xs text-muted-foreground font-medium">
-                {t("search.resultsCount", { count: results.length })}
+                {t("search.resultsCount", { count: totalResults || results.length })}
               </div>
 
               {results.map((res) => {
@@ -301,6 +348,18 @@ export function SearchDialog<T extends SearchableConfigPreview>({
                   </button>
                 );
               })}
+
+              {results.length < totalResults && (
+                <button
+                  type="button"
+                  onClick={() => void runSearch(results.length, true)}
+                  disabled={isLoadingMore}
+                  className="mt-2 flex w-full items-center justify-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isLoadingMore && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {t("search.loadMore")}
+                </button>
+              )}
             </div>
           )}
         </ScrollArea>
