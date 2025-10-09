@@ -59,3 +59,15 @@ export async function searchSnippetIndex(request: SearchIndexRequest): Promise<S
 export async function refreshSearchIndexFile(filePath: string, matchDir: string): Promise<SearchIndexStatus> {
   return await invoke<SearchIndexStatus>("refresh_search_index_file", { filePath, matchDir });
 }
+
+export async function markSearchIndexInternalWrite(filePath: string): Promise<void> {
+  return await invoke<void>("mark_search_index_internal_write", { filePath });
+}
+
+export async function startSearchIndexWatcher(matchDir: string): Promise<void> {
+  return await invoke<void>("start_search_index_watcher", { matchDir });
+}
+
+export async function stopSearchIndexWatcher(): Promise<void> {
+  return await invoke<void>("stop_search_index_watcher");
+}

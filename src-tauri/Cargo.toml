@@ -30,6 +30,6 @@ serde_yaml = "0.9"
 rusqlite = { version = "0.32", features = ["bundled"] }
 walkdir = "2"
 tempfile = "3"
-
+notify = "6"
 
 

@@ -61,7 +61,7 @@ import { Textarea } from "./components/ui/textarea";
 import { AboutDialog } from "./components/AboutDialog";
 import { EspansoLogDialog } from "./components/EspansoLogDialog";
 import { SearchDialog } from "./components/SearchDialog";
-import { startSearchIndexSync, refreshSearchIndexFile } from "./tauri/searchIndex";
+import { startSearchIndexSync, refreshSearchIndexFile, markSearchIndexInternalWrite, startSearchIndexWatcher, stopSearchIndexWatcher } from "./tauri/searchIndex";
 import { WarningsDialog } from "./components/WarningsDialog";
 import { SearchResult } from "./logic/snippetSearch";
 import {
@@ -680,6 +680,48 @@ function App() {
     };
   }, []);
 
+  useEffect(() => {
+    let statusUnlisten: (() => void) | undefined;
+    let errorUnlisten: (() => void) | undefined;
+
+    listen("search-index-status-changed", () => {
+      // SearchDialog requests fresh status with each SQLite search; this event keeps
+      // external edits from being silent while avoiding another frontend scan loop.
+    }).then((fn) => {
+      statusUnlisten = fn;
+    });
+
+    listen<string>("search-index-watch-error", (event) => {
+      console.warn("Search index watcher failed:", event.payload);
+    }).then((fn) => {
+      errorUnlisten = fn;
+    });
+
+    return () => {
+      if (statusUnlisten) statusUnlisten();
+      if (errorUnlisten) errorUnlisten();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!espansoMatchDir) {
+      stopSearchIndexWatcher().catch((e) =>
+        console.warn("Search index watcher stop failed:", e)
+      );
+      return;
+    }
+
+    startSearchIndexWatcher(espansoMatchDir).catch((e) =>
+      console.warn("Search index watcher start failed:", e)
+    );
+
+    return () => {
+      stopSearchIndexWatcher().catch((e) =>
+        console.warn("Search index watcher stop failed:", e)
+      );
+    };
+  }, [espansoMatchDir]);
+
   const showConfirm = useCallback(
     (
       description: string,
@@ -853,6 +895,7 @@ function App() {
       const targetAbsPath = resolveTargetPath(parentAbsPath, normalizedName);
 
       const template = getInitialYamlTemplate(normalizedName);
+      await markSearchIndexInternalWrite(targetAbsPath);
       await writeTextFile(targetAbsPath, template);
       if (espansoMatchDir) {
         refreshSearchIndexFile(targetAbsPath, espansoMatchDir).catch((e) =>
@@ -1447,6 +1490,7 @@ function App() {
 
       setIsSavingSnippet(true);
       try {
+        await markSearchIndexInternalWrite(targetPath);
         await writeTextFile(targetPath, visualEditorYamlContent);
         if (espansoMatchDir) {
           refreshSearchIndexFile(targetPath, espansoMatchDir).catch((e) =>
@@ -1506,6 +1550,7 @@ function App() {
       const updatedContent = snippetEditTarget
         ? replaceSnippetInYamlContent(content, snippetEditTarget.match.originalMatchIndex, snippet)
         : appendSnippetToYamlContent(content, snippet);
+      await markSearchIndexInternalWrite(targetPreview.config.path);
       await writeTextFile(targetPreview.config.path, updatedContent);
       if (espansoMatchDir) {
         refreshSearchIndexFile(targetPreview.config.path, espansoMatchDir).catch((e) =>
@@ -1543,6 +1588,7 @@ function App() {
         try {
           const content = await readTextFile(target.preview.config.path);
           const updatedContent = deleteSnippetFromYamlContent(content, target.match.originalMatchIndex);
+          await markSearchIndexInternalWrite(target.preview.config.path);
           await writeTextFile(target.preview.config.path, updatedContent);
           if (espansoMatchDir) {
             refreshSearchIndexFile(target.preview.config.path, espansoMatchDir).catch((e) =>
@@ -1584,6 +1630,7 @@ function App() {
         try {
           const content = await readTextFile(configPath);
           const updatedContent = deleteMultipleSnippetsFromYamlContent(content, matchIndices);
+          await markSearchIndexInternalWrite(configPath);
           await writeTextFile(configPath, updatedContent);
           if (espansoMatchDir) {
             refreshSearchIndexFile(configPath, espansoMatchDir).catch((e) =>
