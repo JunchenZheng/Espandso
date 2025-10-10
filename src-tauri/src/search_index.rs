@@ -1,10 +1,13 @@
+use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use rusqlite::{params, Connection, Result as SqlResult};
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
-use std::time::SystemTime;
+use std::sync::{mpsc, Arc, Mutex, OnceLock};
+use std::thread;
+use std::time::{Duration, Instant, SystemTime};
+use tauri::Emitter;
 use tauri::Manager;
 use walkdir::WalkDir;
 
@@ -80,6 +83,84 @@ pub struct ParsedYamlFile {
 // Global or lazy mutex state for indexer locking if needed
 #[allow(dead_code)]
 pub struct SearchIndexState(pub Mutex<Option<PathBuf>>);
+
+struct SearchIndexWatcherState {
+    match_dir: String,
+    ignored_paths: Arc<Mutex<HashMap<String, Instant>>>,
+    _watcher: RecommendedWatcher,
+}
+
+static SEARCH_INDEX_WATCHER: OnceLock<Mutex<Option<SearchIndexWatcherState>>> = OnceLock::new();
+const WATCHER_DEBOUNCE_MS: u64 = 800;
+const INTERNAL_WRITE_IGNORE_MS: u64 = 3_000;
+
+fn watcher_state() -> &'static Mutex<Option<SearchIndexWatcherState>> {
+    SEARCH_INDEX_WATCHER.get_or_init(|| Mutex::new(None))
+}
+
+fn path_key(path: &Path) -> String {
+    path.to_string_lossy().to_string()
+}
+
+fn is_yaml_path(path: &Path) -> bool {
+    matches!(
+        path.extension()
+            .and_then(|s| s.to_str())
+            .map(|s| s.to_lowercase()),
+        Some(ext) if ext == "yml" || ext == "yaml"
+    )
+}
+
+fn mark_internal_write_path(file_path: &str) {
+    let state_guard = match watcher_state().lock() {
+        Ok(guard) => guard,
+        Err(_) => return,
+    };
+    let Some(state) = state_guard.as_ref() else {
+        return;
+    };
+    let Ok(mut ignored_paths) = state.ignored_paths.lock() else {
+        return;
+    };
+    ignored_paths.insert(
+        file_path.to_string(),
+        Instant::now() + Duration::from_millis(INTERNAL_WRITE_IGNORE_MS),
+    );
+}
+
+fn remove_expired_ignored_paths(ignored_paths: &mut HashMap<String, Instant>, now: Instant) {
+    ignored_paths.retain(|_, expires_at| *expires_at > now);
+}
+
+fn should_ignore_event_paths(
+    paths: &[PathBuf],
+    ignored_paths: &Arc<Mutex<HashMap<String, Instant>>>,
+) -> bool {
+    let yaml_paths: Vec<String> = paths
+        .iter()
+        .filter(|path| is_yaml_path(path))
+        .map(|path| path_key(path))
+        .collect();
+
+    if yaml_paths.is_empty() {
+        return false;
+    }
+
+    let Ok(mut ignored) = ignored_paths.lock() else {
+        return false;
+    };
+    let now = Instant::now();
+    remove_expired_ignored_paths(&mut ignored, now);
+    yaml_paths.iter().all(|path| ignored.contains_key(path))
+}
+
+fn is_relevant_watch_event(event: &Event) -> bool {
+    if event.paths.iter().any(|path| is_yaml_path(path)) {
+        return true;
+    }
+
+    matches!(event.kind, EventKind::Remove(_) | EventKind::Modify(_))
+}
 
 pub fn resolve_db_path(app_handle: &tauri::AppHandle) -> Result<PathBuf, String> {
     let app_dir = app_handle
@@ -1184,6 +1265,7 @@ pub fn refresh_search_index_file(
     file_path: String,
     match_dir: String,
 ) -> Result<SearchIndexStatus, String> {
+    mark_internal_write_path(&file_path);
     let db_path = resolve_db_path(&app_handle)?;
     let path = Path::new(&file_path);
     let match_path = Path::new(&match_dir);
@@ -1232,6 +1314,121 @@ pub fn refresh_search_index_file(
 
     write_index_state(&conn, "ready", Some(&match_dir), None, None)?;
     get_status_from_conn(&conn, Some(&match_dir))
+}
+
+#[tauri::command]
+pub fn mark_search_index_internal_write(file_path: String) -> Result<(), String> {
+    mark_internal_write_path(&file_path);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn start_search_index_watcher(
+    app_handle: tauri::AppHandle,
+    match_dir: String,
+) -> Result<(), String> {
+    let match_path = PathBuf::from(&match_dir);
+    if !match_path.exists() || !match_path.is_dir() {
+        return Err(format!("Match directory does not exist: {}", match_dir));
+    }
+
+    {
+        let mut state = watcher_state()
+            .lock()
+            .map_err(|_| "Search index watcher state is unavailable.".to_string())?;
+        if state
+            .as_ref()
+            .map(|current| current.match_dir.as_str() == match_dir.as_str())
+            .unwrap_or(false)
+        {
+            return Ok(());
+        }
+        *state = None;
+    }
+
+    let (tx, rx) = mpsc::channel::<notify::Result<Event>>();
+    let mut watcher = RecommendedWatcher::new(
+        move |res| {
+            let _ = tx.send(res);
+        },
+        Config::default(),
+    )
+    .map_err(|e| format!("Failed to create search index watcher: {}", e))?;
+
+    watcher
+        .watch(&match_path, RecursiveMode::Recursive)
+        .map_err(|e| format!("Failed to watch match directory: {}", e))?;
+
+    let ignored_paths = Arc::new(Mutex::new(HashMap::new()));
+    let thread_ignored_paths = Arc::clone(&ignored_paths);
+    let thread_app_handle = app_handle.clone();
+    let thread_match_dir = match_dir.clone();
+
+    thread::spawn(move || {
+        let mut pending_paths: Vec<PathBuf> = Vec::new();
+
+        loop {
+            let first_event = match rx.recv() {
+                Ok(event) => event,
+                Err(_) => break,
+            };
+
+            if let Ok(event) = first_event {
+                if is_relevant_watch_event(&event) {
+                    pending_paths.extend(event.paths);
+                }
+            }
+
+            while let Ok(event_result) = rx.recv_timeout(Duration::from_millis(WATCHER_DEBOUNCE_MS))
+            {
+                if let Ok(event) = event_result {
+                    if is_relevant_watch_event(&event) {
+                        pending_paths.extend(event.paths);
+                    }
+                }
+            }
+
+            if pending_paths.is_empty() {
+                continue;
+            }
+
+            let event_paths = std::mem::take(&mut pending_paths);
+            if should_ignore_event_paths(&event_paths, &thread_ignored_paths) {
+                continue;
+            }
+
+            let status = resolve_db_path(&thread_app_handle)
+                .and_then(|db_path| sync_match_dir(&db_path, &thread_match_dir));
+
+            match status {
+                Ok(status) => {
+                    let _ = thread_app_handle.emit("search-index-status-changed", status);
+                }
+                Err(e) => {
+                    let _ = thread_app_handle.emit("search-index-watch-error", e);
+                }
+            }
+        }
+    });
+
+    let mut state = watcher_state()
+        .lock()
+        .map_err(|_| "Search index watcher state is unavailable.".to_string())?;
+    *state = Some(SearchIndexWatcherState {
+        match_dir,
+        ignored_paths,
+        _watcher: watcher,
+    });
+    Ok(())
+}
+
+#[tauri::command]
+pub fn stop_search_index_watcher() -> Result<(), String> {
+    let mut state = watcher_state()
+        .lock()
+        .map_err(|_| "Search index watcher state is unavailable.".to_string())?;
+    *state = None;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -1294,6 +1491,46 @@ matches:
         assert_eq!(res.results.len(), 1);
         assert_eq!(res.results[0].snippet_index, 0);
         assert_eq!(res.results[0].matched_fields, vec!["trigger"]);
+    }
+
+    #[test]
+    fn test_sync_removes_deleted_yaml_file_from_index() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("test.sqlite");
+
+        let match_dir = dir.path().join("match");
+        fs::create_dir_all(&match_dir).unwrap();
+
+        let sample_file = match_dir.join("base.yml");
+        fs::write(
+            &sample_file,
+            "matches:\n  - trigger: ':stale'\n    replace: 'deleted data'\n",
+        )
+        .unwrap();
+
+        let status = sync_match_dir(&db_path, match_dir.to_str().unwrap()).unwrap();
+        assert_eq!(status.indexed_files, 1);
+        assert_eq!(status.indexed_matches, 1);
+
+        fs::remove_file(&sample_file).unwrap();
+        let status = sync_match_dir(&db_path, match_dir.to_str().unwrap()).unwrap();
+        assert_eq!(status.indexed_files, 0);
+        assert_eq!(status.indexed_matches, 0);
+
+        let req = SearchIndexRequest {
+            match_dir: match_dir.to_str().unwrap().to_string(),
+            query: ":stale".to_string(),
+            scope: SearchScope {
+                trigger: true,
+                description: true,
+                content: true,
+            },
+            limit: 10,
+            offset: 0,
+        };
+
+        let res = query_snippet_index(&db_path, &req).unwrap();
+        assert_eq!(res.results.len(), 0);
     }
 
     #[test]

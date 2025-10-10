@@ -59,7 +59,13 @@ fn menu_text(locale: &str, key: &'static str) -> &'static str {
 }
 
 fn build_app_menu(app: &tauri::AppHandle, locale: &str) -> tauri::Result<Menu<tauri::Wry>> {
-    let about_item = MenuItem::with_id(app, "open_about", menu_text(locale, "about"), true, None::<&str>)?;
+    let about_item = MenuItem::with_id(
+        app,
+        "open_about",
+        menu_text(locale, "about"),
+        true,
+        None::<&str>,
+    )?;
 
     #[cfg(target_os = "macos")]
     {
@@ -133,12 +139,8 @@ fn build_app_menu(app: &tauri::AppHandle, locale: &str) -> tauri::Result<Menu<ta
             ],
         )?;
 
-        let help_submenu = Submenu::with_items(
-            app,
-            menu_text(locale, "help"),
-            true,
-            &[&about_item],
-        )?;
+        let help_submenu =
+            Submenu::with_items(app, menu_text(locale, "help"), true, &[&about_item])?;
 
         Menu::with_items(app, &[&file_submenu, &edit_submenu, &help_submenu])
     }
@@ -164,7 +166,6 @@ pub fn run() {
             app.set_menu(menu)?;
             Ok(())
         })
-
         .on_menu_event(|app, event| {
             if event.id() == "open_about" {
                 let _ = app.emit("open-about-dialog", ());
@@ -177,9 +178,11 @@ pub fn run() {
             search_index::start_search_index_sync,
             search_index::get_search_index_status,
             search_index::search_snippet_index,
-            search_index::refresh_search_index_file
+            search_index::refresh_search_index_file,
+            search_index::mark_search_index_internal_write,
+            search_index::start_search_index_watcher,
+            search_index::stop_search_index_watcher
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
-
