@@ -681,29 +681,6 @@ function App() {
   }, []);
 
   useEffect(() => {
-    let statusUnlisten: (() => void) | undefined;
-    let errorUnlisten: (() => void) | undefined;
-
-    listen("search-index-status-changed", () => {
-      // SearchDialog requests fresh status with each SQLite search; this event keeps
-      // external edits from being silent while avoiding another frontend scan loop.
-    }).then((fn) => {
-      statusUnlisten = fn;
-    });
-
-    listen<string>("search-index-watch-error", (event) => {
-      console.warn("Search index watcher failed:", event.payload);
-    }).then((fn) => {
-      errorUnlisten = fn;
-    });
-
-    return () => {
-      if (statusUnlisten) statusUnlisten();
-      if (errorUnlisten) errorUnlisten();
-    };
-  }, []);
-
-  useEffect(() => {
     if (!espansoMatchDir) {
       stopSearchIndexWatcher().catch((e) =>
         console.warn("Search index watcher stop failed:", e)
@@ -808,13 +785,13 @@ function App() {
   const [isWarningsDialogOpen, setIsWarningsDialogOpen] = useState<boolean>(false);
   const [warningsFilterPath, setWarningsFilterPath] = useState<string | null>(null);
 
-  const scanDefaultEspansoConfigDir = useCallback(async () => {
+  const scanDefaultEspansoConfigDir = useCallback(async (options?: { skipIndexSync?: boolean }) => {
     setIsScanningEspanso(true);
     setEspansoScanMessage(t("status.scanningEspansoConfigs"));
     try {
       const result = await scanEspansoConfigFiles();
       setEspansoMatchDir(result.matchDir);
-      if (result.matchDir) {
+      if (result.matchDir && !options?.skipIndexSync) {
         startSearchIndexSync(result.matchDir).catch((err) => {
           console.warn("Background SQLite search indexing failed:", err);
         });
@@ -842,6 +819,30 @@ function App() {
       setIsScanningEspanso(false);
     }
   }, [t]);
+
+  useEffect(() => {
+    let statusUnlisten: (() => void) | undefined;
+    let errorUnlisten: (() => void) | undefined;
+
+    listen("search-index-status-changed", () => {
+      scanDefaultEspansoConfigDir({ skipIndexSync: true }).catch((e) =>
+        console.warn("Espanso collection refresh failed:", e)
+      );
+    }).then((fn) => {
+      statusUnlisten = fn;
+    });
+
+    listen<string>("search-index-watch-error", (event) => {
+      console.warn("Search index watcher failed:", event.payload);
+    }).then((fn) => {
+      errorUnlisten = fn;
+    });
+
+    return () => {
+      if (statusUnlisten) statusUnlisten();
+      if (errorUnlisten) errorUnlisten();
+    };
+  }, [scanDefaultEspansoConfigDir]);
 
   const openCreateFileDialog = useCallback((defaultParentRelPath?: string) => {
     const targetParent = defaultParentRelPath !== undefined ? defaultParentRelPath : activeDirectoryRelPath;
@@ -1717,7 +1718,7 @@ function App() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={scanDefaultEspansoConfigDir}
+                    onClick={() => scanDefaultEspansoConfigDir()}
                     disabled={isScanningEspanso}
                     aria-label={t("actions.refresh")}
                     title={t("actions.refresh")}
@@ -1881,7 +1882,7 @@ function App() {
                     <FilePlus className="h-4 w-4 mr-2" />
                     {t("filesystem.createFile")}
                   </Button>
-                  <Button variant="ghost" onClick={scanDefaultEspansoConfigDir}>
+                  <Button variant="ghost" onClick={() => scanDefaultEspansoConfigDir()}>
                     <RefreshCw className="h-4 w-4 mr-2" />
                     {t("actions.refresh")}
                   </Button>
@@ -3148,7 +3149,7 @@ function App() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-3">
                     <Label className="text-sm font-semibold">{t("settings.espansoConfigScan")}</Label>
-                    <Button size="sm" variant="outline" onClick={scanDefaultEspansoConfigDir} disabled={isScanningEspanso}>
+                    <Button size="sm" variant="outline" onClick={() => scanDefaultEspansoConfigDir()} disabled={isScanningEspanso}>
                       {isScanningEspanso ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
                       {t("actions.refresh")}
                     </Button>
