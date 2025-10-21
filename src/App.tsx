@@ -62,11 +62,10 @@ import {
   setExperimentalYamlWarningsEnabled,
   isYamlWarningsActive,
 } from "./logic/features";
-import { Snippet, SnippetVar, ValidationError } from "./logic/types";
-import { DateFormatOption, generateUniqueVarName, getReferencedVars } from "./logic/dateFormats";
+import { Snippet } from "./logic/types";
 import { validate } from "./logic/validate";
 import { importYamlContent } from "./logic/importYaml";
-import { buildTriggerInput, getSnippetTriggers, isImageFilePath, normalizeTriggerLines } from "./logic/snippetUtils";
+import { getSnippetTriggers, isImageFilePath } from "./logic/snippetUtils";
 import { appendSnippetToYamlContent, deleteSnippetFromYamlContent, deleteMultipleSnippetsFromYamlContent, deleteSelectedTriggersFromYamlContent, findSnippetLineRangeInYaml, findDeleteSelectionLineRangesInYaml, replaceSnippetInYamlContent, DeleteTriggerSelection, SnippetLineRange } from "./logic/yamlEditor";
 import { EspansoConfigFile, EspansoDirectoryInfo, EspansoPathSource, scanEspansoConfigFiles } from "./logic/espansoPaths";
 import { getInitialYamlTemplate, normalizeYamlFileName, resolveTargetPath, validateFileName, validateFolderName } from "./logic/createFileSystem";
@@ -87,23 +86,21 @@ import type {
   AddSnippetKind,
   FormFieldConfig,
   FormFieldControl,
-  FormSelectionState,
   SnippetEditTarget,
 } from "./features/snippets/types";
 import {
   areFormFieldConfigsEqual,
   buildUniqueFormFieldId,
-  configsToFormFields,
   createDefaultFormFieldConfig,
   escapeRegExp,
   extractFormFieldNames,
-  formFieldsToConfigs,
   getFormFieldCategory,
   getSelectedFormFieldId,
   getTextFieldMode,
   normalizeFormFieldConfigs,
   snippetKindLabel,
 } from "./features/snippets/formSnippet";
+import { useSnippetEditor } from "./features/snippets/hooks/useSnippetEditor";
 
 interface DragDropPayload {
   paths: string[];
@@ -184,28 +181,50 @@ function App() {
       setHighlightedSnippetIndex((prev) => (prev === result.snippetIndex ? null : prev));
     }, 2500);
   }, []);
-  const [isAddSnippetOpen, setIsAddSnippetOpen] = useState<boolean>(false);
   const [isVisualEditorOpen, setIsVisualEditorOpen] = useState<boolean>(false);
   const [visualEditorYamlContent, setVisualEditorYamlContent] = useState<string>("");
   const [isLoadingVisualEditorYaml, setIsLoadingVisualEditorYaml] = useState<boolean>(false);
   const [highlightedLineRange, setHighlightedLineRange] = useState<SnippetLineRange | null>(null);
-  const [snippetEditTarget, setSnippetEditTarget] = useState<SnippetEditTarget | null>(null);
-  const [addSnippetKind, setAddSnippetKind] = useState<AddSnippetKind>("text");
-  const [editTriggersText, setEditTriggersText] = useState<string>("");
-  const [editReplace, setEditReplace] = useState<string>("");
-  const [editVars, setEditVars] = useState<SnippetVar[]>([]);
-  const replaceTextareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const visualEditorReplaceTextareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const [editIncludeFile, setEditIncludeFile] = useState<string>("");
-  const [editImagePath, setEditImagePath] = useState<string>("");
-  const [editForm, setEditForm] = useState<string>("");
-  const [editFormFieldConfigs, setEditFormFieldConfigs] = useState<FormFieldConfig[]>([]);
-  const [formSelection, setFormSelection] = useState<FormSelectionState | null>(null);
-  const [editDescription, setEditDescription] = useState<string>("");
-  const [addErrors, setAddErrors] = useState<ValidationError[]>([]);
-  const [addWarnings, setAddWarnings] = useState<string[]>([]);
-  const [isSavingSnippet, setIsSavingSnippet] = useState<boolean>(false);
-  const formTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const {
+    isOpen: isAddSnippetOpen,
+    setIsOpen: setIsAddSnippetOpen,
+    editTarget: snippetEditTarget,
+    setEditTarget: setSnippetEditTarget,
+    kind: addSnippetKind,
+    setKind: setAddSnippetKind,
+    triggersText: editTriggersText,
+    setTriggersText: setEditTriggersText,
+    replace: editReplace,
+    setReplace: setEditReplace,
+    vars: editVars,
+    includeFile: editIncludeFile,
+    setIncludeFile: setEditIncludeFile,
+    imagePath: editImagePath,
+    setImagePath: setEditImagePath,
+    form: editForm,
+    setForm: setEditForm,
+    formFieldConfigs: editFormFieldConfigs,
+    setFormFieldConfigs: setEditFormFieldConfigs,
+    formSelection,
+    setFormSelection,
+    description: editDescription,
+    setDescription: setEditDescription,
+    errors: addErrors,
+    setErrors: setAddErrors,
+    warnings: addWarnings,
+    setWarnings: setAddWarnings,
+    isSaving: isSavingSnippet,
+    setIsSaving: setIsSavingSnippet,
+    replaceTextareaRef,
+    visualEditorReplaceTextareaRef,
+    formTextareaRef,
+    resetForm: resetSnippetForm,
+    openAdd: openSnippetEditorAdd,
+    openEdit: openSnippetEditorEdit,
+    insertDateOption: handleInsertDateVariable,
+    removeVar: handleRemoveDateVar,
+    buildSnippetObject: buildFormSnippet,
+  } = useSnippetEditor();
 
   const [visualEditorMode, setVisualEditorMode] = useState<"add" | "delete">("add");
   const [visualEditorOriginalYaml, setVisualEditorOriginalYaml] = useState<string>("");
@@ -863,21 +882,6 @@ function App() {
     });
   }, [detectedFormFieldKey]);
 
-  function resetSnippetForm() {
-    setAddSnippetKind("text");
-    setEditTriggersText("");
-    setEditReplace("");
-    setEditVars([]);
-    setEditIncludeFile("");
-    setEditImagePath("");
-    setEditForm("");
-    setEditFormFieldConfigs([]);
-    setFormSelection(null);
-    setEditDescription("");
-    setAddErrors([]);
-    setAddWarnings([]);
-  }
-
   const loadVisualEditorYaml = useCallback(async (pathOverride?: string, matchIndexToHighlight?: number) => {
     const targetPath = pathOverride || snippetEditTarget?.preview.config.path || selectedEspansoPreview?.config.path;
     if (!targetPath) return;
@@ -992,123 +996,11 @@ function App() {
       showAlert(t("errors.selectConfigBeforeAddingSnippet"), t("errors.noConfigSelected"));
       return;
     }
-    setSnippetEditTarget(null);
-    resetSnippetForm();
-    setIsAddSnippetOpen(true);
+    openSnippetEditorAdd();
   }
 
   function openEditSnippetDialog(target: SnippetEditTarget) {
-    const editableSnippet = target.match.originalSnippet || target.match.snippet;
-    const triggerInput = buildTriggerInput(editableSnippet);
-    setSnippetEditTarget(target);
-    setAddSnippetKind(
-      editableSnippet.include_file
-        ? "file"
-        : editableSnippet.image_path !== undefined
-          ? "image"
-          : editableSnippet.form !== undefined
-            ? "form"
-            : "text",
-    );
-    setEditTriggersText(triggerInput.multiline);
-    setEditReplace(editableSnippet.replace || "");
-    setEditVars(editableSnippet.vars ? [...editableSnippet.vars] : []);
-    setEditIncludeFile(target.match.resourcePath || editableSnippet.include_file || "");
-    setEditImagePath(editableSnippet.image_path || "");
-    setEditForm(editableSnippet.form || "");
-    setEditFormFieldConfigs(formFieldsToConfigs(editableSnippet.form_fields));
-    setFormSelection(null);
-    setEditDescription(editableSnippet.description || "");
-    setAddErrors([]);
-    setAddWarnings([]);
-    setIsAddSnippetOpen(true);
-  }
-
-  function buildFormSnippet(): Snippet {
-    const normalizedTriggers = normalizeTriggerLines(editTriggersText);
-    const triggerFields = normalizedTriggers.length > 1
-      ? { triggers: normalizedTriggers }
-      : { trigger: normalizedTriggers[0] || "" };
-
-    const snippet: Snippet = {
-      ...triggerFields,
-    };
-
-    if (activeSnippetKind === "file") {
-      snippet.include_file = editIncludeFile.trim();
-    } else if (activeSnippetKind === "image") {
-      snippet.image_path = editImagePath.trim();
-    } else if (activeSnippetKind === "form") {
-      snippet.form = editForm;
-      const formFields = configsToFormFields(editFormFieldConfigs);
-      if (formFields) {
-        snippet.form_fields = formFields;
-      }
-      const referencedVars = getReferencedVars(editForm, editVars);
-      if (referencedVars.length > 0) {
-        snippet.vars = referencedVars;
-      }
-    } else {
-      snippet.replace = editReplace;
-      const referencedVars = getReferencedVars(editReplace, editVars);
-      if (referencedVars.length > 0) {
-        snippet.vars = referencedVars;
-      }
-    }
-
-    if (editDescription.trim()) {
-      snippet.description = editDescription.trim();
-    }
-
-    return snippet;
-  }
-
-  function handleInsertDateVariable(option: DateFormatOption, target: "replace" | "visualReplace" | "form" = "replace") {
-    const varName = generateUniqueVarName(editVars, option.defaultVarName);
-    const newVar: SnippetVar = {
-      name: varName,
-      type: "date",
-      params: {
-        format: option.format,
-      },
-    };
-    setEditVars((prev) => [...prev, newVar]);
-
-    const tagToInsert = `{{${varName}}}`;
-    const targetRef = target === "form"
-      ? formTextareaRef
-      : target === "visualReplace"
-        ? visualEditorReplaceTextareaRef
-        : replaceTextareaRef;
-    const textarea = targetRef.current;
-
-    if (textarea) {
-      const start = textarea.selectionStart || 0;
-      const end = textarea.selectionEnd || 0;
-      const currentVal = target === "form" ? editForm : editReplace;
-      const nextVal = currentVal.substring(0, start) + tagToInsert + currentVal.substring(end);
-      if (target === "form") {
-        setEditForm(nextVal);
-      } else {
-        setEditReplace(nextVal);
-      }
-
-      requestAnimationFrame(() => {
-        textarea.focus();
-        const newPos = start + tagToInsert.length;
-        textarea.setSelectionRange(newPos, newPos);
-      });
-    } else {
-      if (target === "form") {
-        setEditForm((prev) => (prev ? `${prev} ${tagToInsert}` : tagToInsert));
-      } else {
-        setEditReplace((prev) => (prev ? `${prev} ${tagToInsert}` : tagToInsert));
-      }
-    }
-  }
-
-  function handleRemoveDateVar(varName: string) {
-    setEditVars((prev) => prev.filter((v) => v.name !== varName));
+    openSnippetEditorEdit(target);
   }
 
   function updateFormFieldConfig(id: string, patch: Partial<FormFieldConfig>) {

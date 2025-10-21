@@ -61,7 +61,7 @@ export function buildEspansoConfigPreviewTree(
       children: [],
     };
     nodes.push(dir);
-    nodes.sort((a, b) => Number(a.isDir !== b.isDir) || a.name.localeCompare(b.name));
+    nodes.sort((a, b) => Number(b.isDir) - Number(a.isDir) || a.name.localeCompare(b.name));
     return dir;
   }
 
@@ -104,7 +104,7 @@ export function buildEspansoConfigPreviewTree(
             fileCount: 1,
             preview,
           });
-          currentNodes.sort((a, b) => Number(a.isDir !== b.isDir) || a.name.localeCompare(b.name));
+          currentNodes.sort((a, b) => Number(b.isDir) - Number(a.isDir) || a.name.localeCompare(b.name));
         }
       } else {
         const dir = getOrCreateDir(currentNodes, part, currentPath, currentRelPath);

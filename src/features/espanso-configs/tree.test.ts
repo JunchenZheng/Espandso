@@ -49,6 +49,12 @@ describe("Espanso config tree helpers", () => {
     ]);
 
     expect(tree).toHaveLength(3); // emptyDir (dir), sub (dir), base.yml (file)
+    expect(tree.map((node) => `${node.isDir ? "dir" : "file"}:${node.name}`)).toEqual([
+      "dir:emptyDir",
+      "dir:sub",
+      "file:base.yml",
+    ]);
+
     const baseNode = findTreeNode(tree, "/path/base.yml");
     expect(baseNode).not.toBeNull();
     expect(baseNode?.snippetCount).toBe(5);
