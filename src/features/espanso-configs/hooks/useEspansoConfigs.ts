@@ -1,15 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { mkdir, readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
-import { listen } from "@tauri-apps/api/event";
 
 import { useI18n } from "../../../i18n/useI18n";
 import {
   EspansoConfigFile,
   EspansoDirectoryInfo,
   EspansoPathSource,
-  scanEspansoConfigFiles,
 } from "../../../logic/espansoPaths";
-import { importYamlContent } from "../../../logic/importYaml";
 import {
   getInitialYamlTemplate,
   normalizeYamlFileName,
@@ -18,12 +14,19 @@ import {
   validateFolderName,
 } from "../../../logic/createFileSystem";
 import {
-  markSearchIndexInternalWrite,
-  refreshSearchIndexFile,
-  startSearchIndexSync,
-  startSearchIndexWatcher,
-  stopSearchIndexWatcher,
-} from "../../../tauri/searchIndex";
+  createEspansoDirectory,
+  loadEspansoConfigPreview as loadEspansoConfigPreviewFromRepository,
+  scanEspansoConfigDirectory,
+  writeYamlConfigFile,
+} from "../../../repositories/espansoConfigRepository";
+import {
+  markSearchIndexWrite,
+  refreshSearchIndexForFile,
+  startSearchIndexFileWatcher,
+  stopSearchIndexFileWatcher,
+  subscribeSearchIndexEvents,
+  syncSearchIndex,
+} from "../../../services/searchIndexSyncService";
 import {
   buildEspansoConfigPreviewTree,
   findTreeNode,
@@ -93,56 +96,21 @@ export function useEspansoConfigs(options: UseEspansoConfigsOptions = {}) {
     [t],
   );
 
-  const buildEspansoConfigPreview = useCallback(
-    async (config: EspansoConfigFile): Promise<EspansoConfigPreview> => {
-      try {
-        const content = await readTextFile(config.path);
-        const result = importYamlContent(content, config.name);
-        const inlineCount = result.snippets.filter((snippet) => snippet.replace !== undefined).length;
-        const resourceCount = result.snippets.filter((snippet) => snippet.include_file).length;
-        const imageCount = result.snippets.filter((snippet) => snippet.image_path !== undefined).length;
-        const formCount = result.snippets.filter((snippet) => snippet.form !== undefined).length;
-
-        return {
-          config,
-          snippetCount: result.snippets.length,
-          inlineCount,
-          resourceCount,
-          imageCount,
-          formCount,
-          warningCount: result.warnings.length,
-          warnings: result.warnings,
-          snippets: result.snippets,
-          importedMatches: result.importedMatches,
-        };
-      } catch (e: any) {
-        return {
-          config,
-          snippetCount: 0,
-          inlineCount: 0,
-          resourceCount: 0,
-          imageCount: 0,
-          formCount: 0,
-          warningCount: 1,
-          warnings: [t("errors.failedToReadFile", { file: config.name, message: e?.message || e })],
-          snippets: [],
-          importedMatches: [],
-        };
-      }
-    },
-    [t],
-  );
-
   const loadEspansoConfigPreview = useCallback(
     async (config: EspansoConfigFile): Promise<EspansoConfigPreview> => {
-      const preview = await buildEspansoConfigPreview(config);
+      const preview = await loadEspansoConfigPreviewFromRepository(config, (error) =>
+        t("errors.failedToReadFile", {
+          file: config.name,
+          message: error instanceof Error ? error.message : String(error),
+        }),
+      );
       setEspansoConfigPreviews((current) => [
         ...current.filter((item) => item.config.path !== config.path),
         preview,
       ]);
       return preview;
     },
-    [buildEspansoConfigPreview],
+    [t],
   );
 
   const scanDefaultEspansoConfigDir = useCallback(
@@ -150,12 +118,10 @@ export function useEspansoConfigs(options: UseEspansoConfigsOptions = {}) {
       setIsScanningEspanso(true);
       setEspansoScanMessage(t("status.scanningEspansoConfigs"));
       try {
-        const result = await scanEspansoConfigFiles();
+        const result = await scanEspansoConfigDirectory();
         setEspansoMatchDir(result.matchDir);
         if (result.matchDir && !options?.skipIndexSync) {
-          startSearchIndexSync(result.matchDir).catch((err) => {
-            console.warn("Background SQLite search indexing failed:", err);
-          });
+          syncSearchIndex(result.matchDir);
         }
         setEspansoPathSource(result.pathSource);
         setEspansoConfigs(result.files);
@@ -291,44 +257,47 @@ export function useEspansoConfigs(options: UseEspansoConfigsOptions = {}) {
 
   useEffect(() => {
     if (!espansoMatchDir) {
-      stopSearchIndexWatcher().catch((e) =>
+      stopSearchIndexFileWatcher().catch((e) =>
         console.warn("Search index watcher stop failed:", e),
       );
       return;
     }
 
-    startSearchIndexWatcher(espansoMatchDir).catch((e) =>
+    startSearchIndexFileWatcher(espansoMatchDir).catch((e) =>
       console.warn("Search index watcher start failed:", e),
     );
 
     return () => {
-      stopSearchIndexWatcher().catch((e) =>
+      stopSearchIndexFileWatcher().catch((e) =>
         console.warn("Search index watcher stop failed:", e),
       );
     };
   }, [espansoMatchDir]);
 
   useEffect(() => {
-    let statusUnlisten: (() => void) | undefined;
-    let errorUnlisten: (() => void) | undefined;
+    let unlisten: (() => void) | undefined;
+    let disposed = false;
 
-    listen("search-index-status-changed", () => {
-      scanDefaultEspansoConfigDir({ skipIndexSync: true }).catch((e) =>
-        console.warn("Espanso collection refresh failed:", e),
-      );
+    subscribeSearchIndexEvents({
+      onStatusChanged: () => {
+        scanDefaultEspansoConfigDir({ skipIndexSync: true }).catch((e) =>
+          console.warn("Espanso collection refresh failed:", e),
+        );
+      },
+      onWatchError: (message) => {
+        console.warn("Search index watcher failed:", message);
+      },
     }).then((fn) => {
-      statusUnlisten = fn;
-    });
-
-    listen<string>("search-index-watch-error", (event) => {
-      console.warn("Search index watcher failed:", event.payload);
-    }).then((fn) => {
-      errorUnlisten = fn;
+      if (disposed) {
+        fn();
+        return;
+      }
+      unlisten = fn;
     });
 
     return () => {
-      if (statusUnlisten) statusUnlisten();
-      if (errorUnlisten) errorUnlisten();
+      disposed = true;
+      if (unlisten) unlisten();
     };
   }, [scanDefaultEspansoConfigDir]);
 
@@ -439,12 +408,10 @@ export function useEspansoConfigs(options: UseEspansoConfigsOptions = {}) {
       const targetAbsPath = resolveTargetPath(parentAbsPath, normalizedName);
 
       const template = getInitialYamlTemplate(normalizedName);
-      await markSearchIndexInternalWrite(targetAbsPath);
-      await writeTextFile(targetAbsPath, template);
+      await markSearchIndexWrite(targetAbsPath);
+      await writeYamlConfigFile(targetAbsPath, template);
       if (espansoMatchDir) {
-        refreshSearchIndexFile(targetAbsPath, espansoMatchDir).catch((e) =>
-          console.warn("Index refresh failed:", e),
-        );
+        refreshSearchIndexForFile(targetAbsPath, espansoMatchDir);
       }
 
       setIsCreateFileOpen(false);
@@ -490,7 +457,7 @@ export function useEspansoConfigs(options: UseEspansoConfigsOptions = {}) {
         : espansoMatchDir;
       const targetAbsPath = resolveTargetPath(parentAbsPath, createFolderName.trim());
 
-      await mkdir(targetAbsPath, { recursive: true });
+      await createEspansoDirectory(targetAbsPath);
 
       const newRelPath = createFolderParentRelPath
         ? `${createFolderParentRelPath}/${createFolderName.trim()}`
@@ -508,14 +475,10 @@ export function useEspansoConfigs(options: UseEspansoConfigsOptions = {}) {
 
   return {
     espansoMatchDir,
-    setEspansoMatchDir,
     espansoPathSource,
     espansoConfigs,
-    setEspansoConfigs,
     espansoDirectories,
-    setEspansoDirectories,
     espansoConfigPreviews,
-    setEspansoConfigPreviews,
     selectedEspansoConfigPath,
     setSelectedEspansoConfigPath,
     isScanningEspanso,
@@ -524,9 +487,7 @@ export function useEspansoConfigs(options: UseEspansoConfigsOptions = {}) {
     espansoScanMessage,
 
     // Derived states
-    espansoPreviewList,
     espansoPreviewTree,
-    selectedTreeNode,
     selectedEspansoPreview,
     isSelectedPreviewLoaded,
     selectedDirectoryNode,
@@ -534,7 +495,6 @@ export function useEspansoConfigs(options: UseEspansoConfigsOptions = {}) {
     activeEspansoAncestorPaths,
 
     // Actions & Methods
-    buildEspansoConfigPreview,
     loadEspansoConfigPreview,
     scanDefaultEspansoConfigDir,
     addDroppedYamlFile,
