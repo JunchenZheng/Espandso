@@ -50,14 +50,7 @@ import {
 } from "../types";
 import { getFormFieldCategory, getTextFieldMode } from "../formSnippet";
 
-export interface VisualYamlEditorDialogProps {
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-  snippetEditTarget: SnippetEditTarget | null;
-  selectedEspansoPreview: EspansoConfigPreview | null;
-  t: (key: string, options?: any) => string;
-
-  // Hook states & actions
+export interface VisualYamlEditorStateProps {
   visualEditorMode: "add" | "delete";
   setVisualEditorMode: (mode: "add" | "delete") => void;
   highlightedLineRange: { startLine: number; endLine: number } | null;
@@ -74,8 +67,9 @@ export interface VisualYamlEditorDialogProps {
   loadVisualEditorYaml: (pathOverride?: string, matchIndexToHighlight?: number) => void;
   visualEditorPreviewYamlContent: string;
   pendingDeletedLineNumbers: Set<number>;
+}
 
-  // Form states & actions
+export interface VisualYamlEditorFormProps {
   addErrors: ValidationError[];
   addWarnings: string[];
   isYamlWarningsEnabled: boolean;
@@ -109,8 +103,9 @@ export interface VisualYamlEditorDialogProps {
   visualEditorReplaceTextareaRef: React.RefObject<HTMLTextAreaElement | null>;
   editDescription: string;
   setEditDescription: (desc: string) => void;
+}
 
-  // General actions
+export interface VisualYamlEditorActionProps {
   deleteSnippetFromYaml: (target: SnippetEditTarget) => void;
   saveSnippetToYaml: () => void;
   isSavingSnippet: boolean;
@@ -119,68 +114,91 @@ export interface VisualYamlEditorDialogProps {
   setSnippetEditTarget: (target: SnippetEditTarget | null) => void;
 }
 
+export interface VisualYamlEditorDialogProps {
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  snippetEditTarget: SnippetEditTarget | null;
+  selectedEspansoPreview: EspansoConfigPreview | null;
+  t: (key: string, options?: any) => string;
+  visualEditor: VisualYamlEditorStateProps;
+  form: VisualYamlEditorFormProps;
+  actions: VisualYamlEditorActionProps;
+}
+
 export function VisualYamlEditorDialog({
   isOpen,
   onOpenChange,
   snippetEditTarget,
   selectedEspansoPreview,
   t,
-  visualEditorMode,
-  setVisualEditorMode,
-  highlightedLineRange,
-  setHighlightedLineRange,
-  pendingDeleteSelections,
-  deleteSearchQuery,
-  setDeleteSearchQuery,
-  handleUndoLastDelete,
-  handleResetDeletions,
-  visualEditorMatches,
-  toggleDeleteSelection,
-  getDeleteSelectionKey,
-  isLoadingVisualEditorYaml,
-  loadVisualEditorYaml,
-  visualEditorPreviewYamlContent,
-  pendingDeletedLineNumbers,
-  addErrors,
-  addWarnings,
-  isYamlWarningsEnabled,
-  editTriggersText,
-  setEditTriggersText,
-  activeSnippetKind,
-  setAddSnippetKind,
-  setAddErrors,
-  setAddWarnings,
-  editIncludeFile,
-  setEditIncludeFile,
-  chooseSnippetFile,
-  editImagePath,
-  setEditImagePath,
-  chooseSnippetImageFile,
-  editForm,
-  setEditForm,
-  formTextareaRef,
-  formSelection,
-  setFormSelection,
-  captureFormSelection,
-  configureSelectedFormField,
-  editVars,
-  handleInsertDateVariable,
-  handleRemoveDateVar,
-  editFormFieldConfigs,
-  undoFormField,
-  updateFormFieldConfig,
-  editReplace,
-  setEditReplace,
-  visualEditorReplaceTextareaRef,
-  editDescription,
-  setEditDescription,
-  deleteSnippetFromYaml,
-  saveSnippetToYaml,
-  isSavingSnippet,
-  showAlert,
-  resetSnippetForm,
-  setSnippetEditTarget,
+  visualEditor,
+  form,
+  actions,
 }: VisualYamlEditorDialogProps) {
+  const {
+    visualEditorMode,
+    setVisualEditorMode,
+    highlightedLineRange,
+    setHighlightedLineRange,
+    pendingDeleteSelections,
+    deleteSearchQuery,
+    setDeleteSearchQuery,
+    handleUndoLastDelete,
+    handleResetDeletions,
+    visualEditorMatches,
+    toggleDeleteSelection,
+    getDeleteSelectionKey,
+    isLoadingVisualEditorYaml,
+    loadVisualEditorYaml,
+    visualEditorPreviewYamlContent,
+    pendingDeletedLineNumbers,
+  } = visualEditor;
+
+  const {
+    addErrors,
+    addWarnings,
+    isYamlWarningsEnabled,
+    editTriggersText,
+    setEditTriggersText,
+    activeSnippetKind,
+    setAddSnippetKind,
+    setAddErrors,
+    setAddWarnings,
+    editIncludeFile,
+    setEditIncludeFile,
+    chooseSnippetFile,
+    editImagePath,
+    setEditImagePath,
+    chooseSnippetImageFile,
+    editForm,
+    setEditForm,
+    formTextareaRef,
+    formSelection,
+    setFormSelection,
+    captureFormSelection,
+    configureSelectedFormField,
+    editVars,
+    handleInsertDateVariable,
+    handleRemoveDateVar,
+    editFormFieldConfigs,
+    undoFormField,
+    updateFormFieldConfig,
+    editReplace,
+    setEditReplace,
+    visualEditorReplaceTextareaRef,
+    editDescription,
+    setEditDescription,
+  } = form;
+
+  const {
+    deleteSnippetFromYaml,
+    saveSnippetToYaml,
+    isSavingSnippet,
+    showAlert,
+    resetSnippetForm,
+    setSnippetEditTarget,
+  } = actions;
+
   return (
     <Dialog
       open={isOpen}

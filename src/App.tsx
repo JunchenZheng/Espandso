@@ -264,7 +264,6 @@ function App() {
   const {
     isVisualEditorOpen,
     setIsVisualEditorOpen,
-    visualEditorYamlContent,
     isLoadingVisualEditorYaml,
     visualEditorMode,
     setVisualEditorMode,
@@ -282,8 +281,14 @@ function App() {
     visualEditorPreviewYamlContent,
     pendingDeletedLineNumbers,
     getDeleteSelectionKey,
+    applyPendingDeleteWorkflow,
   } = useVisualYamlEditor({
     selectedEspansoPreview,
+    snippetEditTarget,
+    espansoConfigs,
+    espansoMatchDir,
+    loadEspansoConfigPreview,
+    setSelectedEspansoConfigPath,
     t,
   });
 
@@ -635,30 +640,9 @@ function App() {
 
   async function saveSnippetToYaml() {
     if (visualEditorMode === "delete") {
-      const targetPath = snippetEditTarget?.preview.config.path || selectedEspansoPreview?.config.path;
-      if (!targetPath) return;
-
-      if (pendingDeleteSelections.length === 0) {
-        setIsVisualEditorOpen(false);
-        return;
-      }
-
       setIsSavingSnippet(true);
       try {
-        await markSearchIndexInternalWrite(targetPath);
-        await writeTextFile(targetPath, visualEditorYamlContent);
-        if (espansoMatchDir) {
-          refreshSearchIndexFile(targetPath, espansoMatchDir).catch((e) =>
-            console.warn("Index refresh failed:", e)
-          );
-        }
-        setPendingDeleteSelections([]);
-        const targetConfig = espansoConfigs.find((config) => config.path === targetPath);
-        if (targetConfig) {
-          await loadEspansoConfigPreview(targetConfig);
-        }
-        setSelectedEspansoConfigPath(targetPath);
-        setIsVisualEditorOpen(false);
+        await applyPendingDeleteWorkflow();
       } catch (e: any) {
         showAlert(t("errors.failedToSaveSnippet", { message: e?.message || e }), t("errors.genericError"));
       } finally {
@@ -1520,61 +1504,67 @@ function App() {
         snippetEditTarget={snippetEditTarget}
         selectedEspansoPreview={selectedEspansoPreview}
         t={t}
-        visualEditorMode={visualEditorMode}
-        setVisualEditorMode={setVisualEditorMode}
-        highlightedLineRange={highlightedLineRange}
-        setHighlightedLineRange={setHighlightedLineRange}
-        pendingDeleteSelections={pendingDeleteSelections}
-        deleteSearchQuery={deleteSearchQuery}
-        setDeleteSearchQuery={setDeleteSearchQuery}
-        handleUndoLastDelete={handleUndoLastDelete}
-        handleResetDeletions={handleResetDeletions}
-        visualEditorMatches={visualEditorMatches}
-        toggleDeleteSelection={toggleDeleteSelection}
-        getDeleteSelectionKey={getDeleteSelectionKey}
-        isLoadingVisualEditorYaml={isLoadingVisualEditorYaml}
-        loadVisualEditorYaml={loadVisualEditorYaml}
-        visualEditorPreviewYamlContent={visualEditorPreviewYamlContent}
-        pendingDeletedLineNumbers={pendingDeletedLineNumbers}
-        addErrors={addErrors}
-        addWarnings={addWarnings}
-        isYamlWarningsEnabled={isYamlWarningsEnabled}
-        editTriggersText={editTriggersText}
-        setEditTriggersText={setEditTriggersText}
-        activeSnippetKind={addSnippetKind}
-        setAddSnippetKind={setAddSnippetKind}
-        setAddErrors={setAddErrors}
-        setAddWarnings={setAddWarnings}
-        editIncludeFile={editIncludeFile}
-        setEditIncludeFile={setEditIncludeFile}
-        chooseSnippetFile={chooseSnippetFile}
-        editImagePath={editImagePath}
-        setEditImagePath={setEditImagePath}
-        chooseSnippetImageFile={chooseSnippetImageFile}
-        editForm={editForm}
-        setEditForm={setEditForm}
-        formTextareaRef={formTextareaRef}
-        formSelection={formSelection}
-        setFormSelection={setFormSelection}
-        captureFormSelection={captureFormSelection}
-        configureSelectedFormField={configureSelectedFormField}
-        editVars={editVars}
-        handleInsertDateVariable={handleInsertDateVariable}
-        handleRemoveDateVar={handleRemoveDateVar}
-        editFormFieldConfigs={editFormFieldConfigs}
-        undoFormField={undoFormField}
-        updateFormFieldConfig={updateFormFieldConfig}
-        editReplace={editReplace}
-        setEditReplace={setEditReplace}
-        visualEditorReplaceTextareaRef={visualEditorReplaceTextareaRef}
-        editDescription={editDescription}
-        setEditDescription={setEditDescription}
-        deleteSnippetFromYaml={deleteSnippetFromYaml}
-        saveSnippetToYaml={saveSnippetToYaml}
-        isSavingSnippet={isSavingSnippet}
-        showAlert={showAlert}
-        resetSnippetForm={resetSnippetForm}
-        setSnippetEditTarget={setSnippetEditTarget}
+        visualEditor={{
+          visualEditorMode,
+          setVisualEditorMode,
+          highlightedLineRange,
+          setHighlightedLineRange,
+          pendingDeleteSelections,
+          deleteSearchQuery,
+          setDeleteSearchQuery,
+          handleUndoLastDelete,
+          handleResetDeletions,
+          visualEditorMatches,
+          toggleDeleteSelection,
+          getDeleteSelectionKey,
+          isLoadingVisualEditorYaml,
+          loadVisualEditorYaml,
+          visualEditorPreviewYamlContent,
+          pendingDeletedLineNumbers,
+        }}
+        form={{
+          addErrors,
+          addWarnings,
+          isYamlWarningsEnabled,
+          editTriggersText,
+          setEditTriggersText,
+          activeSnippetKind: addSnippetKind,
+          setAddSnippetKind,
+          setAddErrors,
+          setAddWarnings,
+          editIncludeFile,
+          setEditIncludeFile,
+          chooseSnippetFile,
+          editImagePath,
+          setEditImagePath,
+          chooseSnippetImageFile,
+          editForm,
+          setEditForm,
+          formTextareaRef,
+          formSelection,
+          setFormSelection,
+          captureFormSelection,
+          configureSelectedFormField,
+          editVars,
+          handleInsertDateVariable,
+          handleRemoveDateVar,
+          editFormFieldConfigs,
+          undoFormField,
+          updateFormFieldConfig,
+          editReplace,
+          setEditReplace,
+          visualEditorReplaceTextareaRef,
+          editDescription,
+          setEditDescription,
+        }}
+        actions={{
+          deleteSnippetFromYaml,
+          saveSnippetToYaml,
+          isSavingSnippet,
+          showAlert,
+          resetSnippetForm,
+          setSnippetEditTarget,
+        }}
       />
 
       <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>

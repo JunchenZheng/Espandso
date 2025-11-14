@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
-import { readTextFile } from "@tauri-apps/plugin-fs";
+import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
+import { markSearchIndexInternalWrite, refreshSearchIndexFile } from "../../../tauri/searchIndex";
 import {
   DeleteTriggerSelection,
   deleteSelectedTriggersFromYamlContent,
@@ -8,13 +9,28 @@ import {
 } from "../../../logic/yamlEditor";
 import { importYamlContent, ImportedMatch } from "../../../logic/importYaml";
 import { EspansoConfigPreview } from "../../espanso-configs/types";
+import { EspansoConfigFile } from "../../../logic/espansoPaths";
+import { SnippetEditTarget } from "../types";
 
 export interface UseVisualYamlEditorProps {
   selectedEspansoPreview: EspansoConfigPreview | null;
+  snippetEditTarget: SnippetEditTarget | null;
+  espansoConfigs: EspansoConfigFile[];
+  espansoMatchDir: string;
+  loadEspansoConfigPreview: (config: EspansoConfigFile) => Promise<unknown>;
+  setSelectedEspansoConfigPath: (path: string) => void;
   t: (key: string, options?: any) => string;
 }
 
-export function useVisualYamlEditor({ selectedEspansoPreview, t }: UseVisualYamlEditorProps) {
+export function useVisualYamlEditor({
+  selectedEspansoPreview,
+  snippetEditTarget,
+  espansoConfigs,
+  espansoMatchDir,
+  loadEspansoConfigPreview,
+  setSelectedEspansoConfigPath,
+  t,
+}: UseVisualYamlEditorProps) {
   const [isVisualEditorOpen, setIsVisualEditorOpen] = useState<boolean>(false);
   const [visualEditorYamlContent, setVisualEditorYamlContent] = useState<string>("");
   const [isLoadingVisualEditorYaml, setIsLoadingVisualEditorYaml] = useState<boolean>(false);
@@ -24,8 +40,10 @@ export function useVisualYamlEditor({ selectedEspansoPreview, t }: UseVisualYaml
   const [deleteSearchQuery, setDeleteSearchQuery] = useState<string>("");
   const [highlightedLineRange, setHighlightedLineRange] = useState<{ startLine: number; endLine: number } | null>(null);
 
+  const activeVisualEditorPreview = snippetEditTarget?.preview || selectedEspansoPreview;
+
   const loadVisualEditorYaml = useCallback(async (pathOverride?: string, matchIndexToHighlight?: number) => {
-    const targetPath = pathOverride || selectedEspansoPreview?.config.path;
+    const targetPath = pathOverride || activeVisualEditorPreview?.config.path;
     if (!targetPath) return;
     setIsLoadingVisualEditorYaml(true);
     try {
@@ -45,7 +63,7 @@ export function useVisualYamlEditor({ selectedEspansoPreview, t }: UseVisualYaml
     } finally {
       setIsLoadingVisualEditorYaml(false);
     }
-  }, [selectedEspansoPreview, t]);
+  }, [activeVisualEditorPreview, t]);
 
   const applyPendingDeletionsToYaml = useCallback((originalContent: string, selections: DeleteTriggerSelection[]) => {
     if (selections.length === 0) {
@@ -94,10 +112,10 @@ export function useVisualYamlEditor({ selectedEspansoPreview, t }: UseVisualYaml
 
   const visualEditorMatches: ImportedMatch[] = useMemo(() => {
     if (!visualEditorOriginalYaml) return [];
-    const relPath = selectedEspansoPreview?.config.relativePath || "file.yml";
+    const relPath = activeVisualEditorPreview?.config.relativePath || "file.yml";
     const res = importYamlContent(visualEditorOriginalYaml, relPath);
     return res.importedMatches;
-  }, [visualEditorOriginalYaml, selectedEspansoPreview]);
+  }, [visualEditorOriginalYaml, activeVisualEditorPreview]);
 
   const visualEditorPreviewYamlContent = visualEditorMode === "delete"
     ? visualEditorOriginalYaml
@@ -127,6 +145,42 @@ export function useVisualYamlEditor({ selectedEspansoPreview, t }: UseVisualYaml
     }
   }, [isVisualEditorOpen, highlightedLineRange, visualEditorYamlContent]);
 
+  const applyPendingDeleteWorkflow = useCallback(async () => {
+    const targetPath = activeVisualEditorPreview?.config.path;
+    if (!targetPath) {
+      return false;
+    }
+
+    if (pendingDeleteSelections.length === 0) {
+      setIsVisualEditorOpen(false);
+      return true;
+    }
+
+    await markSearchIndexInternalWrite(targetPath);
+    await writeTextFile(targetPath, visualEditorYamlContent);
+    if (espansoMatchDir) {
+      refreshSearchIndexFile(targetPath, espansoMatchDir).catch((e) =>
+        console.warn("Index refresh failed:", e)
+      );
+    }
+    setPendingDeleteSelections([]);
+    const targetConfig = espansoConfigs.find((config) => config.path === targetPath);
+    if (targetConfig) {
+      await loadEspansoConfigPreview(targetConfig);
+    }
+    setSelectedEspansoConfigPath(targetPath);
+    setIsVisualEditorOpen(false);
+    return true;
+  }, [
+    activeVisualEditorPreview,
+    pendingDeleteSelections,
+    visualEditorYamlContent,
+    espansoMatchDir,
+    espansoConfigs,
+    loadEspansoConfigPreview,
+    setSelectedEspansoConfigPath,
+  ]);
+
   return {
     isVisualEditorOpen,
     setIsVisualEditorOpen,
@@ -151,5 +205,6 @@ export function useVisualYamlEditor({ selectedEspansoPreview, t }: UseVisualYaml
     visualEditorPreviewYamlContent,
     pendingDeletedLineNumbers,
     getDeleteSelectionKey,
+    applyPendingDeleteWorkflow,
   };
 }
