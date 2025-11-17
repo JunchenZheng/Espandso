@@ -5,11 +5,11 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "./ui/dialog";
-import { ScrollArea } from "./ui/scroll-area";
-import { Button } from "./ui/button";
-import { EspansoConfigPreview } from "../features/espanso-configs/types";
-import { useI18n } from "../i18n/useI18n";
+} from "../../../components/ui/dialog";
+import { ScrollArea } from "../../../components/ui/scroll-area";
+import { Button } from "../../../components/ui/button";
+import { EspansoConfigPreview } from "../../espanso-configs/types";
+import { useI18n } from "../../../i18n/useI18n";
 
 export interface WarningsDialogProps {
   open: boolean;

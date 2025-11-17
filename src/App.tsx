@@ -50,16 +50,13 @@ import { Switch } from "./components/ui/switch";
 import { Textarea } from "./components/ui/textarea";
 import { AboutDialog } from "./components/AboutDialog";
 import { EspansoLogDialog } from "./components/EspansoLogDialog";
-import { SearchDialog } from "./components/SearchDialog";
+import { SearchDialog } from "./features/search/components/SearchDialog";
+import { useSearchIndex } from "./features/search/hooks/useSearchIndex";
 import { refreshSearchIndexFile, markSearchIndexInternalWrite } from "./tauri/searchIndex";
-import { WarningsDialog } from "./components/WarningsDialog";
-import { SearchResult } from "./logic/snippetSearch";
-import {
-  IS_EXPERIMENTAL_BUILD,
-  getExperimentalYamlWarningsEnabled,
-  setExperimentalYamlWarningsEnabled,
-  isYamlWarningsActive,
-} from "./logic/features";
+import { WarningsDialog } from "./features/warnings/components/WarningsDialog";
+import { useYamlWarnings } from "./features/warnings/hooks/useYamlWarnings";
+
+import { IS_EXPERIMENTAL_BUILD } from "./logic/features";
 import { Snippet } from "./logic/types";
 import { validate } from "./logic/validate";
 import { getSnippetTriggers, isImageFilePath } from "./logic/snippetUtils";
@@ -141,14 +138,16 @@ function App() {
   const [isCollectionResizing, setIsCollectionResizing] = useState<boolean>(false);
   const mainSplitRef = useRef<HTMLDivElement | null>(null);
 
-  const [enableExperimentalYamlWarnings, setEnableExperimentalYamlWarnings] = useState<boolean>(() =>
-    getExperimentalYamlWarningsEnabled(),
-  );
-
-  const isYamlWarningsEnabled = useMemo(
-    () => isYamlWarningsActive(enableExperimentalYamlWarnings),
-    [enableExperimentalYamlWarnings],
-  );
+  const {
+    enableExperimentalYamlWarnings,
+    isYamlWarningsEnabled,
+    isWarningsDialogOpen,
+    setIsWarningsDialogOpen,
+    warningsFilterPath,
+    setWarningsFilterPath,
+    handleToggleExperimentalYamlWarnings,
+    openWarningsDialog,
+  } = useYamlWarnings();
 
   const {
     espansoMatchDir,
@@ -194,32 +193,19 @@ function App() {
     openCreateFolderDialog,
     handleCreateFolder,
   } = useEspansoConfigs({ isYamlWarningsEnabled });
-  const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
-  const [highlightedSnippetIndex, setHighlightedSnippetIndex] = useState<number | null>(null);
+
+  const {
+    isSearchOpen,
+    setIsSearchOpen,
+    highlightedSnippetIndex,
+    handleSelectSearchResult,
+  } = useSearchIndex({
+    onSelectConfigPath: setSelectedEspansoConfigPath,
+  });
+
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isLogOpen, setIsLogOpen] = useState<boolean>(false);
   const [isAboutOpen, setIsAboutOpen] = useState<boolean>(false);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        setIsSearchOpen((prev) => !prev);
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
-
-  const handleSelectSearchResult = useCallback((result: SearchResult) => {
-    setSelectedEspansoConfigPath(result.filePath);
-    setHighlightedSnippetIndex(result.snippetIndex);
-
-    // Clear highlight after 2.5 seconds
-    setTimeout(() => {
-      setHighlightedSnippetIndex((prev) => (prev === result.snippetIndex ? null : prev));
-    }, 2500);
-  }, []);
   const {
     isOpen: isAddSnippetOpen,
     setIsOpen: setIsAddSnippetOpen,
@@ -293,10 +279,7 @@ function App() {
   });
 
 
-  const handleToggleExperimentalYamlWarnings = (checked: boolean) => {
-    setEnableExperimentalYamlWarnings(checked);
-    setExperimentalYamlWarningsEnabled(checked);
-  };
+
 
   const updateCollectionPaneWidth = useCallback((clientX: number) => {
     const split = mainSplitRef.current;
@@ -397,9 +380,7 @@ function App() {
     [t],
   );
 
-  // Warnings Dialog State
-  const [isWarningsDialogOpen, setIsWarningsDialogOpen] = useState<boolean>(false);
-  const [warningsFilterPath, setWarningsFilterPath] = useState<string | null>(null);
+
 
   async function addDroppedYamlPreview(path: string) {
     if (isAddSnippetOpen) {
@@ -971,10 +952,7 @@ function App() {
                       }
                       onAddSnippet={openAddSnippetDialog}
                       onOpenVisualEditor={openVisualEditorDialog}
-                      onOpenWarnings={(path) => {
-                        setWarningsFilterPath(path);
-                        setIsWarningsDialogOpen(true);
-                      }}
+                      onOpenWarnings={(path) => openWarningsDialog(path)}
                       onBatchDelete={(matchIndices, onComplete) =>
                         batchDeleteSnippetsFromYaml(
                           selectedEspansoPreview.config.path,

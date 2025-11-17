@@ -5,27 +5,27 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "./ui/dialog";
-import { Input } from "./ui/input";
-import { ScrollArea } from "./ui/scroll-area";
-import { useI18n } from "../i18n/useI18n";
+} from "../../../components/ui/dialog";
+import { Input } from "../../../components/ui/input";
+import { ScrollArea } from "../../../components/ui/scroll-area";
+import { useI18n } from "../../../i18n/useI18n";
 import {
   searchSnippets,
   SearchScope,
   SearchResult,
   SearchableConfigPreview,
-} from "../logic/snippetSearch";
-import { getSnippetTriggers } from "../logic/snippetUtils";
-import { cn } from "../lib/utils";
+} from "../../../logic/snippetSearch";
+import { getSnippetTriggers } from "../../../logic/snippetUtils";
+import { cn } from "../../../lib/utils";
 import {
   searchSnippetIndex,
   SearchIndexStatus,
   SearchIndexResult,
-} from "../tauri/searchIndex";
+} from "../../../tauri/searchIndex";
 
 const SEARCH_PAGE_SIZE = 50;
 
-interface SearchDialogProps<T extends SearchableConfigPreview> {
+export interface SearchDialogProps<T extends SearchableConfigPreview> {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   previews: T[];
