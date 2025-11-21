@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { SearchResult } from "../../../logic/snippetSearch";
 
 export interface UseSearchIndexOptions {
@@ -9,6 +9,7 @@ export function useSearchIndex(options: UseSearchIndexOptions = {}) {
   const { onSelectConfigPath } = options;
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
   const [highlightedSnippetIndex, setHighlightedSnippetIndex] = useState<number | null>(null);
+  const clearHighlightTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -21,6 +22,14 @@ export function useSearchIndex(options: UseSearchIndexOptions = {}) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (clearHighlightTimeoutRef.current !== null) {
+        window.clearTimeout(clearHighlightTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const handleSelectSearchResult = useCallback(
     (result: SearchResult, overrideSelectPath?: (path: string) => void) => {
       const selectPath = overrideSelectPath || onSelectConfigPath;
@@ -29,8 +38,12 @@ export function useSearchIndex(options: UseSearchIndexOptions = {}) {
       }
       setHighlightedSnippetIndex(result.snippetIndex);
 
-      setTimeout(() => {
+      if (clearHighlightTimeoutRef.current !== null) {
+        window.clearTimeout(clearHighlightTimeoutRef.current);
+      }
+      clearHighlightTimeoutRef.current = window.setTimeout(() => {
         setHighlightedSnippetIndex((prev) => (prev === result.snippetIndex ? null : prev));
+        clearHighlightTimeoutRef.current = null;
       }, 2500);
     },
     [onSelectConfigPath],

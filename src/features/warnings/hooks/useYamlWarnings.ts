@@ -5,6 +5,41 @@ import {
   setExperimentalYamlWarningsEnabled,
 } from "../../../logic/features";
 
+export interface YamlWarningsDialogState {
+  isOpen: boolean;
+  filterPath: string | null;
+}
+
+const initialDialogState: YamlWarningsDialogState = {
+  isOpen: false,
+  filterPath: null,
+};
+
+export function openYamlWarningsDialogState(
+  state: YamlWarningsDialogState,
+  filterPath?: string | null,
+): YamlWarningsDialogState {
+  return {
+    ...state,
+    isOpen: true,
+    filterPath: filterPath ?? null,
+  };
+}
+
+export function closeYamlWarningsDialogState(state: YamlWarningsDialogState): YamlWarningsDialogState {
+  return {
+    ...state,
+    isOpen: false,
+  };
+}
+
+export function clearYamlWarningsFilterState(state: YamlWarningsDialogState): YamlWarningsDialogState {
+  return {
+    ...state,
+    filterPath: null,
+  };
+}
+
 export function useYamlWarnings() {
   const [enableExperimentalYamlWarnings, setEnableExperimentalYamlWarnings] = useState<boolean>(() =>
     getExperimentalYamlWarningsEnabled()
@@ -15,8 +50,7 @@ export function useYamlWarnings() {
     [enableExperimentalYamlWarnings]
   );
 
-  const [isWarningsDialogOpen, setIsWarningsDialogOpen] = useState<boolean>(false);
-  const [warningsFilterPath, setWarningsFilterPath] = useState<string | null>(null);
+  const [dialogState, setDialogState] = useState<YamlWarningsDialogState>(initialDialogState);
 
   const handleToggleExperimentalYamlWarnings = (checked: boolean) => {
     setEnableExperimentalYamlWarnings(checked);
@@ -24,25 +58,24 @@ export function useYamlWarnings() {
   };
 
   const openWarningsDialog = (filterPath?: string) => {
-    setWarningsFilterPath(filterPath ?? null);
-    setIsWarningsDialogOpen(true);
+    setDialogState((state) => openYamlWarningsDialogState(state, filterPath));
   };
 
   const closeWarningsDialog = () => {
-    setIsWarningsDialogOpen(false);
+    setDialogState(closeYamlWarningsDialogState);
   };
 
   const clearWarningsFilter = () => {
-    setWarningsFilterPath(null);
+    setDialogState(clearYamlWarningsFilterState);
   };
 
   return {
     enableExperimentalYamlWarnings,
     isYamlWarningsEnabled,
-    isWarningsDialogOpen,
-    setIsWarningsDialogOpen,
-    warningsFilterPath,
-    setWarningsFilterPath,
+    isWarningsDialogOpen: dialogState.isOpen,
+    setIsWarningsDialogOpen: (isOpen: boolean) => setDialogState((state) => ({ ...state, isOpen })),
+    warningsFilterPath: dialogState.filterPath,
+    setWarningsFilterPath: (filterPath: string | null) => setDialogState((state) => ({ ...state, filterPath })),
     handleToggleExperimentalYamlWarnings,
     openWarningsDialog,
     closeWarningsDialog,
