@@ -18,7 +18,7 @@ import {
   DialogTitle,
 } from "./ui/dialog";
 import { Button } from "./ui/button";
-import { getEspansoLog } from "../tauri/espansoRuntime";
+import { getEspansoLog } from "../services/espansoRuntimeService";
 import { useI18n } from "../i18n/useI18n";
 
 interface EspansoLogDialogProps {

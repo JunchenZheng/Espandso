@@ -1,5 +1,5 @@
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { readFile, readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
+import { readFile } from "@tauri-apps/plugin-fs";
 import { listen } from "@tauri-apps/api/event";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { openPath } from "@tauri-apps/plugin-opener";
@@ -52,7 +52,6 @@ import { AboutDialog } from "./components/AboutDialog";
 import { EspansoLogDialog } from "./components/EspansoLogDialog";
 import { SearchDialog } from "./features/search/components/SearchDialog";
 import { useSearchIndex } from "./features/search/hooks/useSearchIndex";
-import { refreshSearchIndexFile, markSearchIndexInternalWrite } from "./tauri/searchIndex";
 import { WarningsDialog } from "./features/warnings/components/WarningsDialog";
 import { useYamlWarnings } from "./features/warnings/hooks/useYamlWarnings";
 
@@ -60,9 +59,13 @@ import { IS_EXPERIMENTAL_BUILD } from "./logic/features";
 import { Snippet } from "./logic/types";
 import { validate } from "./logic/validate";
 import { getSnippetTriggers, isImageFilePath } from "./logic/snippetUtils";
-import { appendSnippetToYamlContent, deleteSnippetFromYamlContent, deleteMultipleSnippetsFromYamlContent, replaceSnippetInYamlContent } from "./logic/yamlEditor";
 import { checkIsBinaryFilePath, isBinaryDomFile } from "./logic/fileCheck";
 import { cn } from "./lib/utils";
+import {
+  saveSnippetToYaml,
+  deleteSnippetFromYaml,
+  batchDeleteSnippetsFromYaml,
+} from "./repositories/snippetYamlRepository";
 
 import { EmptyState } from "./components/shared/EmptyState";
 import { DateInsertMenu } from "./features/snippets/components/DateInsertMenu";
@@ -666,17 +669,12 @@ function App() {
 
     setIsSavingSnippet(true);
     try {
-      const content = await readTextFile(targetPreview.config.path);
-      const updatedContent = snippetEditTarget
-        ? replaceSnippetInYamlContent(content, snippetEditTarget.match.originalMatchIndex, snippet)
-        : appendSnippetToYamlContent(content, snippet);
-      await markSearchIndexInternalWrite(targetPreview.config.path);
-      await writeTextFile(targetPreview.config.path, updatedContent);
-      if (espansoMatchDir) {
-        refreshSearchIndexFile(targetPreview.config.path, espansoMatchDir).catch((e) =>
-          console.warn("Index refresh failed:", e)
-        );
-      }
+      await saveSnippetToYaml(
+        targetPreview.config.path,
+        snippet,
+        snippetEditTarget?.match.originalMatchIndex,
+        espansoMatchDir || undefined
+      );
       // Espanso has its own hot-reload path for match files. Keep restart disabled
       // while testing which edits actually require the more expensive CLI restart.
       const savedMatchIndex = snippetEditTarget
@@ -706,15 +704,11 @@ function App() {
       t("dialogs.confirmDelete.message", { trigger: displayTrigger, file: target.preview.config.relativePath }),
       async () => {
         try {
-          const content = await readTextFile(target.preview.config.path);
-          const updatedContent = deleteSnippetFromYamlContent(content, target.match.originalMatchIndex);
-          await markSearchIndexInternalWrite(target.preview.config.path);
-          await writeTextFile(target.preview.config.path, updatedContent);
-          if (espansoMatchDir) {
-            refreshSearchIndexFile(target.preview.config.path, espansoMatchDir).catch((e) =>
-              console.warn("Index refresh failed:", e)
-            );
-          }
+          await deleteSnippetFromYaml(
+            target.preview.config.path,
+            target.match.originalMatchIndex,
+            espansoMatchDir || undefined
+          );
           // Espanso has its own hot-reload path for match files. Keep restart disabled
           // while testing which edits actually require the more expensive CLI restart.
           resetSnippetForm();
@@ -748,15 +742,11 @@ function App() {
       t("dialogs.confirmBatchDelete.message", { count: matchIndices.length, file: relativePath }),
       async () => {
         try {
-          const content = await readTextFile(configPath);
-          const updatedContent = deleteMultipleSnippetsFromYamlContent(content, matchIndices);
-          await markSearchIndexInternalWrite(configPath);
-          await writeTextFile(configPath, updatedContent);
-          if (espansoMatchDir) {
-            refreshSearchIndexFile(configPath, espansoMatchDir).catch((e) =>
-              console.warn("Index refresh failed:", e)
-            );
-          }
+          await batchDeleteSnippetsFromYaml(
+            configPath,
+            matchIndices,
+            espansoMatchDir || undefined
+          );
           const targetConfig = espansoConfigs.find((config) => config.path === configPath);
           if (targetConfig) {
             await loadEspansoConfigPreview(targetConfig);

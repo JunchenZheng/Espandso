@@ -1,6 +1,5 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
-import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
-import { markSearchIndexInternalWrite, refreshSearchIndexFile } from "../../../tauri/searchIndex";
+import { readYamlFile, writeYamlFile } from "../../../repositories/snippetYamlRepository";
 import {
   DeleteTriggerSelection,
   deleteSelectedTriggersFromYamlContent,
@@ -47,7 +46,7 @@ export function useVisualYamlEditor({
     if (!targetPath) return;
     setIsLoadingVisualEditorYaml(true);
     try {
-      const content = await readTextFile(targetPath);
+      const content = await readYamlFile(targetPath);
       setVisualEditorOriginalYaml(content);
       setVisualEditorYamlContent(content);
       setPendingDeleteSelections([]);
@@ -156,13 +155,7 @@ export function useVisualYamlEditor({
       return true;
     }
 
-    await markSearchIndexInternalWrite(targetPath);
-    await writeTextFile(targetPath, visualEditorYamlContent);
-    if (espansoMatchDir) {
-      refreshSearchIndexFile(targetPath, espansoMatchDir).catch((e) =>
-        console.warn("Index refresh failed:", e)
-      );
-    }
+    await writeYamlFile(targetPath, visualEditorYamlContent, espansoMatchDir || undefined);
     setPendingDeleteSelections([]);
     const targetConfig = espansoConfigs.find((config) => config.path === targetPath);
     if (targetConfig) {
