@@ -27,7 +27,7 @@ export async function writeYamlFile(path: string, content: string, matchDir?: st
   }
 }
 
-export async function saveSnippetToYaml(
+export async function saveSnippetToYamlFile(
   path: string,
   snippet: Snippet,
   originalMatchIndex?: number,
@@ -41,7 +41,7 @@ export async function saveSnippetToYaml(
   return updatedContent;
 }
 
-export async function deleteSnippetFromYaml(
+export async function deleteSnippetFromYamlFile(
   path: string,
   originalMatchIndex: number,
   matchDir?: string,
@@ -52,7 +52,7 @@ export async function deleteSnippetFromYaml(
   return updatedContent;
 }
 
-export async function batchDeleteSnippetsFromYaml(
+export async function batchDeleteSnippetsFromYamlFile(
   path: string,
   matchIndices: number[],
   matchDir?: string,
@@ -63,7 +63,7 @@ export async function batchDeleteSnippetsFromYaml(
   return updatedContent;
 }
 
-export async function deleteSelectedTriggersFromYaml(
+export async function deleteSelectedTriggersFromYamlFile(
   path: string,
   selections: DeleteTriggerSelection[],
   matchDir?: string,

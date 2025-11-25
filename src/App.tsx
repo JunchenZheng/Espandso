@@ -62,9 +62,9 @@ import { getSnippetTriggers, isImageFilePath } from "./logic/snippetUtils";
 import { checkIsBinaryFilePath, isBinaryDomFile } from "./logic/fileCheck";
 import { cn } from "./lib/utils";
 import {
-  saveSnippetToYaml,
-  deleteSnippetFromYaml,
-  batchDeleteSnippetsFromYaml,
+  saveSnippetToYamlFile,
+  deleteSnippetFromYamlFile,
+  batchDeleteSnippetsFromYamlFile,
 } from "./repositories/snippetYamlRepository";
 
 import { EmptyState } from "./components/shared/EmptyState";
@@ -669,7 +669,7 @@ function App() {
 
     setIsSavingSnippet(true);
     try {
-      await saveSnippetToYaml(
+      await saveSnippetToYamlFile(
         targetPreview.config.path,
         snippet,
         snippetEditTarget?.match.originalMatchIndex,
@@ -704,7 +704,7 @@ function App() {
       t("dialogs.confirmDelete.message", { trigger: displayTrigger, file: target.preview.config.relativePath }),
       async () => {
         try {
-          await deleteSnippetFromYaml(
+          await deleteSnippetFromYamlFile(
             target.preview.config.path,
             target.match.originalMatchIndex,
             espansoMatchDir || undefined
@@ -742,7 +742,7 @@ function App() {
       t("dialogs.confirmBatchDelete.message", { count: matchIndices.length, file: relativePath }),
       async () => {
         try {
-          await batchDeleteSnippetsFromYaml(
+          await batchDeleteSnippetsFromYamlFile(
             configPath,
             matchIndices,
             espansoMatchDir || undefined
