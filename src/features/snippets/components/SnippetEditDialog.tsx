@@ -1,4 +1,5 @@
 import type { RefObject } from "react";
+import type { DateFormatOption } from "../../../logic/dateFormats";
 import {
   AlertTriangle,
   AlignLeft,
@@ -32,7 +33,7 @@ import { useI18n } from "../../../i18n/useI18n";
 import { cn } from "../../../lib/utils";
 import { isImageFilePath } from "../../../logic/snippetUtils";
 import { isBinaryDomFile } from "../../../logic/fileCheck";
-import type { SnippetVar } from "../../../logic/types";
+import type { SnippetVar, ValidationError } from "../../../logic/types";
 import { DateInsertMenu } from "./DateInsertMenu";
 import { DateVariableList } from "./DateVariableList";
 import type { EspansoConfigPreview } from "../../espanso-configs/types";
@@ -49,13 +50,9 @@ import {
   snippetKindLabel,
 } from "../formSnippet";
 
-interface SnippetEditDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  snippetEditTarget: SnippetEditTarget | null;
-  selectedEspansoPreview: EspansoConfigPreview | null;
+export interface SnippetEditDialogFormProps {
   isYamlWarningsEnabled: boolean;
-  addErrors: Array<{ message: string }>;
+  addErrors: ValidationError[];
   addWarnings: string[];
   editTriggersText: string;
   setEditTriggersText: (val: string) => void;
@@ -77,7 +74,7 @@ interface SnippetEditDialogProps {
   captureFormSelection: (textarea: HTMLTextAreaElement) => boolean;
   configureSelectedFormField: (control: FormFieldControl) => void;
   editVars: SnippetVar[];
-  handleInsertDateVariable: (opt: any, target: "replace" | "form") => void;
+  handleInsertDateVariable: (opt: DateFormatOption, target: "replace" | "form") => void;
   handleRemoveDateVar: (key: string) => void;
   editFormFieldConfigs: FormFieldConfig[];
   undoFormField: (fieldId: string) => void;
@@ -87,12 +84,24 @@ interface SnippetEditDialogProps {
   replaceTextareaRef: RefObject<HTMLTextAreaElement | null>;
   editDescription: string;
   setEditDescription: (val: string) => void;
-  onDeleteSnippet: (target: SnippetEditTarget) => void;
-  onSaveSnippet: () => void;
+}
+
+export interface SnippetEditDialogActionProps {
+  deleteSnippetFromYaml: (target: SnippetEditTarget) => void;
+  saveSnippetToYaml: () => void;
   isSavingSnippet: boolean;
   showAlert: (description: string, title?: string) => void;
   resetSnippetForm: () => void;
   setSnippetEditTarget: (target: SnippetEditTarget | null) => void;
+}
+
+interface SnippetEditDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  snippetEditTarget: SnippetEditTarget | null;
+  selectedEspansoPreview: EspansoConfigPreview | null;
+  form: SnippetEditDialogFormProps;
+  actions: SnippetEditDialogActionProps;
 }
 
 export function SnippetEditDialog({
@@ -100,47 +109,55 @@ export function SnippetEditDialog({
   onOpenChange,
   snippetEditTarget,
   selectedEspansoPreview,
-  isYamlWarningsEnabled,
-  addErrors,
-  addWarnings,
-  editTriggersText,
-  setEditTriggersText,
-  activeSnippetKind,
-  setAddSnippetKind,
-  setAddErrors,
-  setAddWarnings,
-  editIncludeFile,
-  setEditIncludeFile,
-  chooseSnippetFile,
-  editImagePath,
-  setEditImagePath,
-  chooseSnippetImageFile,
-  editForm,
-  setEditForm,
-  formTextareaRef,
-  formSelection,
-  setFormSelection,
-  captureFormSelection,
-  configureSelectedFormField,
-  editVars,
-  handleInsertDateVariable,
-  handleRemoveDateVar,
-  editFormFieldConfigs,
-  undoFormField,
-  updateFormFieldConfig,
-  editReplace,
-  setEditReplace,
-  replaceTextareaRef,
-  editDescription,
-  setEditDescription,
-  onDeleteSnippet,
-  onSaveSnippet,
-  isSavingSnippet,
-  showAlert,
-  resetSnippetForm,
-  setSnippetEditTarget,
+  form,
+  actions,
 }: SnippetEditDialogProps) {
   const { t } = useI18n();
+
+  const {
+    isYamlWarningsEnabled,
+    addErrors,
+    addWarnings,
+    editTriggersText,
+    setEditTriggersText,
+    activeSnippetKind,
+    setAddSnippetKind,
+    setAddErrors,
+    setAddWarnings,
+    editIncludeFile,
+    setEditIncludeFile,
+    chooseSnippetFile,
+    editImagePath,
+    setEditImagePath,
+    chooseSnippetImageFile,
+    editForm,
+    setEditForm,
+    formTextareaRef,
+    formSelection,
+    setFormSelection,
+    captureFormSelection,
+    configureSelectedFormField,
+    editVars,
+    handleInsertDateVariable,
+    handleRemoveDateVar,
+    editFormFieldConfigs,
+    undoFormField,
+    updateFormFieldConfig,
+    editReplace,
+    setEditReplace,
+    replaceTextareaRef,
+    editDescription,
+    setEditDescription,
+  } = form;
+
+  const {
+    deleteSnippetFromYaml,
+    saveSnippetToYaml,
+    isSavingSnippet,
+    showAlert,
+    resetSnippetForm,
+    setSnippetEditTarget,
+  } = actions;
 
   const snippetDialogTitle = snippetEditTarget
     ? t("snippets.editKindSnippetTitle", { kind: snippetKindLabel(activeSnippetKind, t) })
@@ -594,7 +611,7 @@ export function SnippetEditDialog({
           {snippetEditTarget && (
             <Button
               variant="destructive"
-              onClick={() => onDeleteSnippet(snippetEditTarget)}
+              onClick={() => deleteSnippetFromYaml(snippetEditTarget)}
             >
               <Trash2 className="h-4 w-4" />
               {t("actions.delete")}
@@ -604,7 +621,7 @@ export function SnippetEditDialog({
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               {t("actions.cancel")}
             </Button>
-            <Button onClick={onSaveSnippet} disabled={isSavingSnippet}>
+            <Button onClick={saveSnippetToYaml} disabled={isSavingSnippet}>
               {isSavingSnippet ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               {snippetEditTarget ? t("actions.updateYaml") : t("actions.saveToYaml")}
             </Button>

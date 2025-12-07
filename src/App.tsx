@@ -1,78 +1,42 @@
-import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { readFile } from "@tauri-apps/plugin-fs";
 import { listen } from "@tauri-apps/api/event";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { openPath } from "@tauri-apps/plugin-opener";
-import {
-  FilePlus,
-  FileText,
-  FolderOpen,
-  FolderPlus,
-  Loader2,
-  RefreshCw,
-} from "lucide-react";
 import "./App.css";
 
 import { useI18n } from "./i18n/useI18n";
-import { Button } from "./components/ui/button";
-import { ScrollArea } from "./components/ui/scroll-area";
 import { AboutDialog } from "./components/AboutDialog";
 import { EspansoLogDialog } from "./components/EspansoLogDialog";
-import { EmptyState } from "./components/shared/EmptyState";
 import { ConfirmAlertDialog, type AlertDialogState } from "./components/shared/ConfirmAlertDialog";
-
 import { SearchDialog } from "./features/search/components/SearchDialog";
 import { useSearchIndex } from "./features/search/hooks/useSearchIndex";
-
 import { WarningsDialog } from "./features/warnings/components/WarningsDialog";
 import { useYamlWarnings } from "./features/warnings/hooks/useYamlWarnings";
-
 import { Snippet } from "./logic/types";
 import { validate } from "./logic/validate";
 import { getSnippetTriggers, isImageFilePath } from "./logic/snippetUtils";
 import { checkIsBinaryFilePath } from "./logic/fileCheck";
-import { cn } from "./lib/utils";
 import {
   saveSnippetToYamlFile,
   deleteSnippetFromYamlFile,
   batchDeleteSnippetsFromYamlFile,
 } from "./repositories/snippetYamlRepository";
-
-import { AppHeader } from "./features/app-shell/components/AppHeader";
+import { AppWorkspace } from "./features/app-shell/components/AppWorkspace";
 import { DragOverlay } from "./features/app-shell/components/DragOverlay";
 import { SettingsDialog } from "./features/app-shell/components/SettingsDialog";
-
-import { EspansoConfigTreeNode } from "./features/espanso-configs/components/EspansoConfigTreeNode";
-import { EspansoConfigDetail } from "./features/espanso-configs/components/EspansoConfigDetail";
-import { EspansoDirectoryDetail } from "./features/espanso-configs/components/EspansoDirectoryDetail";
 import { CreateFileDialog } from "./features/espanso-configs/components/CreateFileDialog";
 import { CreateFolderDialog } from "./features/espanso-configs/components/CreateFolderDialog";
 import { useEspansoConfigs } from "./features/espanso-configs/hooks/useEspansoConfigs";
-
 import { useVisualYamlEditor } from "./features/snippets/hooks/useVisualYamlEditor";
 import { VisualYamlEditorDialog } from "./features/snippets/components/VisualYamlEditorDialog";
 import { SnippetEditDialog } from "./features/snippets/components/SnippetEditDialog";
 import { useSnippetEditor } from "./features/snippets/hooks/useSnippetEditor";
-
 export type { EspansoConfigPreview } from "./features/espanso-configs/types";
-import type {
-  FormFieldConfig,
-  FormFieldControl,
-  SnippetEditTarget,
-} from "./features/snippets/types";
-import {
-  areFormFieldConfigsEqual,
-  buildUniqueFormFieldId,
-  createDefaultFormFieldConfig,
-  escapeRegExp,
-  extractFormFieldNames,
-  getSelectedFormFieldId,
-  normalizeFormFieldConfigs,
-} from "./features/snippets/formSnippet";
+import type { SnippetEditTarget } from "./features/snippets/types";
 
 interface DragDropPayload {
   paths: string[];
-  position: { x: number; y: number };
 }
 
 const DEFAULT_COLLECTION_PANE_WIDTH = 20;
@@ -174,7 +138,6 @@ function App() {
     form: editForm,
     setForm: setEditForm,
     formFieldConfigs: editFormFieldConfigs,
-    setFormFieldConfigs: setEditFormFieldConfigs,
     formSelection,
     setFormSelection,
     description: editDescription,
@@ -193,6 +156,10 @@ function App() {
     openEdit: openSnippetEditorEdit,
     insertDateOption: handleInsertDateVariable,
     removeVar: handleRemoveDateVar,
+    updateFormFieldConfig,
+    undoFormField,
+    captureFormSelection,
+    configureSelectedFormField,
     buildSnippetObject: buildFormSnippet,
   } = useSnippetEditor();
 
@@ -397,16 +364,6 @@ function App() {
     };
   }, [addSnippetKind, espansoConfigs, isAddSnippetOpen, snippetEditTarget]);
 
-  const detectedFormFieldNames = useMemo(() => extractFormFieldNames(editForm), [editForm]);
-  const detectedFormFieldKey = detectedFormFieldNames.join("\n");
-
-  useEffect(() => {
-    setEditFormFieldConfigs((current) => {
-      const normalized = normalizeFormFieldConfigs(detectedFormFieldNames, current);
-      return areFormFieldConfigsEqual(current, normalized) ? current : normalized;
-    });
-  }, [detectedFormFieldKey]);
-
   function openVisualEditorDialog() {
     if (!selectedEspansoPreview) {
       showAlert(t("errors.selectConfigBeforeAddingSnippet"), t("errors.noConfigSelected"));
@@ -428,82 +385,6 @@ function App() {
       return;
     }
     openSnippetEditorAdd();
-  }
-
-  function openEditSnippetDialog(target: SnippetEditTarget) {
-    openSnippetEditorEdit(target);
-  }
-
-  function updateFormFieldConfig(id: string, patch: Partial<FormFieldConfig>) {
-    setEditFormFieldConfigs((current) => current.map((field) => (
-      field.id === id ? { ...field, ...patch } : field
-    )));
-  }
-
-  function undoFormField(fieldId: string) {
-    const placeholderPattern = new RegExp(`\\[\\[\\s*${escapeRegExp(fieldId)}\\s*\\]\\]`, "g");
-    const nextForm = editForm.replace(placeholderPattern, fieldId);
-
-    setEditForm(nextForm);
-    setEditFormFieldConfigs((current) => current.filter((field) => field.id !== fieldId));
-    setFormSelection(null);
-
-    requestAnimationFrame(() => {
-      formTextareaRef.current?.focus();
-    });
-  }
-
-  function captureFormSelection(textarea: HTMLTextAreaElement) {
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const selectedText = textarea.value.slice(start, end);
-
-    if (!selectedText.trim()) {
-      setFormSelection(null);
-      return false;
-    }
-
-    setFormSelection({
-      start,
-      end,
-      text: selectedText,
-    });
-    return true;
-  }
-
-  function configureSelectedFormField(control: FormFieldControl) {
-    if (!formSelection) return;
-
-    const selectedText = formSelection.text;
-    const selectedFieldId = getSelectedFormFieldId(selectedText);
-    const isExistingPlaceholder = /^\s*\[\[[^\][\n]+\]\]\s*$/.test(selectedText);
-    const existingFieldNames = extractFormFieldNames(editForm);
-    const fieldId = isExistingPlaceholder
-      ? selectedFieldId
-      : buildUniqueFormFieldId(selectedFieldId, existingFieldNames);
-    const placeholder = `[[${fieldId}]]`;
-    const nextForm = isExistingPlaceholder
-      ? editForm
-      : `${editForm.slice(0, formSelection.start)}${placeholder}${editForm.slice(formSelection.end)}`;
-
-    setEditForm(nextForm);
-    setEditFormFieldConfigs((current) => {
-      const next = normalizeFormFieldConfigs(extractFormFieldNames(nextForm), current);
-      const existing = next.find((field) => field.id === fieldId);
-      if (existing) {
-        return next.map((field) => (field.id === fieldId ? { ...field, control } : field));
-      }
-      return [...next, { ...createDefaultFormFieldConfig(fieldId), control }];
-    });
-    setFormSelection(null);
-
-    requestAnimationFrame(() => {
-      const textarea = formTextareaRef.current;
-      if (!textarea) return;
-      const cursor = isExistingPlaceholder ? formSelection.end : formSelection.start + placeholder.length;
-      textarea.focus();
-      textarea.setSelectionRange(cursor, cursor);
-    });
   }
 
   async function chooseSnippetFile() {
@@ -700,6 +581,52 @@ function App() {
     }
   }
 
+  const snippetEditorForm = {
+    addErrors,
+    addWarnings,
+    isYamlWarningsEnabled,
+    editTriggersText,
+    setEditTriggersText,
+    activeSnippetKind: addSnippetKind,
+    setAddSnippetKind,
+    setAddErrors,
+    setAddWarnings,
+    editIncludeFile,
+    setEditIncludeFile,
+    chooseSnippetFile,
+    editImagePath,
+    setEditImagePath,
+    chooseSnippetImageFile,
+    editForm,
+    setEditForm,
+    formTextareaRef,
+    formSelection,
+    setFormSelection,
+    captureFormSelection,
+    configureSelectedFormField,
+    editVars,
+    handleInsertDateVariable,
+    handleRemoveDateVar,
+    editFormFieldConfigs,
+    undoFormField,
+    updateFormFieldConfig,
+    editReplace,
+    setEditReplace,
+    replaceTextareaRef,
+    visualEditorReplaceTextareaRef,
+    editDescription,
+    setEditDescription,
+  };
+
+  const snippetEditorActions = {
+    deleteSnippetFromYaml,
+    saveSnippetToYaml,
+    isSavingSnippet,
+    showAlert,
+    resetSnippetForm,
+    setSnippetEditTarget,
+  };
+
   return (
     <div className="app-shell">
       <DragOverlay
@@ -708,203 +635,57 @@ function App() {
         addSnippetKind={addSnippetKind}
       />
 
-      <main className="flex h-full w-full overflow-hidden bg-[linear-gradient(180deg,hsl(var(--background))_0%,hsl(var(--secondary))_100%)] p-4">
-        <div className="flex h-full w-full flex-col rounded-lg border bg-secondary/40 p-4 text-left shadow-sm">
-          {espansoConfigs.length > 0 ? (
-            <div className="flex min-h-0 flex-1 flex-col gap-3">
-              <AppHeader
-                espansoMatchDir={espansoMatchDir}
-                isScanningEspanso={isScanningEspanso}
-                onOpenSearch={() => setIsSearchOpen(true)}
-                onRefresh={() => scanDefaultEspansoConfigDir()}
-                onOpenLogs={() => setIsLogOpen(true)}
-                onOpenSettings={() => setIsSettingsOpen(true)}
-              />
-
-              <div
-                ref={mainSplitRef}
-                className="home-split grid min-h-0 flex-1 overflow-hidden rounded-md border bg-background"
-                style={{ "--collection-pane-width": `${collectionPaneWidth}%` } as CSSProperties}
-              >
-                <aside className="flex min-h-0 flex-col border-b bg-secondary/30 md:border-b-0">
-                  <div className="flex h-10 shrink-0 items-center justify-between border-b px-3">
-                    <h2 className="text-lg font-semibold">{t("navigation.collection")}</h2>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 w-7 p-0"
-                        title={activeDirectoryRelPath ? t("filesystem.createFolderIn", { path: `/${activeDirectoryRelPath}` }) : t("filesystem.createFolder")}
-                        onClick={() => openCreateFolderDialog()}
-                      >
-                        <FolderPlus className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 w-7 p-0"
-                        title={activeDirectoryRelPath ? t("filesystem.createFileIn", { path: `/${activeDirectoryRelPath}` }) : t("filesystem.createFile")}
-                        onClick={() => openCreateFileDialog()}
-                      >
-                        <FilePlus className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                  <ScrollArea className="min-h-0 flex-1">
-                    <div className="space-y-1 p-2">
-                      {espansoPreviewTree.map((node) => (
-                        <EspansoConfigTreeNode
-                          key={node.path}
-                          node={node}
-                          activePath={selectedEspansoConfigPath}
-                          activeAncestorPaths={activeEspansoAncestorPaths}
-                          onSelect={setSelectedEspansoConfigPath}
-                          onOpenFile={openYamlFileInDefaultApp}
-                          onCreateFile={openCreateFileDialog}
-                          onCreateFolder={openCreateFolderDialog}
-                        />
-                      ))}
-                    </div>
-                  </ScrollArea>
-                </aside>
-
-                <button
-                  type="button"
-                  className={cn(
-                    "hidden cursor-col-resize border-x bg-border/40 transition-colors hover:bg-primary/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:block",
-                    isCollectionResizing && "bg-primary/40",
-                  )}
-                  aria-label={t("navigation.resizeCollectionPane")}
-                  title={t("navigation.resizeCollectionPane")}
-                  onPointerDown={startCollectionResize}
-                  onPointerMove={handleCollectionResizeMove}
-                  onPointerUp={stopCollectionResize}
-                  onPointerCancel={stopCollectionResize}
-                />
-
-                <section className="flex min-h-0 min-w-0 flex-col">
-                  {selectedEspansoPreview && (isLoadingSelectedPreview || !isSelectedPreviewLoaded) ? (
-                    <div className="flex h-full min-h-56 flex-col items-center justify-center p-6 text-center">
-                      <Loader2 className="mb-3 h-7 w-7 animate-spin text-primary" />
-                      <h3 className="text-sm font-semibold">{selectedEspansoPreview.config.relativePath}</h3>
-                      <p className="mt-2 max-w-sm text-sm text-muted-foreground">
-                        {selectedPreviewError || t("status.loadingYamlPreview")}
-                      </p>
-                    </div>
-                  ) : selectedEspansoPreview ? (
-                    <EspansoConfigDetail
-                      preview={selectedEspansoPreview}
-                      highlightedIndex={highlightedSnippetIndex}
-                      onViewSnippet={(match, index) =>
-                        openEditSnippetDialog({
-                          preview: selectedEspansoPreview,
-                          match,
-                          displayIndex: index,
-                        })
-                      }
-                      onAddSnippet={openAddSnippetDialog}
-                      onOpenVisualEditor={openVisualEditorDialog}
-                      onOpenWarnings={(path) => openWarningsDialog(path)}
-                      onBatchDelete={(matchIndices, onComplete) =>
-                        batchDeleteSnippetsFromYaml(
-                          selectedEspansoPreview.config.path,
-                          selectedEspansoPreview.config.relativePath,
-                          matchIndices,
-                          onComplete
-                        )
-                      }
-                    />
-                  ) : selectedDirectoryNode ? (
-                    <EspansoDirectoryDetail
-                      node={selectedDirectoryNode}
-                      onSelectFile={setSelectedEspansoConfigPath}
-                      onCreateFile={openCreateFileDialog}
-                      onCreateFolder={openCreateFolderDialog}
-                    />
-                  ) : (
-                    <EmptyState
-                      icon={FileText}
-                      title={t("empty.noSelection")}
-                      description={t("empty.noSelectionDescription")}
-                    />
-                  )}
-                </section>
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center p-8 text-center rounded-lg border border-dashed my-auto bg-background/50">
-              <FolderOpen className="h-12 w-12 text-muted-foreground/60 mb-3" />
-              <h3 className="text-2xl font-semibold mb-1">{t("empty.noYamlFilesTitle")}</h3>
-              <p className="text-base text-muted-foreground max-w-md mb-6">
-                {isScanningEspanso
-                  ? t("status.scanningEspansoConfigs")
-                  : espansoScanMessage || t("empty.noYamlFilesMessage")}
-              </p>
-              {!isScanningEspanso && (
-                <div className="flex flex-wrap justify-center gap-3">
-                  <Button onClick={() => openCreateFolderDialog("")}>
-                    <FolderPlus className="h-4 w-4 mr-2" />
-                    {t("filesystem.createFolder")}
-                  </Button>
-                  <Button variant="outline" onClick={() => openCreateFileDialog("")}>
-                    <FilePlus className="h-4 w-4 mr-2" />
-                    {t("filesystem.createFile")}
-                  </Button>
-                  <Button variant="ghost" onClick={() => scanDefaultEspansoConfigDir()}>
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    {t("actions.refresh")}
-                  </Button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </main>
+      <AppWorkspace
+        espansoMatchDir={espansoMatchDir}
+        espansoConfigsCount={espansoConfigs.length}
+        espansoPreviewTree={espansoPreviewTree}
+        selectedEspansoConfigPath={selectedEspansoConfigPath}
+        selectedEspansoPreview={selectedEspansoPreview}
+        selectedDirectoryNode={selectedDirectoryNode}
+        activeDirectoryRelPath={activeDirectoryRelPath}
+        activeEspansoAncestorPaths={activeEspansoAncestorPaths}
+        collectionPaneWidth={collectionPaneWidth}
+        isCollectionResizing={isCollectionResizing}
+        isScanningEspanso={isScanningEspanso}
+        isLoadingSelectedPreview={isLoadingSelectedPreview}
+        isSelectedPreviewLoaded={isSelectedPreviewLoaded}
+        selectedPreviewError={selectedPreviewError}
+        espansoScanMessage={espansoScanMessage}
+        highlightedSnippetIndex={highlightedSnippetIndex}
+        mainSplitRef={mainSplitRef}
+        onOpenSearch={() => setIsSearchOpen(true)}
+        onRefresh={scanDefaultEspansoConfigDir}
+        onOpenLogs={() => setIsLogOpen(true)}
+        onOpenSettings={() => setIsSettingsOpen(true)}
+        onSelectConfigPath={setSelectedEspansoConfigPath}
+        onOpenYamlFile={openYamlFileInDefaultApp}
+        onCreateFile={openCreateFileDialog}
+        onCreateFolder={openCreateFolderDialog}
+        onOpenSnippet={openSnippetEditorEdit}
+        onAddSnippet={openAddSnippetDialog}
+        onOpenVisualEditor={openVisualEditorDialog}
+        onOpenWarnings={openWarningsDialog}
+        onBatchDelete={(matchIndices, onComplete) => {
+          if (!selectedEspansoPreview) return;
+          batchDeleteSnippetsFromYaml(
+            selectedEspansoPreview.config.path,
+            selectedEspansoPreview.config.relativePath,
+            matchIndices,
+            onComplete,
+          );
+        }}
+        onCollectionResizeStart={startCollectionResize}
+        onCollectionResizeMove={handleCollectionResizeMove}
+        onCollectionResizeStop={stopCollectionResize}
+      />
 
       <SnippetEditDialog
         open={isAddSnippetOpen}
         onOpenChange={setIsAddSnippetOpen}
         snippetEditTarget={snippetEditTarget}
         selectedEspansoPreview={selectedEspansoPreview}
-        isYamlWarningsEnabled={isYamlWarningsEnabled}
-        addErrors={addErrors}
-        addWarnings={addWarnings}
-        editTriggersText={editTriggersText}
-        setEditTriggersText={setEditTriggersText}
-        activeSnippetKind={addSnippetKind}
-        setAddSnippetKind={setAddSnippetKind}
-        setAddErrors={setAddErrors}
-        setAddWarnings={setAddWarnings}
-        editIncludeFile={editIncludeFile}
-        setEditIncludeFile={setEditIncludeFile}
-        chooseSnippetFile={chooseSnippetFile}
-        editImagePath={editImagePath}
-        setEditImagePath={setEditImagePath}
-        chooseSnippetImageFile={chooseSnippetImageFile}
-        editForm={editForm}
-        setEditForm={setEditForm}
-        formTextareaRef={formTextareaRef}
-        formSelection={formSelection}
-        setFormSelection={setFormSelection}
-        captureFormSelection={captureFormSelection}
-        configureSelectedFormField={configureSelectedFormField}
-        editVars={editVars}
-        handleInsertDateVariable={handleInsertDateVariable}
-        handleRemoveDateVar={handleRemoveDateVar}
-        editFormFieldConfigs={editFormFieldConfigs}
-        undoFormField={undoFormField}
-        updateFormFieldConfig={updateFormFieldConfig}
-        editReplace={editReplace}
-        setEditReplace={setEditReplace}
-        replaceTextareaRef={replaceTextareaRef}
-        editDescription={editDescription}
-        setEditDescription={setEditDescription}
-        onDeleteSnippet={deleteSnippetFromYaml}
-        onSaveSnippet={saveSnippetToYaml}
-        isSavingSnippet={isSavingSnippet}
-        showAlert={showAlert}
-        resetSnippetForm={resetSnippetForm}
-        setSnippetEditTarget={setSnippetEditTarget}
+        form={snippetEditorForm}
+        actions={snippetEditorActions}
       />
 
       <VisualYamlEditorDialog
@@ -931,49 +712,8 @@ function App() {
           visualEditorPreviewYamlContent,
           pendingDeletedLineNumbers,
         }}
-        form={{
-          addErrors,
-          addWarnings,
-          isYamlWarningsEnabled,
-          editTriggersText,
-          setEditTriggersText,
-          activeSnippetKind: addSnippetKind,
-          setAddSnippetKind,
-          setAddErrors,
-          setAddWarnings,
-          editIncludeFile,
-          setEditIncludeFile,
-          chooseSnippetFile,
-          editImagePath,
-          setEditImagePath,
-          chooseSnippetImageFile,
-          editForm,
-          setEditForm,
-          formTextareaRef,
-          formSelection,
-          setFormSelection,
-          captureFormSelection,
-          configureSelectedFormField,
-          editVars,
-          handleInsertDateVariable,
-          handleRemoveDateVar,
-          editFormFieldConfigs,
-          undoFormField,
-          updateFormFieldConfig,
-          editReplace,
-          setEditReplace,
-          visualEditorReplaceTextareaRef,
-          editDescription,
-          setEditDescription,
-        }}
-        actions={{
-          deleteSnippetFromYaml,
-          saveSnippetToYaml,
-          isSavingSnippet,
-          showAlert,
-          resetSnippetForm,
-          setSnippetEditTarget,
-        }}
+        form={snippetEditorForm}
+        actions={snippetEditorActions}
       />
 
       <SettingsDialog

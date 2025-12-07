@@ -1,14 +1,22 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type DateFormatOption, generateUniqueVarName, getReferencedVars } from "../../../logic/dateFormats";
 import type { Snippet, SnippetVar, ValidationError } from "../../../logic/types";
 import { buildTriggerInput, normalizeTriggerLines } from "../../../logic/snippetUtils";
 import {
+  areFormFieldConfigsEqual,
+  buildUniqueFormFieldId,
+  createDefaultFormFieldConfig,
+  escapeRegExp,
   configsToFormFields,
+  extractFormFieldNames,
   formFieldsToConfigs,
+  getSelectedFormFieldId,
+  normalizeFormFieldConfigs,
 } from "../formSnippet";
 import type {
   AddSnippetKind,
   FormFieldConfig,
+  FormFieldControl,
   FormSelectionState,
   SnippetEditTarget,
 } from "../types";
@@ -33,6 +41,16 @@ export function useSnippetEditor() {
   const replaceTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const visualEditorReplaceTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const formTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const detectedFormFieldNames = useMemo(() => extractFormFieldNames(form), [form]);
+  const detectedFormFieldKey = detectedFormFieldNames.join("\n");
+
+  useEffect(() => {
+    setFormFieldConfigs((current) => {
+      const normalized = normalizeFormFieldConfigs(detectedFormFieldNames, current);
+      return areFormFieldConfigsEqual(current, normalized) ? current : normalized;
+    });
+  }, [detectedFormFieldKey]);
 
   const resetForm = useCallback(() => {
     setKind("text");
@@ -146,6 +164,78 @@ export function useSnippetEditor() {
     setVars((prev) => prev.filter((v) => v.name !== varName));
   }, []);
 
+  const updateFormFieldConfig = useCallback((id: string, patch: Partial<FormFieldConfig>) => {
+    setFormFieldConfigs((current) => current.map((field) => (
+      field.id === id ? { ...field, ...patch } : field
+    )));
+  }, []);
+
+  const undoFormField = useCallback((fieldId: string) => {
+    const placeholderPattern = new RegExp(`\\[\\[\\s*${escapeRegExp(fieldId)}\\s*\\]\\]`, "g");
+    const nextForm = form.replace(placeholderPattern, fieldId);
+
+    setForm(nextForm);
+    setFormFieldConfigs((current) => current.filter((field) => field.id !== fieldId));
+    setFormSelection(null);
+
+    requestAnimationFrame(() => {
+      formTextareaRef.current?.focus();
+    });
+  }, [form]);
+
+  const captureFormSelection = useCallback((textarea: HTMLTextAreaElement) => {
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = textarea.value.slice(start, end);
+
+    if (!selectedText.trim()) {
+      setFormSelection(null);
+      return false;
+    }
+
+    setFormSelection({
+      start,
+      end,
+      text: selectedText,
+    });
+    return true;
+  }, []);
+
+  const configureSelectedFormField = useCallback((control: FormFieldControl) => {
+    if (!formSelection) return;
+
+    const selectedText = formSelection.text;
+    const selectedFieldId = getSelectedFormFieldId(selectedText);
+    const isExistingPlaceholder = /^\s*\[\[[^\][\n]+\]\]\s*$/.test(selectedText);
+    const existingFieldNames = extractFormFieldNames(form);
+    const fieldId = isExistingPlaceholder
+      ? selectedFieldId
+      : buildUniqueFormFieldId(selectedFieldId, existingFieldNames);
+    const placeholder = `[[${fieldId}]]`;
+    const nextForm = isExistingPlaceholder
+      ? form
+      : `${form.slice(0, formSelection.start)}${placeholder}${form.slice(formSelection.end)}`;
+
+    setForm(nextForm);
+    setFormFieldConfigs((current) => {
+      const next = normalizeFormFieldConfigs(extractFormFieldNames(nextForm), current);
+      const existing = next.find((field) => field.id === fieldId);
+      if (existing) {
+        return next.map((field) => (field.id === fieldId ? { ...field, control } : field));
+      }
+      return [...next, { ...createDefaultFormFieldConfig(fieldId), control }];
+    });
+    setFormSelection(null);
+
+    requestAnimationFrame(() => {
+      const textarea = formTextareaRef.current;
+      if (!textarea) return;
+      const cursor = isExistingPlaceholder ? formSelection.end : formSelection.start + placeholder.length;
+      textarea.focus();
+      textarea.setSelectionRange(cursor, cursor);
+    });
+  }, [form, formSelection]);
+
   const buildSnippetObject = useCallback((): Snippet => {
     const normalizedTriggers = normalizeTriggerLines(triggersText);
     const triggerFields =
@@ -226,6 +316,10 @@ export function useSnippetEditor() {
     closeDialog,
     insertDateOption,
     removeVar,
+    updateFormFieldConfig,
+    undoFormField,
+    captureFormSelection,
+    configureSelectedFormField,
     buildSnippetObject,
   };
 }
