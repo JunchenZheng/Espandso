@@ -5,11 +5,11 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "./ui/dialog";
-import { ScrollArea } from "./ui/scroll-area";
-import { Button } from "./ui/button";
-import { EspansoConfigPreview } from "../App";
-import { useI18n } from "../i18n/useI18n";
+} from "../../../components/ui/dialog";
+import { ScrollArea } from "../../../components/ui/scroll-area";
+import { Button } from "../../../components/ui/button";
+import { EspansoConfigPreview } from "../../espanso-configs/types";
+import { useI18n } from "../../../i18n/useI18n";
 
 export interface WarningsDialogProps {
   open: boolean;
@@ -145,7 +145,7 @@ export function WarningsDialog({
                     </div>
 
                     <div className="space-y-2 pt-1">
-                      {preview.warnings.map((warn, idx) => (
+                      {preview.warnings.map((warn: string, idx: number) => (
                         <div
                           key={`warn-${preview.config.path}-${idx}`}
                           className="flex items-start gap-2.5 rounded-md border border-amber-200/80 bg-amber-50/50 p-2.5 text-xs text-amber-900 leading-relaxed font-mono"

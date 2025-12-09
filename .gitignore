@@ -194,6 +194,9 @@ cython_debug/
 .vscode/
 .claude/
 
+# Local snippet source directories may contain private user data.
+/snippets/
+
 # Abstra
 #   Abstra is an AI-powered process automation framework.
 #   Ignore directories containing user credentials, local state, and settings.
