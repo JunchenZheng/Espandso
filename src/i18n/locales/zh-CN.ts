@@ -299,6 +299,7 @@ export const zhCN: TranslationTree = {
     failedToCreateFile: "创建文件失败：{{message}}",
     failedToCreateDirectory: "创建目录失败：{{message}}",
     imageFileNotAllowed: "所选文件是图片。文件标签页仅支持纯文本文件。请切换到图片标签页添加图片片段。",
+    nonImageFileNotAllowed: "所选文件不是图片。图片标签页仅支持图片文件。",
     binaryFileNotAllowed: "所选文件是二进制文件。文件标签页仅支持纯文本文件。",
     dropYamlFile: "请拖入 Espanso YAML 文件。",
     selectConfigBeforeAddingSnippet: "添加片段前请先选择 YAML 配置。",

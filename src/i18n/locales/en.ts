@@ -297,6 +297,7 @@ export const en = {
     failedToCreateFile: "Failed to create file: {{message}}",
     failedToCreateDirectory: "Failed to create directory: {{message}}",
     imageFileNotAllowed: "Selected file is an image. The File tab only supports plain text files. Please switch to the Image tab to add an image snippet.",
+    nonImageFileNotAllowed: "Selected file is not an image. The Image tab only supports image files.",
     binaryFileNotAllowed: "Selected file is a binary file. The File tab only supports plain text files.",
     dropYamlFile: "Please drop an Espanso YAML file.",
     selectConfigBeforeAddingSnippet: "Please select a YAML config before adding a snippet.",

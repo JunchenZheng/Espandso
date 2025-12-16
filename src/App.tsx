@@ -8,7 +8,7 @@ import "./App.css";
 import { useI18n } from "./i18n/useI18n";
 import { AboutDialog } from "./components/AboutDialog";
 import { EspansoLogDialog } from "./components/EspansoLogDialog";
-import { ConfirmAlertDialog, type AlertDialogState } from "./components/shared/ConfirmAlertDialog";
+import { ConfirmAlertDialog } from "./components/shared/ConfirmAlertDialog";
 import { SearchDialog } from "./features/search/components/SearchDialog";
 import { useSearchIndex } from "./features/search/hooks/useSearchIndex";
 import { WarningsDialog } from "./features/warnings/components/WarningsDialog";
@@ -17,6 +17,7 @@ import { Snippet } from "./logic/types";
 import { validate } from "./logic/validate";
 import { getSnippetTriggers, isImageFilePath } from "./logic/snippetUtils";
 import { checkIsBinaryFilePath } from "./logic/fileCheck";
+import { getErrorMessage } from "./logic/errors";
 import {
   saveSnippetToYamlFile,
   deleteSnippetFromYamlFile,
@@ -25,6 +26,8 @@ import {
 import { AppWorkspace } from "./features/app-shell/components/AppWorkspace";
 import { DragOverlay } from "./features/app-shell/components/DragOverlay";
 import { SettingsDialog } from "./features/app-shell/components/SettingsDialog";
+import { useAppFileDrop } from "./features/app-shell/hooks/useAppFileDrop";
+import { useConfirmAlertDialog } from "./features/app-shell/hooks/useConfirmAlertDialog";
 import { CreateFileDialog } from "./features/espanso-configs/components/CreateFileDialog";
 import { CreateFolderDialog } from "./features/espanso-configs/components/CreateFolderDialog";
 import { useEspansoConfigs } from "./features/espanso-configs/hooks/useEspansoConfigs";
@@ -34,10 +37,6 @@ import { SnippetEditDialog } from "./features/snippets/components/SnippetEditDia
 import { useSnippetEditor } from "./features/snippets/hooks/useSnippetEditor";
 export type { EspansoConfigPreview } from "./features/espanso-configs/types";
 import type { SnippetEditTarget } from "./features/snippets/types";
-
-interface DragDropPayload {
-  paths: string[];
-}
 
 const DEFAULT_COLLECTION_PANE_WIDTH = 20;
 const MIN_COLLECTION_PANE_WIDTH = 14;
@@ -238,131 +237,49 @@ function App() {
     };
   }, [isCollectionResizing]);
 
-  const [alertDialog, setAlertDialog] = useState<AlertDialogState>({
-    isOpen: false,
-    title: "",
-    description: "",
-    confirmText: t("actions.ok"),
-  });
-
-  const showAlert = useCallback((description: string, title = t("app.name")) => {
-    setAlertDialog({
-      isOpen: true,
-      title,
-      description,
-      confirmText: t("actions.ok"),
-    });
-  }, [t]);
+  const {
+    alertDialog,
+    showAlert,
+    showConfirm,
+    closeAlertDialog,
+  } = useConfirmAlertDialog();
 
   useEffect(() => {
+    let active = true;
     let unlisten: (() => void) | undefined;
-    listen("open-about-dialog", () => {
+    void listen("open-about-dialog", () => {
       setIsAboutOpen(true);
     }).then((fn) => {
+      if (!active) {
+        fn();
+        return;
+      }
       unlisten = fn;
     });
 
     return () => {
-      if (unlisten) unlisten();
+      active = false;
+      unlisten?.();
     };
   }, []);
 
-  const showConfirm = useCallback(
-    (
-      description: string,
-      onConfirm: () => void,
-      title = t("app.name"),
-      confirmText = t("actions.ok"),
-      cancelText = t("actions.cancel"),
-    ) => {
-      setAlertDialog({
-        isOpen: true,
-        title,
-        description,
-        confirmText,
-        cancelText,
-        onConfirm,
-      });
+  useAppFileDrop({
+    snippetEditorOpen: isAddSnippetOpen,
+    snippetKind: addSnippetKind,
+    messages: {
+      binaryFileNotAllowed: t("errors.binaryFileNotAllowed"),
+      dropYamlFile: t("errors.dropYamlFile"),
+      imageFileNotAllowed: t("errors.imageFileNotAllowed"),
+      invalidFile: t("errors.invalidFile"),
+      invalidFileType: t("errors.invalidFileType"),
+      nonImageFileNotAllowed: t("errors.nonImageFileNotAllowed"),
     },
-    [t],
-  );
-
-  async function addDroppedYamlPreview(path: string) {
-    if (isAddSnippetOpen) {
-      if (addSnippetKind === "file") {
-        if (isImageFilePath(path)) {
-          showAlert(t("errors.imageFileNotAllowed"), t("errors.invalidFileType"));
-          setIsDragging(false);
-          return;
-        }
-        const isBinary = await checkIsBinaryFilePath(path, (p) => readFile(p));
-        if (isBinary) {
-          showAlert(t("errors.binaryFileNotAllowed"), t("errors.invalidFileType"));
-          setIsDragging(false);
-          return;
-        }
-        setEditIncludeFile(path);
-        setIsDragging(false);
-        return;
-      }
-      if (addSnippetKind === "image") {
-        setEditImagePath(path);
-        setIsDragging(false);
-        return;
-      }
-      setIsDragging(false);
-      return;
-    }
-
-    const lowerPath = path.toLowerCase();
-    if (!lowerPath.endsWith(".yml") && !lowerPath.endsWith(".yaml")) {
-      showAlert(t("errors.dropYamlFile"), t("errors.invalidFile"));
-      return;
-    }
-
-    addDroppedYamlFile(path);
-  }
-
-  useEffect(() => {
-    let active = true;
-    const unlisteners: (() => void)[] = [];
-
-    async function setupDragDrop() {
-      try {
-        const uEnter = await listen<DragDropPayload>("tauri://drag-enter", () => {
-          if (isAddSnippetOpen && (addSnippetKind === "text" || addSnippetKind === "form")) {
-            return;
-          }
-          setIsDragging(true);
-        });
-        if (!active) { uEnter(); return; }
-        unlisteners.push(uEnter);
-
-        const uDrop = await listen<DragDropPayload>("tauri://drag-drop", async (event) => {
-          setIsDragging(false);
-          const path = event.payload.paths[0];
-          if (path) {
-            await addDroppedYamlPreview(path);
-          }
-        });
-        if (!active) { uDrop(); return; }
-        unlisteners.push(uDrop);
-
-        const uCancel = await listen("tauri://drag-leave", () => setIsDragging(false));
-        if (!active) { uCancel(); return; }
-        unlisteners.push(uCancel);
-      } catch (e) {
-        console.error("Failed to setup drag and drop:", e);
-      }
-    }
-
-    setupDragDrop();
-
-    return () => {
-      active = false;
-      unlisteners.forEach((unlisten) => unlisten());
-    };
-  }, [addSnippetKind, espansoConfigs, isAddSnippetOpen, snippetEditTarget]);
+    onDropIncludeFile: setEditIncludeFile,
+    onDropImage: setEditImagePath,
+    onDropYaml: addDroppedYamlFile,
+    setIsDragging,
+    showAlert,
+  });
 
   function openVisualEditorDialog() {
     if (!selectedEspansoPreview) {
@@ -414,6 +331,14 @@ function App() {
     }
   }
 
+  function setSnippetImagePathSafely(path: string) {
+    if (!isImageFilePath(path)) {
+      showAlert(t("errors.nonImageFileNotAllowed"), t("errors.invalidFileType"));
+      return;
+    }
+    setEditImagePath(path);
+  }
+
   async function chooseSnippetImageFile() {
     const selected = await openDialog({
       multiple: false,
@@ -427,9 +352,9 @@ function App() {
     });
 
     if (typeof selected === "string") {
-      setEditImagePath(selected);
+      setSnippetImagePathSafely(selected);
     } else if (Array.isArray(selected) && typeof selected[0] === "string") {
-      setEditImagePath(selected[0]);
+      setSnippetImagePathSafely(selected[0]);
     }
   }
 
@@ -438,8 +363,8 @@ function App() {
       setIsSavingSnippet(true);
       try {
         await applyPendingDeleteWorkflow();
-      } catch (e: any) {
-        showAlert(t("errors.failedToSaveSnippet", { message: e?.message || e }), t("errors.genericError"));
+      } catch (error: unknown) {
+        showAlert(t("errors.failedToSaveSnippet", { message: getErrorMessage(error) }), t("errors.genericError"));
       } finally {
         setIsSavingSnippet(false);
       }
@@ -452,8 +377,8 @@ function App() {
     let snippet: Snippet;
     try {
       snippet = buildFormSnippet();
-    } catch (e: any) {
-      const errMsg = e?.message || String(e);
+    } catch (error: unknown) {
+      const errMsg = getErrorMessage(error);
       setAddErrors([{ message: errMsg }]);
       showAlert(errMsg, t("errors.validationError"));
       return;
@@ -498,8 +423,8 @@ function App() {
       } else {
         setIsAddSnippetOpen(false);
       }
-    } catch (e: any) {
-      showAlert(t("errors.failedToSaveSnippet", { message: e?.message || e }), t("errors.genericError"));
+    } catch (error: unknown) {
+      showAlert(t("errors.failedToSaveSnippet", { message: getErrorMessage(error) }), t("errors.genericError"));
     } finally {
       setIsSavingSnippet(false);
     }
@@ -527,8 +452,8 @@ function App() {
           } else {
             setIsAddSnippetOpen(false);
           }
-        } catch (e: any) {
-          showAlert(t("errors.failedToDeleteSnippet", { message: e?.message || e }), t("errors.genericError"));
+        } catch (error: unknown) {
+          showAlert(t("errors.failedToDeleteSnippet", { message: getErrorMessage(error) }), t("errors.genericError"));
         }
       },
       t("dialogs.confirmDelete.title"),
@@ -563,8 +488,8 @@ function App() {
             await loadVisualEditorYaml(configPath);
           }
           onComplete?.();
-        } catch (e: any) {
-          showAlert(t("errors.failedToBatchDeleteSnippets", { message: e?.message || e }), t("errors.genericError"));
+        } catch (error: unknown) {
+          showAlert(t("errors.failedToBatchDeleteSnippets", { message: getErrorMessage(error) }), t("errors.genericError"));
         }
       },
       t("dialogs.confirmBatchDelete.title"),
@@ -576,8 +501,8 @@ function App() {
   async function openYamlFileInDefaultApp(path: string) {
     try {
       await openPath(path);
-    } catch (e: any) {
-      showAlert(t("errors.failedToOpenYamlFile", { message: e?.message || e }), t("errors.genericError"));
+    } catch (error: unknown) {
+      showAlert(t("errors.failedToOpenYamlFile", { message: getErrorMessage(error) }), t("errors.genericError"));
     }
   }
 
@@ -755,9 +680,7 @@ function App() {
       <ConfirmAlertDialog
         state={alertDialog}
         onOpenChange={(open) => {
-          if (!open) {
-            setAlertDialog((prev) => ({ ...prev, isOpen: false }));
-          }
+          if (!open) closeAlertDialog();
         }}
       />
 
