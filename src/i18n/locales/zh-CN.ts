@@ -305,6 +305,7 @@ export const zhCN: TranslationTree = {
     selectConfigBeforeAddingSnippet: "添加片段前请先选择 YAML 配置。",
     noConfigSelected: "未选择配置",
     validationError: "校验错误",
+    failedToSelectFile: "选择文件失败：{{message}}",
     failedToOpenYamlFile: "打开 YAML 文件失败：{{message}}",
     failedToRetrieveLogs: "获取 Espanso 日志失败。",
     errorFetchingLogs: "获取日志时出错：{{message}}",

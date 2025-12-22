@@ -303,6 +303,7 @@ export const en = {
     selectConfigBeforeAddingSnippet: "Please select a YAML config before adding a snippet.",
     noConfigSelected: "No Config Selected",
     validationError: "Validation Error",
+    failedToSelectFile: "Failed to select file: {{message}}",
     failedToOpenYamlFile: "Failed to open YAML file: {{message}}",
     failedToRetrieveLogs: "Failed to retrieve Espanso logs.",
     errorFetchingLogs: "Error fetching logs: {{message}}",
