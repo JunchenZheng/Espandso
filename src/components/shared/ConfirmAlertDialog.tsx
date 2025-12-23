@@ -14,7 +14,7 @@ export interface AlertDialogState {
   description: string;
   confirmText: string;
   cancelText?: string;
-  onConfirm?: () => void;
+  onConfirm?: () => void | Promise<void>;
   onCancel?: () => void;
 }
 
@@ -60,7 +60,7 @@ export function ConfirmAlertDialog({ state, onOpenChange }: ConfirmAlertDialogPr
             onClick={() => {
               const cb = state.onConfirm;
               onOpenChange(false);
-              if (cb) cb();
+              if (cb) void cb();
             }}
           >
             {state.confirmText}

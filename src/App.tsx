@@ -1,30 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { readFile } from "@tauri-apps/plugin-fs";
 import { listen } from "@tauri-apps/api/event";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { openPath } from "@tauri-apps/plugin-opener";
 import "./App.css";
 
 import { useI18n } from "./i18n/useI18n";
 import { AboutDialog } from "./components/AboutDialog";
 import { EspansoLogDialog } from "./components/EspansoLogDialog";
-import { ConfirmAlertDialog, type AlertDialogState } from "./components/shared/ConfirmAlertDialog";
+import { ConfirmAlertDialog } from "./components/shared/ConfirmAlertDialog";
 import { SearchDialog } from "./features/search/components/SearchDialog";
 import { useSearchIndex } from "./features/search/hooks/useSearchIndex";
 import { WarningsDialog } from "./features/warnings/components/WarningsDialog";
 import { useYamlWarnings } from "./features/warnings/hooks/useYamlWarnings";
-import { Snippet } from "./logic/types";
-import { validate } from "./logic/validate";
-import { getSnippetTriggers, isImageFilePath } from "./logic/snippetUtils";
-import { checkIsBinaryFilePath } from "./logic/fileCheck";
-import {
-  saveSnippetToYamlFile,
-  deleteSnippetFromYamlFile,
-  batchDeleteSnippetsFromYamlFile,
-} from "./repositories/snippetYamlRepository";
 import { AppWorkspace } from "./features/app-shell/components/AppWorkspace";
 import { DragOverlay } from "./features/app-shell/components/DragOverlay";
 import { SettingsDialog } from "./features/app-shell/components/SettingsDialog";
+import { useAppFileDrop } from "./features/app-shell/hooks/useAppFileDrop";
+import { useConfirmAlertDialog } from "./features/app-shell/hooks/useConfirmAlertDialog";
 import { CreateFileDialog } from "./features/espanso-configs/components/CreateFileDialog";
 import { CreateFolderDialog } from "./features/espanso-configs/components/CreateFolderDialog";
 import { useEspansoConfigs } from "./features/espanso-configs/hooks/useEspansoConfigs";
@@ -32,12 +22,8 @@ import { useVisualYamlEditor } from "./features/snippets/hooks/useVisualYamlEdit
 import { VisualYamlEditorDialog } from "./features/snippets/components/VisualYamlEditorDialog";
 import { SnippetEditDialog } from "./features/snippets/components/SnippetEditDialog";
 import { useSnippetEditor } from "./features/snippets/hooks/useSnippetEditor";
+import { useSnippetCommands } from "./features/snippets/hooks/useSnippetCommands";
 export type { EspansoConfigPreview } from "./features/espanso-configs/types";
-import type { SnippetEditTarget } from "./features/snippets/types";
-
-interface DragDropPayload {
-  paths: string[];
-}
 
 const DEFAULT_COLLECTION_PANE_WIDTH = 20;
 const MIN_COLLECTION_PANE_WIDTH = 14;
@@ -119,49 +105,7 @@ function App() {
   const [isLogOpen, setIsLogOpen] = useState<boolean>(false);
   const [isAboutOpen, setIsAboutOpen] = useState<boolean>(false);
 
-  const {
-    isOpen: isAddSnippetOpen,
-    setIsOpen: setIsAddSnippetOpen,
-    editTarget: snippetEditTarget,
-    setEditTarget: setSnippetEditTarget,
-    kind: addSnippetKind,
-    setKind: setAddSnippetKind,
-    triggersText: editTriggersText,
-    setTriggersText: setEditTriggersText,
-    replace: editReplace,
-    setReplace: setEditReplace,
-    vars: editVars,
-    includeFile: editIncludeFile,
-    setIncludeFile: setEditIncludeFile,
-    imagePath: editImagePath,
-    setImagePath: setEditImagePath,
-    form: editForm,
-    setForm: setEditForm,
-    formFieldConfigs: editFormFieldConfigs,
-    formSelection,
-    setFormSelection,
-    description: editDescription,
-    setDescription: setEditDescription,
-    errors: addErrors,
-    setErrors: setAddErrors,
-    warnings: addWarnings,
-    setWarnings: setAddWarnings,
-    isSaving: isSavingSnippet,
-    setIsSaving: setIsSavingSnippet,
-    replaceTextareaRef,
-    visualEditorReplaceTextareaRef,
-    formTextareaRef,
-    resetForm: resetSnippetForm,
-    openAdd: openSnippetEditorAdd,
-    openEdit: openSnippetEditorEdit,
-    insertDateOption: handleInsertDateVariable,
-    removeVar: handleRemoveDateVar,
-    updateFormFieldConfig,
-    undoFormField,
-    captureFormSelection,
-    configureSelectedFormField,
-    buildSnippetObject: buildFormSnippet,
-  } = useSnippetEditor();
+  const snippetEditor = useSnippetEditor();
 
   const {
     isVisualEditorOpen,
@@ -186,7 +130,7 @@ function App() {
     applyPendingDeleteWorkflow,
   } = useVisualYamlEditor({
     selectedEspansoPreview,
-    snippetEditTarget,
+    snippetEditTarget: snippetEditor.editTarget,
     espansoConfigs,
     espansoMatchDir,
     loadEspansoConfigPreview,
@@ -238,139 +182,91 @@ function App() {
     };
   }, [isCollectionResizing]);
 
-  const [alertDialog, setAlertDialog] = useState<AlertDialogState>({
-    isOpen: false,
-    title: "",
-    description: "",
-    confirmText: t("actions.ok"),
+  const {
+    alertDialog,
+    showAlert,
+    showConfirm,
+    closeAlertDialog,
+  } = useConfirmAlertDialog();
+
+  const {
+    chooseSnippetFile,
+    chooseSnippetImageFile,
+    setSnippetImagePathSafely,
+    saveSnippetToYaml,
+    deleteSnippetFromYaml,
+    batchDeleteSnippetsFromYaml,
+    openYamlFileInDefaultApp,
+  } = useSnippetCommands({
+    selectedEspansoPreview,
+    snippetEditTarget: snippetEditor.editTarget,
+    espansoConfigs,
+    espansoMatchDir,
+    isVisualEditorOpen,
+    visualEditorMode,
+    isSavingSnippet: snippetEditor.isSaving,
+    setIsSavingSnippet: snippetEditor.setIsSaving,
+    buildFormSnippet: snippetEditor.buildSnippetObject,
+    setAddErrors: snippetEditor.setErrors,
+    setAddWarnings: snippetEditor.setWarnings,
+    resetSnippetForm: snippetEditor.resetForm,
+    setSnippetEditTarget: snippetEditor.setEditTarget,
+    setIsAddSnippetOpen: snippetEditor.setIsOpen,
+    setEditIncludeFile: snippetEditor.setIncludeFile,
+    setEditImagePath: snippetEditor.setImagePath,
+    applyPendingDeleteWorkflow,
+    loadEspansoConfigPreview,
+    setSelectedEspansoConfigPath,
+    loadVisualEditorYaml,
+    showAlert,
+    showConfirm,
+    t,
   });
 
-  const showAlert = useCallback((description: string, title = t("app.name")) => {
-    setAlertDialog({
-      isOpen: true,
-      title,
-      description,
-      confirmText: t("actions.ok"),
-    });
-  }, [t]);
-
   useEffect(() => {
+    let active = true;
     let unlisten: (() => void) | undefined;
-    listen("open-about-dialog", () => {
+    void listen("open-about-dialog", () => {
       setIsAboutOpen(true);
     }).then((fn) => {
+      if (!active) {
+        fn();
+        return;
+      }
       unlisten = fn;
     });
 
     return () => {
-      if (unlisten) unlisten();
+      active = false;
+      unlisten?.();
     };
   }, []);
 
-  const showConfirm = useCallback(
-    (
-      description: string,
-      onConfirm: () => void,
-      title = t("app.name"),
-      confirmText = t("actions.ok"),
-      cancelText = t("actions.cancel"),
-    ) => {
-      setAlertDialog({
-        isOpen: true,
-        title,
-        description,
-        confirmText,
-        cancelText,
-        onConfirm,
-      });
+  useAppFileDrop({
+    snippetEditorOpen: snippetEditor.isOpen,
+    snippetKind: snippetEditor.kind,
+    messages: {
+      binaryFileNotAllowed: t("errors.binaryFileNotAllowed"),
+      dropYamlFile: t("errors.dropYamlFile"),
+      imageFileNotAllowed: t("errors.imageFileNotAllowed"),
+      invalidFile: t("errors.invalidFile"),
+      invalidFileType: t("errors.invalidFileType"),
+      nonImageFileNotAllowed: t("errors.nonImageFileNotAllowed"),
     },
-    [t],
-  );
-
-  async function addDroppedYamlPreview(path: string) {
-    if (isAddSnippetOpen) {
-      if (addSnippetKind === "file") {
-        if (isImageFilePath(path)) {
-          showAlert(t("errors.imageFileNotAllowed"), t("errors.invalidFileType"));
-          setIsDragging(false);
-          return;
-        }
-        const isBinary = await checkIsBinaryFilePath(path, (p) => readFile(p));
-        if (isBinary) {
-          showAlert(t("errors.binaryFileNotAllowed"), t("errors.invalidFileType"));
-          setIsDragging(false);
-          return;
-        }
-        setEditIncludeFile(path);
-        setIsDragging(false);
-        return;
-      }
-      if (addSnippetKind === "image") {
-        setEditImagePath(path);
-        setIsDragging(false);
-        return;
-      }
-      setIsDragging(false);
-      return;
-    }
-
-    const lowerPath = path.toLowerCase();
-    if (!lowerPath.endsWith(".yml") && !lowerPath.endsWith(".yaml")) {
-      showAlert(t("errors.dropYamlFile"), t("errors.invalidFile"));
-      return;
-    }
-
-    addDroppedYamlFile(path);
-  }
-
-  useEffect(() => {
-    let active = true;
-    const unlisteners: (() => void)[] = [];
-
-    async function setupDragDrop() {
-      try {
-        const uEnter = await listen<DragDropPayload>("tauri://drag-enter", () => {
-          if (isAddSnippetOpen && (addSnippetKind === "text" || addSnippetKind === "form")) {
-            return;
-          }
-          setIsDragging(true);
-        });
-        if (!active) { uEnter(); return; }
-        unlisteners.push(uEnter);
-
-        const uDrop = await listen<DragDropPayload>("tauri://drag-drop", async (event) => {
-          setIsDragging(false);
-          const path = event.payload.paths[0];
-          if (path) {
-            await addDroppedYamlPreview(path);
-          }
-        });
-        if (!active) { uDrop(); return; }
-        unlisteners.push(uDrop);
-
-        const uCancel = await listen("tauri://drag-leave", () => setIsDragging(false));
-        if (!active) { uCancel(); return; }
-        unlisteners.push(uCancel);
-      } catch (e) {
-        console.error("Failed to setup drag and drop:", e);
-      }
-    }
-
-    setupDragDrop();
-
-    return () => {
-      active = false;
-      unlisteners.forEach((unlisten) => unlisten());
-    };
-  }, [addSnippetKind, espansoConfigs, isAddSnippetOpen, snippetEditTarget]);
+    onDropIncludeFile: snippetEditor.setIncludeFile,
+    onDropImage: setSnippetImagePathSafely,
+    onDropYaml: addDroppedYamlFile,
+    setIsDragging,
+    showAlert,
+  });
 
   function openVisualEditorDialog() {
     if (!selectedEspansoPreview) {
       showAlert(t("errors.selectConfigBeforeAddingSnippet"), t("errors.noConfigSelected"));
       return;
     }
-    setSnippetEditTarget(null);
-    resetSnippetForm();
+    snippetEditor.setEditTarget(null);
+    snippetEditor.resetForm();
     setHighlightedLineRange(null);
     setVisualEditorMode("add");
     setPendingDeleteSelections([]);
@@ -384,255 +280,61 @@ function App() {
       showAlert(t("errors.selectConfigBeforeAddingSnippet"), t("errors.noConfigSelected"));
       return;
     }
-    openSnippetEditorAdd();
-  }
-
-  async function chooseSnippetFile() {
-    const selected = await openDialog({
-      multiple: false,
-      directory: false,
-    });
-
-    let selectedPath = "";
-    if (typeof selected === "string") {
-      selectedPath = selected;
-    } else if (Array.isArray(selected) && typeof selected[0] === "string") {
-      selectedPath = selected[0];
-    }
-
-    if (selectedPath) {
-      if (isImageFilePath(selectedPath)) {
-        showAlert(t("errors.imageFileNotAllowed"), t("errors.invalidFileType"));
-        return;
-      }
-      const isBinary = await checkIsBinaryFilePath(selectedPath, (p) => readFile(p));
-      if (isBinary) {
-        showAlert(t("errors.binaryFileNotAllowed"), t("errors.invalidFileType"));
-        return;
-      }
-      setEditIncludeFile(selectedPath);
-    }
-  }
-
-  async function chooseSnippetImageFile() {
-    const selected = await openDialog({
-      multiple: false,
-      directory: false,
-      filters: [
-        {
-          name: t("snippets.imageFilesFilter"),
-          extensions: ["png", "jpg", "jpeg", "gif", "svg", "webp", "bmp"],
-        },
-      ],
-    });
-
-    if (typeof selected === "string") {
-      setEditImagePath(selected);
-    } else if (Array.isArray(selected) && typeof selected[0] === "string") {
-      setEditImagePath(selected[0]);
-    }
-  }
-
-  async function saveSnippetToYaml() {
-    if (visualEditorMode === "delete") {
-      setIsSavingSnippet(true);
-      try {
-        await applyPendingDeleteWorkflow();
-      } catch (e: any) {
-        showAlert(t("errors.failedToSaveSnippet", { message: e?.message || e }), t("errors.genericError"));
-      } finally {
-        setIsSavingSnippet(false);
-      }
-      return;
-    }
-
-    const targetPreview = snippetEditTarget?.preview || selectedEspansoPreview;
-    if (!targetPreview || isSavingSnippet) return;
-
-    let snippet: Snippet;
-    try {
-      snippet = buildFormSnippet();
-    } catch (e: any) {
-      const errMsg = e?.message || String(e);
-      setAddErrors([{ message: errMsg }]);
-      showAlert(errMsg, t("errors.validationError"));
-      return;
-    }
-
-    const snippetsForValidation = snippetEditTarget
-      ? snippetEditTarget.preview.importedMatches
-        .filter((match) => match.originalMatchIndex !== snippetEditTarget.match.originalMatchIndex)
-        .map((match) => match.snippet)
-      : targetPreview.snippets;
-
-    const validationResult = await validate({
-      version: 1,
-      snippets: [...snippetsForValidation, snippet],
-    });
-
-    setAddErrors(validationResult.errors);
-    setAddWarnings(validationResult.warnings);
-
-    if (validationResult.errors.length > 0) {
-      showAlert(validationResult.errors[0].message, t("errors.validationError"));
-      return;
-    }
-
-    setIsSavingSnippet(true);
-    try {
-      await saveSnippetToYamlFile(
-        targetPreview.config.path,
-        snippet,
-        snippetEditTarget?.match.originalMatchIndex,
-        espansoMatchDir || undefined
-      );
-      const savedMatchIndex = snippetEditTarget
-        ? snippetEditTarget.match.originalMatchIndex
-        : targetPreview.snippets.length;
-      resetSnippetForm();
-      setSnippetEditTarget(null);
-      await loadEspansoConfigPreview(targetPreview.config);
-      setSelectedEspansoConfigPath(targetPreview.config.path);
-      if (isVisualEditorOpen) {
-        await loadVisualEditorYaml(targetPreview.config.path, savedMatchIndex);
-      } else {
-        setIsAddSnippetOpen(false);
-      }
-    } catch (e: any) {
-      showAlert(t("errors.failedToSaveSnippet", { message: e?.message || e }), t("errors.genericError"));
-    } finally {
-      setIsSavingSnippet(false);
-    }
-  }
-
-  async function deleteSnippetFromYaml(target: SnippetEditTarget) {
-    const triggers = getSnippetTriggers(target.match.originalSnippet || target.match.snippet);
-    const displayTrigger = triggers.length > 0 ? triggers.join(", ") : `Snippet ${target.displayIndex + 1}`;
-
-    showConfirm(
-      t("dialogs.confirmDelete.message", { trigger: displayTrigger, file: target.preview.config.relativePath }),
-      async () => {
-        try {
-          await deleteSnippetFromYamlFile(
-            target.preview.config.path,
-            target.match.originalMatchIndex,
-            espansoMatchDir || undefined
-          );
-          resetSnippetForm();
-          setSnippetEditTarget(null);
-          await loadEspansoConfigPreview(target.preview.config);
-          setSelectedEspansoConfigPath(target.preview.config.path);
-          if (isVisualEditorOpen) {
-            await loadVisualEditorYaml(target.preview.config.path);
-          } else {
-            setIsAddSnippetOpen(false);
-          }
-        } catch (e: any) {
-          showAlert(t("errors.failedToDeleteSnippet", { message: e?.message || e }), t("errors.genericError"));
-        }
-      },
-      t("dialogs.confirmDelete.title"),
-      t("actions.delete"),
-      t("actions.cancel"),
-    );
-  }
-
-  async function batchDeleteSnippetsFromYaml(
-    configPath: string,
-    relativePath: string,
-    matchIndices: number[],
-    onComplete?: () => void
-  ) {
-    if (matchIndices.length === 0) return;
-
-    showConfirm(
-      t("dialogs.confirmBatchDelete.message", { count: matchIndices.length, file: relativePath }),
-      async () => {
-        try {
-          await batchDeleteSnippetsFromYamlFile(
-            configPath,
-            matchIndices,
-            espansoMatchDir || undefined
-          );
-          const targetConfig = espansoConfigs.find((config) => config.path === configPath);
-          if (targetConfig) {
-            await loadEspansoConfigPreview(targetConfig);
-          }
-          setSelectedEspansoConfigPath(configPath);
-          if (isVisualEditorOpen) {
-            await loadVisualEditorYaml(configPath);
-          }
-          onComplete?.();
-        } catch (e: any) {
-          showAlert(t("errors.failedToBatchDeleteSnippets", { message: e?.message || e }), t("errors.genericError"));
-        }
-      },
-      t("dialogs.confirmBatchDelete.title"),
-      t("dialogs.confirmBatchDelete.confirmBtn"),
-      t("actions.cancel"),
-    );
-  }
-
-  async function openYamlFileInDefaultApp(path: string) {
-    try {
-      await openPath(path);
-    } catch (e: any) {
-      showAlert(t("errors.failedToOpenYamlFile", { message: e?.message || e }), t("errors.genericError"));
-    }
+    snippetEditor.openAdd();
   }
 
   const snippetEditorForm = {
-    addErrors,
-    addWarnings,
+    addErrors: snippetEditor.errors,
+    addWarnings: snippetEditor.warnings,
     isYamlWarningsEnabled,
-    editTriggersText,
-    setEditTriggersText,
-    activeSnippetKind: addSnippetKind,
-    setAddSnippetKind,
-    setAddErrors,
-    setAddWarnings,
-    editIncludeFile,
-    setEditIncludeFile,
+    editTriggersText: snippetEditor.triggersText,
+    setEditTriggersText: snippetEditor.setTriggersText,
+    activeSnippetKind: snippetEditor.kind,
+    setAddSnippetKind: snippetEditor.setKind,
+    setAddErrors: snippetEditor.setErrors,
+    setAddWarnings: snippetEditor.setWarnings,
+    editIncludeFile: snippetEditor.includeFile,
+    setEditIncludeFile: snippetEditor.setIncludeFile,
     chooseSnippetFile,
-    editImagePath,
-    setEditImagePath,
+    editImagePath: snippetEditor.imagePath,
+    setEditImagePath: snippetEditor.setImagePath,
     chooseSnippetImageFile,
-    editForm,
-    setEditForm,
-    formTextareaRef,
-    formSelection,
-    setFormSelection,
-    captureFormSelection,
-    configureSelectedFormField,
-    editVars,
-    handleInsertDateVariable,
-    handleRemoveDateVar,
-    editFormFieldConfigs,
-    undoFormField,
-    updateFormFieldConfig,
-    editReplace,
-    setEditReplace,
-    replaceTextareaRef,
-    visualEditorReplaceTextareaRef,
-    editDescription,
-    setEditDescription,
+    editForm: snippetEditor.form,
+    setEditForm: snippetEditor.setForm,
+    formTextareaRef: snippetEditor.formTextareaRef,
+    formSelection: snippetEditor.formSelection,
+    setFormSelection: snippetEditor.setFormSelection,
+    captureFormSelection: snippetEditor.captureFormSelection,
+    configureSelectedFormField: snippetEditor.configureSelectedFormField,
+    editVars: snippetEditor.vars,
+    handleInsertDateVariable: snippetEditor.insertDateOption,
+    handleRemoveDateVar: snippetEditor.removeVar,
+    editFormFieldConfigs: snippetEditor.formFieldConfigs,
+    undoFormField: snippetEditor.undoFormField,
+    updateFormFieldConfig: snippetEditor.updateFormFieldConfig,
+    editReplace: snippetEditor.replace,
+    setEditReplace: snippetEditor.setReplace,
+    replaceTextareaRef: snippetEditor.replaceTextareaRef,
+    visualEditorReplaceTextareaRef: snippetEditor.visualEditorReplaceTextareaRef,
+    editDescription: snippetEditor.description,
+    setEditDescription: snippetEditor.setDescription,
   };
 
   const snippetEditorActions = {
     deleteSnippetFromYaml,
     saveSnippetToYaml,
-    isSavingSnippet,
+    isSavingSnippet: snippetEditor.isSaving,
     showAlert,
-    resetSnippetForm,
-    setSnippetEditTarget,
+    resetSnippetForm: snippetEditor.resetForm,
+    setSnippetEditTarget: snippetEditor.setEditTarget,
   };
 
   return (
     <div className="app-shell">
       <DragOverlay
         isDragging={isDragging}
-        isAddSnippetOpen={isAddSnippetOpen}
-        addSnippetKind={addSnippetKind}
+        isAddSnippetOpen={snippetEditor.isOpen}
+        addSnippetKind={snippetEditor.kind}
       />
 
       <AppWorkspace
@@ -661,7 +363,7 @@ function App() {
         onOpenYamlFile={openYamlFileInDefaultApp}
         onCreateFile={openCreateFileDialog}
         onCreateFolder={openCreateFolderDialog}
-        onOpenSnippet={openSnippetEditorEdit}
+        onOpenSnippet={snippetEditor.openEdit}
         onAddSnippet={openAddSnippetDialog}
         onOpenVisualEditor={openVisualEditorDialog}
         onOpenWarnings={openWarningsDialog}
@@ -680,9 +382,9 @@ function App() {
       />
 
       <SnippetEditDialog
-        open={isAddSnippetOpen}
-        onOpenChange={setIsAddSnippetOpen}
-        snippetEditTarget={snippetEditTarget}
+        open={snippetEditor.isOpen}
+        onOpenChange={snippetEditor.setIsOpen}
+        snippetEditTarget={snippetEditor.editTarget}
         selectedEspansoPreview={selectedEspansoPreview}
         form={snippetEditorForm}
         actions={snippetEditorActions}
@@ -691,7 +393,7 @@ function App() {
       <VisualYamlEditorDialog
         isOpen={isVisualEditorOpen}
         onOpenChange={setIsVisualEditorOpen}
-        snippetEditTarget={snippetEditTarget}
+        snippetEditTarget={snippetEditor.editTarget}
         selectedEspansoPreview={selectedEspansoPreview}
         t={t}
         visualEditor={{
@@ -755,9 +457,7 @@ function App() {
       <ConfirmAlertDialog
         state={alertDialog}
         onOpenChange={(open) => {
-          if (!open) {
-            setAlertDialog((prev) => ({ ...prev, isOpen: false }));
-          }
+          if (!open) closeAlertDialog();
         }}
       />
 
