@@ -43,13 +43,13 @@ export function extractFormFieldNames(form: string): string[] {
 
 export function getSelectedFormFieldId(selection: string): string {
   const trimmed = selection.trim();
-  const placeholderMatch = trimmed.match(/^\[\[([^\][\n]+)\]\]$/);
+  const placeholderMatch = trimmed.match(/^\[\[([^\]\n]+)\]\]$/);
   const rawName = placeholderMatch ? placeholderMatch[1] : trimmed;
   return rawName
     .trim()
     .replace(/^\[\[|\]\]$/g, "")
     .replace(/\s+/g, "_")
-    .replace(/[\[\]{}]/g, "")
+    .replace(/[[\]{}]/g, "")
     .trim();
 }
 

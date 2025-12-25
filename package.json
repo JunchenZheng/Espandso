@@ -5,13 +5,22 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "npm run type-check && vite build",
     "build:frontend": "vite build",
     "preview": "vite preview",
     "generate:icons": "./scripts/generate_icons.sh",
     "tauri": "tauri",
     "tauri:dev": "npm run generate:icons && npm run tauri -- dev",
-    "tauri:build": "npm run generate:icons && npm run tauri -- build"
+    "tauri:build": "npm run generate:icons && npm run tauri -- build",
+    "type-check": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit",
+    "type-check:rs": "cargo check --manifest-path src-tauri/Cargo.toml",
+    "lint": "eslint .",
+    "lint:rs": "cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings",
+    "format:check": "prettier --check \"*.{js,json,ts}\" \"src/**/*.{ts,tsx,css}\"",
+    "format:write": "prettier --write \"*.{js,json,ts}\" \"src/**/*.{ts,tsx,css}\"",
+    "format:check:rs": "cargo fmt --manifest-path src-tauri/Cargo.toml -- --check",
+    "format:write:rs": "cargo fmt --manifest-path src-tauri/Cargo.toml",
+    "check:static": "npm run type-check && npm run type-check:rs && npm run lint && npm run lint:rs && npm run format:check && npm run format:check:rs"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.20",
@@ -34,16 +43,24 @@
     "yaml": "^2.4.0"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@tauri-apps/cli": "^2",
     "@types/node": "^20.0.0",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.6.0",
     "autoprefixer": "^10.5.4",
+    "eslint": "^10.7.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.3",
+    "globals": "^17.7.0",
     "postcss": "^8.5.20",
+    "prettier": "^3.9.6",
     "tailwindcss": "^3.4.17",
     "tailwindcss-animate": "^1.0.7",
     "typescript": "~5.8.3",
+    "typescript-eslint": "^8.65.0",
     "vite": "^7.0.4",
     "vitest": "^4.1.10"
   }

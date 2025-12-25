@@ -69,26 +69,36 @@ export function useEspansoConfigs(options: UseEspansoConfigsOptions = {}) {
 
   const localizeFileSystemError = useCallback(
     (message: string): string => {
-      const fileDuplicate = message.match(/^File "(.+)" already exists in the selected directory\.$/);
+      const fileDuplicate = message.match(
+        /^File "(.+)" already exists in the selected directory\.$/,
+      );
       if (fileDuplicate) {
         return t("filesystem.fileAlreadyExists", { name: fileDuplicate[1] });
       }
 
-      const folderDuplicate = message.match(/^Folder "(.+)" already exists in the selected directory\.$/);
+      const folderDuplicate = message.match(
+        /^Folder "(.+)" already exists in the selected directory\.$/,
+      );
       if (folderDuplicate) {
         return t("filesystem.folderAlreadyExists", { name: folderDuplicate[1] });
       }
 
-      const reservedFolder = message.match(/^'(.+)' is a reserved Espanso directory name and cannot be used\.$/);
+      const reservedFolder = message.match(
+        /^'(.+)' is a reserved Espanso directory name and cannot be used\.$/,
+      );
       if (reservedFolder) {
         return t("filesystem.folderReserved", { name: reservedFolder[1] });
       }
 
       const staticMessages: Record<string, string> = {
         "File name cannot be empty.": t("filesystem.fileNameRequired"),
-        "File name contains invalid characters (/ \\ : * ? \" < > |).": t("filesystem.fileNameInvalidChars"),
+        'File name contains invalid characters (/ \\ : * ? " < > |).': t(
+          "filesystem.fileNameInvalidChars",
+        ),
         "Folder name cannot be empty.": t("filesystem.folderNameRequired"),
-        "Folder name contains invalid characters (/ \\ : * ? \" < > |).": t("filesystem.folderNameInvalidChars"),
+        'Folder name contains invalid characters (/ \\ : * ? " < > |).': t(
+          "filesystem.folderNameInvalidChars",
+        ),
       };
 
       return staticMessages[message] || message;
@@ -201,7 +211,10 @@ export function useEspansoConfigs(options: UseEspansoConfigsOptions = {}) {
   );
 
   const selectedTreeNode = useMemo(
-    () => (selectedEspansoConfigPath ? findTreeNode(espansoPreviewTree, selectedEspansoConfigPath) : null),
+    () =>
+      selectedEspansoConfigPath
+        ? findTreeNode(espansoPreviewTree, selectedEspansoConfigPath)
+        : null,
     [espansoPreviewTree, selectedEspansoConfigPath],
   );
 
@@ -306,7 +319,9 @@ export function useEspansoConfigs(options: UseEspansoConfigsOptions = {}) {
   }, [scanDefaultEspansoConfigDir]);
 
   useEffect(() => {
-    const selectedConfig = espansoConfigs.find((config) => config.path === selectedEspansoConfigPath);
+    const selectedConfig = espansoConfigs.find(
+      (config) => config.path === selectedEspansoConfigPath,
+    );
     if (!selectedConfig) {
       setIsLoadingSelectedPreview(false);
       setSelectedPreviewError("");

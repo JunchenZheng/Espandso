@@ -34,18 +34,12 @@ export function EspansoDirectoryDetail({
                 {node.relativePath ? `/${node.relativePath}` : "/"}
               </span>
             </div>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {t("filesystem.directory")}
-            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">{t("filesystem.directory")}</p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            onClick={() => onCreateFolder(node.relativePath)}
-            className="gap-1.5"
-          >
+          <Button size="sm" onClick={() => onCreateFolder(node.relativePath)} className="gap-1.5">
             <FolderPlus className="h-4 w-4" />
             {t("filesystem.newSubdirectory")}
           </Button>
@@ -64,11 +58,15 @@ export function EspansoDirectoryDetail({
       {/* Directory Contents */}
       <ScrollArea className="flex-1 p-6">
         <div className="max-w-4xl space-y-4">
-          <h3 className="text-sm font-semibold text-foreground/80">{t("filesystem.contentsIn", { name: node.name })}</h3>
+          <h3 className="text-sm font-semibold text-foreground/80">
+            {t("filesystem.contentsIn", { name: node.name })}
+          </h3>
           {!node.children || node.children.length === 0 ? (
             <div className="rounded-lg border border-dashed p-8 text-center bg-muted/10">
               <Folder className="h-10 w-10 text-muted-foreground/50 mx-auto mb-2" />
-              <p className="text-sm font-medium text-muted-foreground">{t("empty.directoryEmpty")}</p>
+              <p className="text-sm font-medium text-muted-foreground">
+                {t("empty.directoryEmpty")}
+              </p>
               <p className="text-xs text-muted-foreground/70 mt-1 mb-4">
                 {t("empty.directoryEmptyDescription")}
               </p>

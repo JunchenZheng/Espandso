@@ -99,7 +99,9 @@ export function sortEspansoConfigFiles(files: EspansoConfigFile[]): EspansoConfi
   return [...files].sort((a, b) => a.relativePath.localeCompare(b.relativePath));
 }
 
-export function sortEspansoDirectories(directories: EspansoDirectoryInfo[]): EspansoDirectoryInfo[] {
+export function sortEspansoDirectories(
+  directories: EspansoDirectoryInfo[],
+): EspansoDirectoryInfo[] {
   return [...directories].sort((a, b) => a.relativePath.localeCompare(b.relativePath));
 }
 

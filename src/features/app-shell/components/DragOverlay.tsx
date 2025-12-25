@@ -8,14 +8,13 @@ interface DragOverlayProps {
   addSnippetKind: AddSnippetKind;
 }
 
-export function DragOverlay({
-  isDragging,
-  isAddSnippetOpen,
-  addSnippetKind,
-}: DragOverlayProps) {
+export function DragOverlay({ isDragging, isAddSnippetOpen, addSnippetKind }: DragOverlayProps) {
   const { t } = useI18n();
 
-  if (!isDragging || (isAddSnippetOpen && addSnippetKind !== "file" && addSnippetKind !== "image")) {
+  if (
+    !isDragging ||
+    (isAddSnippetOpen && addSnippetKind !== "file" && addSnippetKind !== "image")
+  ) {
     return null;
   }
 

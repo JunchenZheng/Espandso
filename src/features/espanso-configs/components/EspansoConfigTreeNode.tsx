@@ -125,7 +125,12 @@ export const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
         className="flex min-w-0 flex-1 items-center gap-2 rounded-l-md px-2 py-1.5 text-left"
         onClick={() => node.preview && onSelect(node.preview.config.path)}
       >
-        <FileText className={cn("h-4 w-4 shrink-0", isActive ? "text-primary-foreground" : "text-muted-foreground")} />
+        <FileText
+          className={cn(
+            "h-4 w-4 shrink-0",
+            isActive ? "text-primary-foreground" : "text-muted-foreground",
+          )}
+        />
         <div className="min-w-0 flex-1">
           <div className="truncate text-xs font-medium">{node.name.replace(/\.ya?ml$/i, "")}</div>
         </div>
@@ -134,7 +139,9 @@ export const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
         <button
           className={cn(
             "mr-1 flex h-6 w-6 shrink-0 items-center justify-center rounded opacity-70 transition hover:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-            isActive ? "hover:bg-primary-foreground/20 text-primary-foreground" : "hover:bg-accent-foreground/10 text-muted-foreground",
+            isActive
+              ? "hover:bg-primary-foreground/20 text-primary-foreground"
+              : "hover:bg-accent-foreground/10 text-muted-foreground",
           )}
           title={t("filesystem.openFileInDefaultApp", { file: node.name })}
           onClick={() => onOpenFile(node.preview!.config.path)}

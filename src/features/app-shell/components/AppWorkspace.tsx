@@ -8,7 +8,10 @@ import { cn } from "../../../lib/utils";
 import { EspansoConfigDetail } from "../../espanso-configs/components/EspansoConfigDetail";
 import { EspansoConfigTreeNode } from "../../espanso-configs/components/EspansoConfigTreeNode";
 import { EspansoDirectoryDetail } from "../../espanso-configs/components/EspansoDirectoryDetail";
-import type { EspansoConfigPreview, EspansoConfigPreviewTreeNode } from "../../espanso-configs/types";
+import type {
+  EspansoConfigPreview,
+  EspansoConfigPreviewTreeNode,
+} from "../../espanso-configs/types";
 import type { SnippetEditTarget } from "../../snippets/types";
 import { AppHeader } from "./AppHeader";
 
@@ -112,7 +115,11 @@ export function AppWorkspace({
                       size="sm"
                       variant="ghost"
                       className="h-7 w-7 p-0"
-                      title={activeDirectoryRelPath ? t("filesystem.createFolderIn", { path: `/${activeDirectoryRelPath}` }) : t("filesystem.createFolder")}
+                      title={
+                        activeDirectoryRelPath
+                          ? t("filesystem.createFolderIn", { path: `/${activeDirectoryRelPath}` })
+                          : t("filesystem.createFolder")
+                      }
                       onClick={() => onCreateFolder()}
                     >
                       <FolderPlus className="h-4 w-4" />
@@ -121,7 +128,11 @@ export function AppWorkspace({
                       size="sm"
                       variant="ghost"
                       className="h-7 w-7 p-0"
-                      title={activeDirectoryRelPath ? t("filesystem.createFileIn", { path: `/${activeDirectoryRelPath}` }) : t("filesystem.createFile")}
+                      title={
+                        activeDirectoryRelPath
+                          ? t("filesystem.createFileIn", { path: `/${activeDirectoryRelPath}` })
+                          : t("filesystem.createFile")
+                      }
                       onClick={() => onCreateFile()}
                     >
                       <FilePlus className="h-4 w-4" />
@@ -161,10 +172,13 @@ export function AppWorkspace({
               />
 
               <section className="flex min-h-0 min-w-0 flex-col">
-                {selectedEspansoPreview && (isLoadingSelectedPreview || !isSelectedPreviewLoaded) ? (
+                {selectedEspansoPreview &&
+                (isLoadingSelectedPreview || !isSelectedPreviewLoaded) ? (
                   <div className="flex h-full min-h-56 flex-col items-center justify-center p-6 text-center">
                     <Loader2 className="mb-3 h-7 w-7 animate-spin text-primary" />
-                    <h3 className="text-sm font-semibold">{selectedEspansoPreview.config.relativePath}</h3>
+                    <h3 className="text-sm font-semibold">
+                      {selectedEspansoPreview.config.relativePath}
+                    </h3>
                     <p className="mt-2 max-w-sm text-sm text-muted-foreground">
                       {selectedPreviewError || t("status.loadingYamlPreview")}
                     </p>

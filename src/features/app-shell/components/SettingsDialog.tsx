@@ -92,12 +92,21 @@ export function SettingsDialog({
           <div className="rounded-lg border bg-secondary/40 p-4">
             <div className="flex items-start gap-3">
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-background text-primary">
-                {isScanningEspanso ? <Loader2 className="h-5 w-5 animate-spin" /> : <FileSearch className="h-5 w-5" />}
+                {isScanningEspanso ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <FileSearch className="h-5 w-5" />
+                )}
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-3">
                   <Label className="text-sm font-semibold">{t("settings.espansoConfigScan")}</Label>
-                  <Button size="sm" variant="outline" onClick={onRefreshScan} disabled={isScanningEspanso}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={onRefreshScan}
+                    disabled={isScanningEspanso}
+                  >
                     {isScanningEspanso ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
                     {t("actions.refresh")}
                   </Button>
@@ -107,7 +116,9 @@ export function SettingsDialog({
                 </p>
                 {espansoPathSource && (
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {espansoPathSource === "cli" ? t("settings.resolvedWithCli") : t("settings.usingPlatformDefault")}
+                    {espansoPathSource === "cli"
+                      ? t("settings.resolvedWithCli")
+                      : t("settings.usingPlatformDefault")}
                   </p>
                 )}
               </div>
@@ -123,7 +134,10 @@ export function SettingsDialog({
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-3">
-                    <Label htmlFor="experimental-yaml-warnings" className="text-sm font-semibold cursor-pointer">
+                    <Label
+                      htmlFor="experimental-yaml-warnings"
+                      className="text-sm font-semibold cursor-pointer"
+                    >
                       {t("settings.enableYamlWarnings")}
                     </Label>
                     <Switch

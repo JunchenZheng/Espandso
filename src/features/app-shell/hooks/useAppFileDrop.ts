@@ -106,7 +106,10 @@ export function useAppFileDrop(options: AppFileDropOptions) {
           }
           setIsDragging(true);
         });
-        if (!active) { uEnter(); return; }
+        if (!active) {
+          uEnter();
+          return;
+        }
         unlisteners.push(uEnter);
 
         const uDrop = await listen<DragDropPayload>("tauri://drag-drop", async (event) => {
@@ -117,13 +120,19 @@ export function useAppFileDrop(options: AppFileDropOptions) {
             await addDroppedFile(path);
           }
         });
-        if (!active) { uDrop(); return; }
+        if (!active) {
+          uDrop();
+          return;
+        }
         unlisteners.push(uDrop);
 
         const uCancel = await listen("tauri://drag-leave", () => {
           optionsRef.current.setIsDragging(false);
         });
-        if (!active) { uCancel(); return; }
+        if (!active) {
+          uCancel();
+          return;
+        }
         unlisteners.push(uCancel);
       } catch (error) {
         console.error("Failed to setup drag and drop:", error);

@@ -8,7 +8,7 @@ export interface ValidateOptions {
 
 export async function validate(
   data: any,
-  options?: ValidateOptions
+  options?: ValidateOptions,
 ): Promise<{ errors: ValidationError[]; warnings: string[] }> {
   const errors: ValidationError[] = [];
   const warnings: string[] = [];
@@ -64,7 +64,9 @@ export async function validate(
       } else {
         for (const item of triggers) {
           if (typeof item !== "string" || !item) {
-            errors.push({ message: `snippet #${i}: 'triggers' elements must be non-empty strings` });
+            errors.push({
+              message: `snippet #${i}: 'triggers' elements must be non-empty strings`,
+            });
             break;
           }
         }
@@ -87,12 +89,18 @@ export async function validate(
     const hasInclude = includeFile !== undefined && includeFile !== null;
     const hasImagePath = imagePath !== undefined && imagePath !== null;
     const hasForm = form !== undefined && form !== null;
-    const replacementKindCount = [hasReplace, hasInclude, hasImagePath, hasForm].filter(Boolean).length;
+    const replacementKindCount = [hasReplace, hasInclude, hasImagePath, hasForm].filter(
+      Boolean,
+    ).length;
 
     if (replacementKindCount === 0) {
-      errors.push({ message: `snippet #${i}: must have either 'replace', 'include_file', 'image_path', or 'form'` });
+      errors.push({
+        message: `snippet #${i}: must have either 'replace', 'include_file', 'image_path', or 'form'`,
+      });
     } else if (replacementKindCount > 1) {
-      errors.push({ message: `snippet #${i}: cannot combine 'replace', 'include_file', and 'form'` });
+      errors.push({
+        message: `snippet #${i}: cannot combine 'replace', 'include_file', and 'form'`,
+      });
     } else if (hasReplace) {
       if (typeof replace !== "string" || !replace) {
         errors.push({ message: `snippet #${i}: 'replace' must be a non-empty string` });
@@ -101,7 +109,9 @@ export async function validate(
       if (typeof includeFile !== "string" || !includeFile) {
         errors.push({ message: `snippet #${i}: 'include_file' must be a non-empty string` });
       } else if (isImageFilePath(includeFile)) {
-        errors.push({ message: `snippet #${i}: 'include_file' cannot be an image file ('${includeFile}'). Use 'image_path' for image snippets.` });
+        errors.push({
+          message: `snippet #${i}: 'include_file' cannot be an image file ('${includeFile}'). Use 'image_path' for image snippets.`,
+        });
       } else if (options?.snippetsDir && options?.checkFileExists) {
         // Resolve absolute or relative path
         // For simplicity, we pass the relative includeFile to checkFileExists helper

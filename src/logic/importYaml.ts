@@ -65,7 +65,11 @@ function isPlainObject(value: any): value is Record<string, any> {
 }
 
 function getVerboseFormVar(varsBlock: any[]): any | null {
-  return varsBlock.find((v) => v?.type === "form" && isPlainObject(v?.params) && v.params.layout !== undefined) || null;
+  return (
+    varsBlock.find(
+      (v) => v?.type === "form" && isPlainObject(v?.params) && v.params.layout !== undefined,
+    ) || null
+  );
 }
 
 function getSupportedFormCompanionVars(varsBlock: any[], formVar: any): any[] {
@@ -75,10 +79,10 @@ function getSupportedFormCompanionVars(varsBlock: any[], formVar: any): any[] {
 export function parseYamlMatch(
   match: any,
   fileName: string,
-  originalMatchIndex = -1
+  originalMatchIndex = -1,
 ): { matches: ImportedMatch[]; warnings: string[] } {
   const warnings: string[] = [];
-  let triggers: string[] = [];
+  let triggers: string[];
 
   if (match.triggers !== undefined && match.triggers !== null) {
     triggers = Array.isArray(match.triggers)
@@ -101,9 +105,10 @@ export function parseYamlMatch(
         const originalName = parts[parts.length - 1];
         const resourceFilename = getResourceFilename(originalName);
 
-        const originalSnippet: Snippet = triggers.length > 1
-          ? { triggers, include_file: resourceFilename }
-          : { trigger: triggers[0], include_file: resourceFilename };
+        const originalSnippet: Snippet =
+          triggers.length > 1
+            ? { triggers, include_file: resourceFilename }
+            : { trigger: triggers[0], include_file: resourceFilename };
         if (match.description) {
           originalSnippet.description = match.description;
         }
@@ -133,7 +138,9 @@ export function parseYamlMatch(
     const formVar = getVerboseFormVar(varsBlock);
     if (formVar) {
       const companionVars = getSupportedFormCompanionVars(varsBlock, formVar);
-      const fields = isPlainObject(formVar.params.fields) ? { form_fields: formVar.params.fields } : {};
+      const fields = isPlainObject(formVar.params.fields)
+        ? { form_fields: formVar.params.fields }
+        : {};
       const vars = companionVars.length > 0 ? { vars: companionVars } : {};
       const formSnippet = {
         form: String(formVar.params.layout),
@@ -141,9 +148,10 @@ export function parseYamlMatch(
         ...vars,
       };
 
-      const originalSnippet: Snippet = triggers.length > 1
-        ? { triggers, ...formSnippet }
-        : { trigger: triggers[0], ...formSnippet };
+      const originalSnippet: Snippet =
+        triggers.length > 1
+          ? { triggers, ...formSnippet }
+          : { trigger: triggers[0], ...formSnippet };
       if (match.description) {
         originalSnippet.description = match.description;
       }
@@ -165,9 +173,10 @@ export function parseYamlMatch(
 
   const imagePath = match.image_path;
   if (imagePath !== undefined && imagePath !== null) {
-    const originalSnippet: Snippet = triggers.length > 1
-      ? { triggers, image_path: String(imagePath) }
-      : { trigger: triggers[0], image_path: String(imagePath) };
+    const originalSnippet: Snippet =
+      triggers.length > 1
+        ? { triggers, image_path: String(imagePath) }
+        : { trigger: triggers[0], image_path: String(imagePath) };
     if (match.description) {
       originalSnippet.description = match.description;
     }
@@ -189,9 +198,10 @@ export function parseYamlMatch(
   const form = match.form;
   if (form !== undefined && form !== null) {
     const sharedFields = isPlainObject(match.form_fields) ? { form_fields: match.form_fields } : {};
-    const originalSnippet: Snippet = triggers.length > 1
-      ? { triggers, form: String(form), ...sharedFields }
-      : { trigger: triggers[0], form: String(form), ...sharedFields };
+    const originalSnippet: Snippet =
+      triggers.length > 1
+        ? { triggers, form: String(form), ...sharedFields }
+        : { trigger: triggers[0], form: String(form), ...sharedFields };
     if (match.description) {
       originalSnippet.description = match.description;
     }
@@ -219,9 +229,10 @@ export function parseYamlMatch(
     };
   }
 
-  const originalSnippet: Snippet = triggers.length > 1
-    ? { triggers, replace: String(replace) }
-    : { trigger: triggers[0], replace: String(replace) };
+  const originalSnippet: Snippet =
+    triggers.length > 1
+      ? { triggers, replace: String(replace) }
+      : { trigger: triggers[0], replace: String(replace) };
   if (match.description) {
     originalSnippet.description = match.description;
   }
@@ -246,10 +257,7 @@ export function parseYamlMatch(
   return { matches, warnings };
 }
 
-export function importYamlContent(
-  yamlContent: string,
-  fileName: string
-): ImportResult {
+export function importYamlContent(yamlContent: string, fileName: string): ImportResult {
   const warnings: string[] = [];
   const importedMatches: ImportedMatch[] = [];
   const snippets: Snippet[] = [];

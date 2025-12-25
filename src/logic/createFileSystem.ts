@@ -4,7 +4,7 @@
 
 export interface DirectoryOption {
   relativePath: string; // "" for root match dir, or "work", "work/email" etc.
-  fullPath: string;     // Absolute path
+  fullPath: string; // Absolute path
 }
 
 export function normalizeYamlFileName(fileName: string): string {
@@ -16,7 +16,10 @@ export function normalizeYamlFileName(fileName: string): string {
   return `${trimmed}.yml`;
 }
 
-export function validateFileName(fileName: string, existingFileNames: string[] = []): string | null {
+export function validateFileName(
+  fileName: string,
+  existingFileNames: string[] = [],
+): string | null {
   const normalized = normalizeYamlFileName(fileName);
   if (!normalized) {
     return "File name cannot be empty.";
@@ -24,12 +27,12 @@ export function validateFileName(fileName: string, existingFileNames: string[] =
 
   // Check invalid filename characters
   if (/[\\/:*?"<>|]/.test(fileName.trim())) {
-    return "File name contains invalid characters (/ \\ : * ? \" < > |).";
+    return 'File name contains invalid characters (/ \\ : * ? " < > |).';
   }
 
   const lowerNormalized = normalized.toLowerCase();
   const isDuplicate = existingFileNames.some(
-    (existing) => existing.toLowerCase() === lowerNormalized
+    (existing) => existing.toLowerCase() === lowerNormalized,
   );
 
   if (isDuplicate) {
@@ -45,7 +48,10 @@ export function isProtectedDirectoryName(name: string): boolean {
   return PROTECTED_DIRECTORY_NAMES.has(name.trim().toLowerCase());
 }
 
-export function validateFolderName(folderName: string, existingFolderNames: string[] = []): string | null {
+export function validateFolderName(
+  folderName: string,
+  existingFolderNames: string[] = [],
+): string | null {
   const trimmed = folderName.trim();
   if (!trimmed) {
     return "Folder name cannot be empty.";
@@ -56,12 +62,12 @@ export function validateFolderName(folderName: string, existingFolderNames: stri
   }
 
   if (/[\\/:*?"<>|]/.test(trimmed)) {
-    return "Folder name contains invalid characters (/ \\ : * ? \" < > |).";
+    return 'Folder name contains invalid characters (/ \\ : * ? " < > |).';
   }
 
   const lowerTrimmed = trimmed.toLowerCase();
   const isDuplicate = existingFolderNames.some(
-    (existing) => existing.toLowerCase() === lowerTrimmed
+    (existing) => existing.toLowerCase() === lowerTrimmed,
   );
 
   if (isDuplicate) {

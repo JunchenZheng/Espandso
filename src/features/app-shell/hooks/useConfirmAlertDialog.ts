@@ -11,14 +11,17 @@ export function useConfirmAlertDialog() {
     confirmText: t("actions.ok"),
   });
 
-  const showAlert = useCallback((description: string, title = t("app.name")) => {
-    setAlertDialog({
-      isOpen: true,
-      title,
-      description,
-      confirmText: t("actions.ok"),
-    });
-  }, [t]);
+  const showAlert = useCallback(
+    (description: string, title = t("app.name")) => {
+      setAlertDialog({
+        isOpen: true,
+        title,
+        description,
+        confirmText: t("actions.ok"),
+      });
+    },
+    [t],
+  );
 
   const showConfirm = useCallback(
     (

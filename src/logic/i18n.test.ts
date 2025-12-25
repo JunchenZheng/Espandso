@@ -12,7 +12,6 @@ describe("i18n translation tests", () => {
     expect(translate("en", "settings.language")).toBe("Language");
   });
 
-
   it("should return correct Chinese string for simple and nested keys", () => {
     expect(translate("zh-CN", "actions.refresh")).toBe("刷新");
     expect(translate("zh-CN", "settings.language")).toBe("界面语言");
@@ -28,12 +27,12 @@ describe("i18n translation tests", () => {
 
   it("should correctly interpolate parameters into templates", () => {
     expect(interpolate("Hello {{name}}!", { name: "World" })).toBe("Hello World!");
-    expect(
-      translate("en", "errors.failedToSaveSnippet", { message: "Disk full" })
-    ).toBe("Failed to save snippet: Disk full");
-    expect(
-      translate("zh-CN", "errors.failedToSaveSnippet", { message: "磁盘已满" })
-    ).toBe("保存片段失败：磁盘已满");
+    expect(translate("en", "errors.failedToSaveSnippet", { message: "Disk full" })).toBe(
+      "Failed to save snippet: Disk full",
+    );
+    expect(translate("zh-CN", "errors.failedToSaveSnippet", { message: "磁盘已满" })).toBe(
+      "保存片段失败：磁盘已满",
+    );
   });
 
   it("should have matching key structure between en and zh-CN", () => {

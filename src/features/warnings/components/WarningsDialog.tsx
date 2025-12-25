@@ -31,22 +31,15 @@ export function WarningsDialog({
   onOpenFileExternal,
 }: WarningsDialogProps) {
   const { t } = useI18n();
-  const previewsWithWarnings = previews.filter(
-    (p) => p.warnings && p.warnings.length > 0
-  );
+  const previewsWithWarnings = previews.filter((p) => p.warnings && p.warnings.length > 0);
 
-  const totalWarningsCount = previewsWithWarnings.reduce(
-    (acc, p) => acc + p.warnings.length,
-    0
-  );
+  const totalWarningsCount = previewsWithWarnings.reduce((acc, p) => acc + p.warnings.length, 0);
 
   const activeFilterPreview = filterPath
     ? previewsWithWarnings.find((p) => p.config.path === filterPath)
     : null;
 
-  const displayPreviews = activeFilterPreview
-    ? [activeFilterPreview]
-    : previewsWithWarnings;
+  const displayPreviews = activeFilterPreview ? [activeFilterPreview] : previewsWithWarnings;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -76,7 +69,8 @@ export function WarningsDialog({
               <div className="flex items-center gap-2 text-amber-900 min-w-0">
                 <Filter className="h-3.5 w-3.5 shrink-0 text-amber-700" />
                 <span className="truncate">
-                  {t("dialogs.warnings.filteringFor")}: <strong>{activeFilterPreview.config.relativePath}</strong>
+                  {t("dialogs.warnings.filteringFor")}:{" "}
+                  <strong>{activeFilterPreview.config.relativePath}</strong>
                 </span>
               </div>
               {onClearFilter && (
@@ -95,7 +89,9 @@ export function WarningsDialog({
           {displayPreviews.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <CheckCircle2 className="h-10 w-10 text-emerald-500/80 mb-2" />
-              <p className="text-sm font-medium text-foreground">{t("dialogs.warnings.noWarnings")}</p>
+              <p className="text-sm font-medium text-foreground">
+                {t("dialogs.warnings.noWarnings")}
+              </p>
             </div>
           ) : (
             <ScrollArea className="max-h-[60vh] pr-2">
@@ -114,7 +110,8 @@ export function WarningsDialog({
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
                         <span className="rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 text-[11px] font-medium">
-                          {preview.warnings.length} {t(preview.warnings.length === 1 ? "counts.warning" : "counts.warnings")}
+                          {preview.warnings.length}{" "}
+                          {t(preview.warnings.length === 1 ? "counts.warning" : "counts.warnings")}
                         </span>
                         {onSelectFile && preview.config.path !== filterPath && (
                           <Button

@@ -71,7 +71,10 @@ export const DATE_FORMAT_OPTIONS: DateFormatOption[] = [
 /**
  * Generates a unique variable name for a new date variable to avoid collisions.
  */
-export function generateUniqueVarName(existingVars: SnippetVar[], baseName: string = "mydate"): string {
+export function generateUniqueVarName(
+  existingVars: SnippetVar[],
+  baseName: string = "mydate",
+): string {
   const existingNames = new Set(existingVars.map((v) => v.name));
   if (!existingNames.has(baseName)) {
     return baseName;
