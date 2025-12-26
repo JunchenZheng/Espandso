@@ -35,7 +35,7 @@ export interface SearchResult {
 export function searchSnippets<T extends SearchableConfigPreview>(
   previews: T[],
   query: string,
-  scope: SearchScope
+  scope: SearchScope,
 ): SearchResult[] {
   const trimmedQuery = query.trim().toLowerCase();
   if (!trimmedQuery) return [];
@@ -56,9 +56,7 @@ export function searchSnippets<T extends SearchableConfigPreview>(
       // Check trigger scope
       if (scope.trigger) {
         const triggers = getSnippetTriggers(snippet);
-        const matchesTrigger = triggers.some((t) =>
-          t.toLowerCase().includes(trimmedQuery)
-        );
+        const matchesTrigger = triggers.some((t) => t.toLowerCase().includes(trimmedQuery));
         if (matchesTrigger) {
           matchedFields.push("trigger");
         }

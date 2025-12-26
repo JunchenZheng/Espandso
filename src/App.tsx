@@ -32,7 +32,9 @@ const MAX_COLLECTION_PANE_WIDTH = 40;
 function App() {
   const { t } = useI18n();
   const [isDragging, setIsDragging] = useState<boolean>(false);
-  const [collectionPaneWidth, setCollectionPaneWidth] = useState<number>(DEFAULT_COLLECTION_PANE_WIDTH);
+  const [collectionPaneWidth, setCollectionPaneWidth] = useState<number>(
+    DEFAULT_COLLECTION_PANE_WIDTH,
+  );
   const [isCollectionResizing, setIsCollectionResizing] = useState<boolean>(false);
   const mainSplitRef = useRef<HTMLDivElement | null>(null);
 
@@ -92,14 +94,10 @@ function App() {
     handleCreateFolder,
   } = useEspansoConfigs({ isYamlWarningsEnabled });
 
-  const {
-    isSearchOpen,
-    setIsSearchOpen,
-    highlightedSnippetIndex,
-    handleSelectSearchResult,
-  } = useSearchIndex({
-    onSelectConfigPath: setSelectedEspansoConfigPath,
-  });
+  const { isSearchOpen, setIsSearchOpen, highlightedSnippetIndex, handleSelectSearchResult } =
+    useSearchIndex({
+      onSelectConfigPath: setSelectedEspansoConfigPath,
+    });
 
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isLogOpen, setIsLogOpen] = useState<boolean>(false);
@@ -146,20 +144,28 @@ function App() {
     if (rect.width <= 0) return;
 
     const nextWidth = ((clientX - rect.left) / rect.width) * 100;
-    setCollectionPaneWidth(Math.min(MAX_COLLECTION_PANE_WIDTH, Math.max(MIN_COLLECTION_PANE_WIDTH, nextWidth)));
+    setCollectionPaneWidth(
+      Math.min(MAX_COLLECTION_PANE_WIDTH, Math.max(MIN_COLLECTION_PANE_WIDTH, nextWidth)),
+    );
   }, []);
 
-  const startCollectionResize = useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
-    event.preventDefault();
-    event.currentTarget.setPointerCapture(event.pointerId);
-    setIsCollectionResizing(true);
-    updateCollectionPaneWidth(event.clientX);
-  }, [updateCollectionPaneWidth]);
+  const startCollectionResize = useCallback(
+    (event: React.PointerEvent<HTMLButtonElement>) => {
+      event.preventDefault();
+      event.currentTarget.setPointerCapture(event.pointerId);
+      setIsCollectionResizing(true);
+      updateCollectionPaneWidth(event.clientX);
+    },
+    [updateCollectionPaneWidth],
+  );
 
-  const handleCollectionResizeMove = useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
-    if (!isCollectionResizing) return;
-    updateCollectionPaneWidth(event.clientX);
-  }, [isCollectionResizing, updateCollectionPaneWidth]);
+  const handleCollectionResizeMove = useCallback(
+    (event: React.PointerEvent<HTMLButtonElement>) => {
+      if (!isCollectionResizing) return;
+      updateCollectionPaneWidth(event.clientX);
+    },
+    [isCollectionResizing, updateCollectionPaneWidth],
+  );
 
   const stopCollectionResize = useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
@@ -182,12 +188,7 @@ function App() {
     };
   }, [isCollectionResizing]);
 
-  const {
-    alertDialog,
-    showAlert,
-    showConfirm,
-    closeAlertDialog,
-  } = useConfirmAlertDialog();
+  const { alertDialog, showAlert, showConfirm, closeAlertDialog } = useConfirmAlertDialog();
 
   const {
     chooseSnippetFile,

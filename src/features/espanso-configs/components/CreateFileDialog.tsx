@@ -51,9 +51,7 @@ export function CreateFileDialog({
             <FilePlus className="h-5 w-5 text-primary" />
             {t("filesystem.createFile")}
           </DialogTitle>
-          <DialogDescription>
-            {t("filesystem.createFileDescription")}
-          </DialogDescription>
+          <DialogDescription>{t("filesystem.createFileDescription")}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
@@ -84,9 +82,7 @@ export function CreateFileDialog({
               }}
               autoFocus
             />
-            <p className="text-xs text-muted-foreground">
-              {t("filesystem.fileExtensionHint")}
-            </p>
+            <p className="text-xs text-muted-foreground">{t("filesystem.fileExtensionHint")}</p>
           </div>
 
           <div className="space-y-2">

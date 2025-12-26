@@ -1,15 +1,34 @@
 import { describe, it, expect } from "vitest";
 import { validate } from "./validate";
 import { importYamlContent } from "./importYaml";
-import { appendSnippetToYamlContent, deleteSnippetFromYamlContent, deleteMultipleSnippetsFromYamlContent, deleteSelectedTriggersFromYamlContent, findSnippetLineRangeInYaml, findSnippetLineRangesInYaml, findDeleteSelectionLineRangesInYaml, replaceSnippetInYamlContent, snippetToYamlMatch } from "./yamlEditor";
-import { isEspansoYamlConfigFile, parseEspansoConfigDir, sortEspansoConfigFiles } from "./espansoPaths";
+import {
+  appendSnippetToYamlContent,
+  deleteSnippetFromYamlContent,
+  deleteMultipleSnippetsFromYamlContent,
+  deleteSelectedTriggersFromYamlContent,
+  findSnippetLineRangeInYaml,
+  findSnippetLineRangesInYaml,
+  findDeleteSelectionLineRangesInYaml,
+  replaceSnippetInYamlContent,
+  snippetToYamlMatch,
+} from "./yamlEditor";
+import {
+  isEspansoYamlConfigFile,
+  parseEspansoConfigDir,
+  sortEspansoConfigFiles,
+} from "./espansoPaths";
 import {
   getIncludeFileCandidates,
   buildIncludeFileShellCommand,
   resolveAndExecuteIncludeFileCommand,
   resolveExistingIncludeFilePath,
 } from "./resolveIncludeFile";
-import { getSnippetTriggers, normalizeTriggerLines, buildTriggerInput, isImageFilePath } from "./snippetUtils";
+import {
+  getSnippetTriggers,
+  normalizeTriggerLines,
+  buildTriggerInput,
+  isImageFilePath,
+} from "./snippetUtils";
 import { isBinaryData, checkIsBinaryFilePath } from "./fileCheck";
 
 describe("snippetUtils", () => {
@@ -117,7 +136,9 @@ describe("validate", () => {
     expect(messages).toContain("snippet #0: 'trigger' must be a non-empty string");
     expect(messages).toContain("snippet #2: duplicate trigger ':dup' (first at #1)");
     expect(messages).toContain("snippet #3: cannot combine 'replace', 'include_file', and 'form'");
-    expect(messages).toContain("snippet #4: must have either 'replace', 'include_file', 'image_path', or 'form'");
+    expect(messages).toContain(
+      "snippet #4: must have either 'replace', 'include_file', 'image_path', or 'form'",
+    );
     expect(messages).toContain("snippet #6: cannot have both 'trigger' and 'triggers'");
     expect(messages).toContain("snippet #7: duplicate trigger ':t1' (first at #7)");
     expect(messages).toContain("snippet #8: 'form' must be a non-empty string");
@@ -173,12 +194,19 @@ matches:
     expect(res.snippets[0]).toEqual({ trigger: ":hello", replace: "world", description: "simple" });
     expect(res.snippets[1]).toEqual({ trigger: ":hi", replace: "greeting" });
     expect(res.snippets[2]).toEqual({ trigger: ":hey", replace: "greeting" });
-    expect(res.snippets[3]).toEqual({ trigger: ":cat", image_path: "/path/to/cat.png", description: "cat image" });
+    expect(res.snippets[3]).toEqual({
+      trigger: ":cat",
+      image_path: "/path/to/cat.png",
+      description: "cat image",
+    });
     expect(res.importedMatches[1].originalMatchIndex).toBe(1);
     expect(res.importedMatches[1].triggerIndex).toBe(0);
     expect(res.importedMatches[2].originalMatchIndex).toBe(1);
     expect(res.importedMatches[2].triggerIndex).toBe(1);
-    expect(res.importedMatches[1].originalSnippet).toEqual({ triggers: [":hi", ":hey"], replace: "greeting" });
+    expect(res.importedMatches[1].originalSnippet).toEqual({
+      triggers: [":hi", ":hey"],
+      replace: "greeting",
+    });
   });
 
   it("should import include_file snippets and snippets with custom vars (like date) with replace block", () => {
@@ -213,7 +241,10 @@ matches:
     const res = importYamlContent(yaml, "test.yml");
     expect(res.snippets).toHaveLength(3);
     expect(res.snippets[0]).toEqual({ trigger: ":inc_legacy", include_file: "resource_data.json" });
-    expect(res.snippets[1]).toEqual({ trigger: ":inc_single", include_file: "single_resource_data.json" });
+    expect(res.snippets[1]).toEqual({
+      trigger: ":inc_single",
+      include_file: "single_resource_data.json",
+    });
     expect(res.snippets[2]).toEqual({
       trigger: ":custom_var",
       replace: "ISO date: {{bad}}",
@@ -489,7 +520,7 @@ matches:
     });
 
     expect(updated).toContain("trigger: :cat");
-    expect(updated).toContain('image_path: /path/to/cat.png');
+    expect(updated).toContain("image_path: /path/to/cat.png");
     expect(updated).toContain("description: cat image snippet");
   });
 
@@ -544,7 +575,9 @@ matches:
     expect(updated).toContain("type: date");
     expect(updated).toContain("name: form1");
     expect(updated).toContain("type: form");
-    expect(updated).toContain("layout: |-\n            Date: {{mydate}}\n            Name: [[name]]");
+    expect(updated).toContain(
+      "layout: |-\n            Date: {{mydate}}\n            Name: [[name]]",
+    );
     expect(updated).toContain("fields:");
     expect(updated).not.toContain("form_fields:");
   });
@@ -801,10 +834,7 @@ describe("resolveIncludeFile", () => {
       currentYamlFile: "/Workspace/match/anki/cards.yml",
     });
 
-    expect(candidates).toEqual([
-      "/Workspace/match/anki/resource.md",
-      "resource.md",
-    ]);
+    expect(candidates).toEqual(["/Workspace/match/anki/resource.md", "resource.md"]);
   });
 
   it("should build shell cat command for path", () => {
@@ -851,7 +881,7 @@ describe("resolveIncludeFile", () => {
           return mockFiles[match[1]];
         }
         throw new Error("Command failed");
-      }
+      },
     );
 
     expect(res.found).toBe(true);
@@ -874,7 +904,7 @@ describe("resolveIncludeFile", () => {
           return "loaded through shell";
         }
         throw new Error("Command failed");
-      }
+      },
     );
 
     expect(res.found).toBe(true);

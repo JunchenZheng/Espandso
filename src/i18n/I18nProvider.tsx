@@ -42,12 +42,8 @@ export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({ children
     (key: string, params?: InterpolationParams) => {
       return translate(locale, key, params);
     },
-    [locale]
+    [locale],
   );
 
-  return (
-    <I18nContext.Provider value={{ locale, setLocale, t }}>
-      {children}
-    </I18nContext.Provider>
-  );
+  return <I18nContext.Provider value={{ locale, setLocale, t }}>{children}</I18nContext.Provider>;
 };

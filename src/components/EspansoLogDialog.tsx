@@ -10,13 +10,7 @@ import {
   PlayCircle,
   AlertCircle,
 } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "./ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Button } from "./ui/button";
 import { getEspansoLog } from "../services/espansoRuntimeService";
 import { useI18n } from "../i18n/useI18n";
@@ -136,7 +130,10 @@ export function EspansoLogDialog({ open, onOpenChange }: EspansoLogDialogProps) 
               <div className="flex items-center gap-2">
                 <DialogTitle className="text-xl font-bold">{t("dialogs.logs.title")}</DialogTitle>
                 {autoRefresh && (
-                  <span className="flex h-2 w-2 relative" title={t("dialogs.logs.realtimePollingActive")}>
+                  <span
+                    className="flex h-2 w-2 relative"
+                    title={t("dialogs.logs.realtimePollingActive")}
+                  >
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                   </span>
@@ -175,7 +172,9 @@ export function EspansoLogDialog({ open, onOpenChange }: EspansoLogDialogProps) 
               className="h-8 text-sm gap-1.5 px-2.5"
               onClick={() => setAutoScroll(!autoScroll)}
             >
-              <ArrowDownCircle className={`h-3.5 w-3.5 ${autoScroll ? "text-primary" : "text-muted-foreground"}`} />
+              <ArrowDownCircle
+                className={`h-3.5 w-3.5 ${autoScroll ? "text-primary" : "text-muted-foreground"}`}
+              />
               <span>{t("dialogs.logs.scroll")}</span>
             </Button>
 
@@ -247,9 +246,14 @@ export function EspansoLogDialog({ open, onOpenChange }: EspansoLogDialogProps) 
         {/* Footer Statistics */}
         <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-1 border-t">
           <div className="flex items-center gap-3">
-            <span>{t("dialogs.logs.totalLines")}: <strong className="text-foreground">{lines.length}</strong></span>
+            <span>
+              {t("dialogs.logs.totalLines")}:{" "}
+              <strong className="text-foreground">{lines.length}</strong>
+            </span>
             {lastUpdated && (
-              <span>{t("dialogs.logs.lastUpdated")}: {lastUpdated.toLocaleTimeString()}</span>
+              <span>
+                {t("dialogs.logs.lastUpdated")}: {lastUpdated.toLocaleTimeString()}
+              </span>
             )}
           </div>
           <div className="flex items-center gap-2">

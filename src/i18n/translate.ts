@@ -31,11 +31,7 @@ export function interpolate(text: string, params?: InterpolationParams): string 
   });
 }
 
-export function translate(
-  locale: Locale,
-  key: string,
-  params?: InterpolationParams
-): string {
+export function translate(locale: Locale, key: string, params?: InterpolationParams): string {
   const targetDict = locales[locale] || locales[DEFAULT_LOCALE];
   let rawText = getNestedValue(targetDict, key);
 

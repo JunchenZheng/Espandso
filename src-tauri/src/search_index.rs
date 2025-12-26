@@ -236,10 +236,7 @@ pub fn open_and_init_db(db_path: &Path) -> SqlResult<Connection> {
 }
 
 fn normalize_match_dir(match_dir: &str) -> String {
-    match_dir
-        .trim()
-        .trim_end_matches(|c| c == '/' || c == '\\')
-        .to_string()
+    match_dir.trim().trim_end_matches(['/', '\\']).to_string()
 }
 
 fn escape_like_pattern(value: &str) -> String {
@@ -378,11 +375,11 @@ fn only_cat_var_types(vars_block: &[serde_yaml::Value]) -> bool {
 fn get_verbose_form_var(vars_block: &[serde_yaml::Value]) -> Option<&serde_yaml::Value> {
     vars_block.iter().find(|v| {
         let vtype = v.get("type").and_then(|t| t.as_str()).unwrap_or("");
-        let has_params = v.get("params").map_or(false, |p| p.is_mapping());
+        let has_params = v.get("params").is_some_and(|p| p.is_mapping());
         let has_layout = v
             .get("params")
             .and_then(|p| p.get("layout"))
-            .map_or(false, |l| !l.is_null());
+            .is_some_and(|l| !l.is_null());
         vtype == "form" && has_params && has_layout
     })
 }
@@ -889,10 +886,8 @@ pub fn sync_match_dir(db_path: &Path, match_dir: &str) -> Result<SearchIndexStat
                 ))
             })
             .map_err(|e| e.to_string())?;
-        for r in rows {
-            if let Ok((fp, mtime, size)) = r {
-                db_files.insert(fp, (mtime, size));
-            }
+        for (fp, mtime, size) in rows.flatten() {
+            db_files.insert(fp, (mtime, size));
         }
     }
 
@@ -903,11 +898,7 @@ pub fn sync_match_dir(db_path: &Path, match_dir: &str) -> Result<SearchIndexStat
     let walker = WalkDir::new(match_path).into_iter();
     for entry in walker.filter_entry(|e| {
         let name = e.file_name().to_string_lossy();
-        if name.starts_with('.') || name == "packages" {
-            false
-        } else {
-            true
-        }
+        !(name.starts_with('.') || name == "packages")
     }) {
         let entry = match entry {
             Ok(e) => e,
@@ -1166,10 +1157,8 @@ pub fn query_snippet_index(
         )
         .map_err(|e| e.to_string())?;
 
-    for r in match_rows {
-        if let Ok(data) = r {
-            rows_data.push(data);
-        }
+    for data in match_rows.flatten() {
+        rows_data.push(data);
     }
 
     let mut results = Vec::new();
@@ -1367,12 +1356,7 @@ pub fn start_search_index_watcher(
     thread::spawn(move || {
         let mut pending_paths: Vec<PathBuf> = Vec::new();
 
-        loop {
-            let first_event = match rx.recv() {
-                Ok(event) => event,
-                Err(_) => break,
-            };
-
+        while let Ok(first_event) = rx.recv() {
             if let Ok(event) = first_event {
                 if is_relevant_watch_event(&event) {
                     pending_paths.extend(event.paths);

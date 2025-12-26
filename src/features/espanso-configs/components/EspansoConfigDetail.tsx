@@ -178,11 +178,7 @@ export function EspansoConfigDetail({
                   {t("actions.visualEditor")}
                 </Button>
               )}
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setIsBatchMode(true)}
-              >
+              <Button size="sm" variant="outline" onClick={() => setIsBatchMode(true)}>
                 <ListChecks className="h-4 w-4" />
                 {t("actions.batchSelect")}
               </Button>
@@ -200,7 +196,7 @@ export function EspansoConfigDetail({
           "grid h-9 shrink-0 items-center border-b bg-secondary/40 px-3 text-xs font-semibold text-muted-foreground",
           isBatchMode
             ? "grid-cols-[2.25rem_minmax(7rem,0.8fr)_minmax(4.5rem,0.45fr)_minmax(8rem,1fr)_minmax(12rem,2fr)]"
-            : "grid-cols-[minmax(7rem,0.8fr)_minmax(4.5rem,0.45fr)_minmax(8rem,1fr)_minmax(12rem,2fr)]"
+            : "grid-cols-[minmax(7rem,0.8fr)_minmax(4.5rem,0.45fr)_minmax(8rem,1fr)_minmax(12rem,2fr)]",
         )}
       >
         {isBatchMode && (
@@ -239,7 +235,10 @@ export function EspansoConfigDetail({
               {visibleSnippets.map((snippet, offset) => {
                 const index = startIndex + offset;
                 const triggers = getSnippetTriggers(snippet);
-                const displayTrigger = triggers.length > 0 ? triggers.join(", ") : t("snippets.snippetNumber", { number: index + 1 });
+                const displayTrigger =
+                  triggers.length > 0
+                    ? triggers.join(", ")
+                    : t("snippets.snippetNumber", { number: index + 1 });
                 const snippetKind = snippet.include_file
                   ? "file"
                   : snippet.image_path !== undefined
@@ -266,8 +265,10 @@ export function EspansoConfigDetail({
                       isBatchMode
                         ? "grid-cols-[2.25rem_minmax(7rem,0.8fr)_minmax(4.5rem,0.45fr)_minmax(8rem,1fr)_minmax(12rem,2fr)]"
                         : "grid-cols-[minmax(7rem,0.8fr)_minmax(4.5rem,0.45fr)_minmax(8rem,1fr)_minmax(12rem,2fr)]",
-                      isSelected && "bg-emerald-500/15 hover:bg-emerald-500/20 border-l-2 border-l-emerald-500",
-                      isHighlighted && "bg-emerald-500/20 hover:bg-emerald-500/30 border-l-4 border-l-emerald-500 font-semibold ring-1 ring-emerald-500/50 animate-pulse"
+                      isSelected &&
+                        "bg-emerald-500/15 hover:bg-emerald-500/20 border-l-2 border-l-emerald-500",
+                      isHighlighted &&
+                        "bg-emerald-500/20 hover:bg-emerald-500/30 border-l-4 border-l-emerald-500 font-semibold ring-1 ring-emerald-500/50 animate-pulse",
                     )}
                     onClick={() => {
                       if (isBatchMode) {
@@ -275,7 +276,7 @@ export function EspansoConfigDetail({
                       } else {
                         onViewSnippet(
                           preview.importedMatches[index] || { snippet, originalMatchIndex: index },
-                          index
+                          index,
                         );
                       }
                     }}
@@ -295,7 +296,9 @@ export function EspansoConfigDetail({
                         />
                       </div>
                     )}
-                    <div className="mono-field min-w-0 truncate pr-3 text-sm font-medium">{displayTrigger}</div>
+                    <div className="mono-field min-w-0 truncate pr-3 text-sm font-medium">
+                      {displayTrigger}
+                    </div>
                     <div className="flex items-center gap-1.5 min-w-0 pr-2">
                       <span
                         className={cn(
@@ -321,9 +324,7 @@ export function EspansoConfigDetail({
                         {snippet.description || ""}
                       </div>
                     </div>
-                    <div className="min-w-0 truncate text-muted-foreground">
-                      {snippetPreview}
-                    </div>
+                    <div className="min-w-0 truncate text-muted-foreground">{snippetPreview}</div>
                   </button>
                 );
               })}

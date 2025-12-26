@@ -76,7 +76,7 @@ export function buildIncludeFileShellCommand(absPath: string): string {
 
 export async function resolveExistingIncludeFilePath(
   options: ResolveIncludeFileOptions,
-  checkExists: (path: string) => Promise<boolean>
+  checkExists: (path: string) => Promise<boolean>,
 ): Promise<string | null> {
   const candidates = getIncludeFileCandidates(options);
 
@@ -106,7 +106,7 @@ export async function resolveAndExecuteIncludeFileCommand(
   options: ResolveIncludeFileOptions,
   checkExists: (path: string) => Promise<boolean>,
   executeCmd: (cmd: string) => Promise<string>,
-  readTextFallback?: (path: string) => Promise<string>
+  readTextFallback?: (path: string) => Promise<string>,
 ): Promise<ReadIncludeFileResult> {
   const candidates = getIncludeFileCandidates(options);
   if (candidates.length === 0) {
@@ -117,7 +117,10 @@ export async function resolveAndExecuteIncludeFileCommand(
     };
   }
 
-  const tryReadPath = async (path: string, allowReadFallback: boolean): Promise<ReadIncludeFileResult | null> => {
+  const tryReadPath = async (
+    path: string,
+    allowReadFallback: boolean,
+  ): Promise<ReadIncludeFileResult | null> => {
     const command = buildIncludeFileShellCommand(path);
 
     try {

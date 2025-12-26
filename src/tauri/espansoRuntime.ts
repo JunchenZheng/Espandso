@@ -96,5 +96,3 @@ export async function getEspansoLog(): Promise<EspansoLogResult> {
     };
   }
 }
-
-

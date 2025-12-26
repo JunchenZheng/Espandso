@@ -1,11 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Search, X, FileText, Check, Database, Loader2 } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "../../../components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../../components/ui/dialog";
 import { Input } from "../../../components/ui/input";
 import { ScrollArea } from "../../../components/ui/scroll-area";
 import { useI18n } from "../../../i18n/useI18n";
@@ -81,77 +76,80 @@ export function SearchDialog<T extends SearchableConfigPreview>({
     });
   };
 
-  const runSearch = useCallback(async (offset = 0, append = false) => {
-    const trimmed = query.trim();
-    if (!trimmed) {
-      setResults([]);
-      setTotalResults(0);
-      setIsLoading(false);
-      setIsLoadingMore(false);
-      return;
-    }
-
-    if (!scope.trigger && !scope.description && !scope.content) {
-      setResults([]);
-      setTotalResults(0);
-      setIsLoading(false);
-      setIsLoadingMore(false);
-      return;
-    }
-
-    const searchId = ++activeSearchIdRef.current;
-    if (append) {
-      setIsLoadingMore(true);
-    } else {
-      setIsLoading(true);
-    }
-
-    if (matchDir) {
-      try {
-        const resp = await searchSnippetIndex({
-          matchDir,
-          query: trimmed,
-          scope,
-          limit: SEARCH_PAGE_SIZE,
-          offset,
-        });
-
-        if (searchId !== activeSearchIdRef.current) return;
-
-        setIndexStatus(resp.indexStatus);
-
-        const mapped: SearchResult[] = resp.results.map((r: SearchIndexResult) => ({
-          filePath: r.filePath,
-          fileRelativePath: r.fileRelativePath,
-          filename: r.filename,
-          snippet: r.snippet,
-          snippetIndex: r.snippetIndex,
-          originalMatchIndex: r.originalMatchIndex,
-          triggerIndex: r.triggerIndex,
-          matchedFields: r.matchedFields,
-        }));
-
-        setResults((current) => (append ? [...current, ...mapped] : mapped));
-        setTotalResults(resp.total);
+  const runSearch = useCallback(
+    async (offset = 0, append = false) => {
+      const trimmed = query.trim();
+      if (!trimmed) {
+        setResults([]);
+        setTotalResults(0);
         setIsLoading(false);
         setIsLoadingMore(false);
         return;
-      } catch (e) {
-        console.warn("SQLite search failed, falling back to loaded preview search:", e);
       }
-    }
 
-    const fallbackRes = searchSnippets(previews, trimmed, scope);
-    if (searchId !== activeSearchIdRef.current) return;
-    setResults((current) =>
-      append
-        ? [...current, ...fallbackRes.slice(offset, offset + SEARCH_PAGE_SIZE)]
-        : fallbackRes.slice(0, SEARCH_PAGE_SIZE)
-    );
-    setTotalResults(fallbackRes.length);
-    setIsLoading(false);
-    setIsLoadingMore(false);
-  }, [matchDir, previews, query, scope]);
+      if (!scope.trigger && !scope.description && !scope.content) {
+        setResults([]);
+        setTotalResults(0);
+        setIsLoading(false);
+        setIsLoadingMore(false);
+        return;
+      }
+
+      const searchId = ++activeSearchIdRef.current;
+      if (append) {
+        setIsLoadingMore(true);
+      } else {
+        setIsLoading(true);
+      }
+
+      if (matchDir) {
+        try {
+          const resp = await searchSnippetIndex({
+            matchDir,
+            query: trimmed,
+            scope,
+            limit: SEARCH_PAGE_SIZE,
+            offset,
+          });
+
+          if (searchId !== activeSearchIdRef.current) return;
+
+          setIndexStatus(resp.indexStatus);
+
+          const mapped: SearchResult[] = resp.results.map((r: SearchIndexResult) => ({
+            filePath: r.filePath,
+            fileRelativePath: r.fileRelativePath,
+            filename: r.filename,
+            snippet: r.snippet,
+            snippetIndex: r.snippetIndex,
+            originalMatchIndex: r.originalMatchIndex,
+            triggerIndex: r.triggerIndex,
+            matchedFields: r.matchedFields,
+          }));
+
+          setResults((current) => (append ? [...current, ...mapped] : mapped));
+          setTotalResults(resp.total);
+          setIsLoading(false);
+          setIsLoadingMore(false);
+          return;
+        } catch (e) {
+          console.warn("SQLite search failed, falling back to loaded preview search:", e);
+        }
+      }
+
+      const fallbackRes = searchSnippets(previews, trimmed, scope);
+      if (searchId !== activeSearchIdRef.current) return;
+      setResults((current) =>
+        append
+          ? [...current, ...fallbackRes.slice(offset, offset + SEARCH_PAGE_SIZE)]
+          : fallbackRes.slice(0, SEARCH_PAGE_SIZE),
+      );
+      setTotalResults(fallbackRes.length);
+      setIsLoading(false);
+      setIsLoadingMore(false);
+    },
+    [matchDir, previews, query, scope],
+  );
 
   // Debounced search via SQLite index with pure TS fallback
   useEffect(() => {
@@ -231,7 +229,7 @@ export function SearchDialog<T extends SearchableConfigPreview>({
                   "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer",
                   scope.trigger
                     ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-700 dark:text-emerald-300 font-semibold"
-                    : "bg-muted/40 border-transparent text-muted-foreground hover:bg-muted"
+                    : "bg-muted/40 border-transparent text-muted-foreground hover:bg-muted",
                 )}
               >
                 {scope.trigger && <Check className="h-3 w-3" />}
@@ -245,7 +243,7 @@ export function SearchDialog<T extends SearchableConfigPreview>({
                   "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer",
                   scope.description
                     ? "bg-blue-500/15 border-blue-500/40 text-blue-700 dark:text-blue-300 font-semibold"
-                    : "bg-muted/40 border-transparent text-muted-foreground hover:bg-muted"
+                    : "bg-muted/40 border-transparent text-muted-foreground hover:bg-muted",
                 )}
               >
                 {scope.description && <Check className="h-3 w-3" />}
@@ -259,7 +257,7 @@ export function SearchDialog<T extends SearchableConfigPreview>({
                   "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer",
                   scope.content
                     ? "bg-purple-500/15 border-purple-500/40 text-purple-700 dark:text-purple-300 font-semibold"
-                    : "bg-muted/40 border-transparent text-muted-foreground hover:bg-muted"
+                    : "bg-muted/40 border-transparent text-muted-foreground hover:bg-muted",
                 )}
               >
                 {scope.content && <Check className="h-3 w-3" />}
@@ -294,8 +292,14 @@ export function SearchDialog<T extends SearchableConfigPreview>({
 
               {results.map((res) => {
                 const triggers = getSnippetTriggers(res.snippet);
-                const displayTrigger = triggers.length > 0 ? triggers.join(", ") : `#${res.snippetIndex + 1}`;
-                const previewText = res.snippet.replace || res.snippet.form || res.snippet.image_path || res.snippet.include_file || "";
+                const displayTrigger =
+                  triggers.length > 0 ? triggers.join(", ") : `#${res.snippetIndex + 1}`;
+                const previewText =
+                  res.snippet.replace ||
+                  res.snippet.form ||
+                  res.snippet.image_path ||
+                  res.snippet.include_file ||
+                  "";
 
                 return (
                   <button

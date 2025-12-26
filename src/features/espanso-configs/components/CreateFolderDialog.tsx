@@ -51,9 +51,7 @@ export function CreateFolderDialog({
             <FolderPlus className="h-5 w-5 text-primary" />
             {t("filesystem.createFolder")}
           </DialogTitle>
-          <DialogDescription>
-            {t("filesystem.createFolderDescription")}
-          </DialogDescription>
+          <DialogDescription>{t("filesystem.createFolderDescription")}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2">

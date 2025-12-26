@@ -52,11 +52,16 @@ export async function getSearchIndexStatus(matchDir: string): Promise<SearchInde
   return await invoke<SearchIndexStatus>("get_search_index_status", { matchDir });
 }
 
-export async function searchSnippetIndex(request: SearchIndexRequest): Promise<SearchIndexResponse> {
+export async function searchSnippetIndex(
+  request: SearchIndexRequest,
+): Promise<SearchIndexResponse> {
   return await invoke<SearchIndexResponse>("search_snippet_index", { request });
 }
 
-export async function refreshSearchIndexFile(filePath: string, matchDir: string): Promise<SearchIndexStatus> {
+export async function refreshSearchIndexFile(
+  filePath: string,
+  matchDir: string,
+): Promise<SearchIndexStatus> {
   return await invoke<SearchIndexStatus>("refresh_search_index_file", { filePath, matchDir });
 }
 

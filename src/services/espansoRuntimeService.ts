@@ -1,4 +1,7 @@
-import { restartEspanso as tauriRestartEspanso, getEspansoLog as tauriGetEspansoLog } from "../tauri/espansoRuntime";
+import {
+  restartEspanso as tauriRestartEspanso,
+  getEspansoLog as tauriGetEspansoLog,
+} from "../tauri/espansoRuntime";
 import type { InstallResult, EspansoLogResult } from "../tauri/espansoRuntime";
 
 /**

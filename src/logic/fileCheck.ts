@@ -15,7 +15,10 @@ export function isBinaryData(data: Uint8Array | ArrayBuffer): boolean {
     return false;
   }
   // UTF-16 BE / LE BOM
-  if (len >= 2 && ((bytes[0] === 0xfe && bytes[1] === 0xff) || (bytes[0] === 0xff && bytes[1] === 0xfe))) {
+  if (
+    len >= 2 &&
+    ((bytes[0] === 0xfe && bytes[1] === 0xff) || (bytes[0] === 0xff && bytes[1] === 0xfe))
+  ) {
     return false;
   }
   // UTF-32 BE / LE BOM
@@ -34,7 +37,7 @@ export function isBinaryData(data: Uint8Array | ArrayBuffer): boolean {
     bytes[1] === 0x50 && // P
     bytes[2] === 0x44 && // D
     bytes[3] === 0x46 && // F
-    bytes[4] === 0x2d    // -
+    bytes[4] === 0x2d // -
   ) {
     return true;
   }
@@ -52,7 +55,7 @@ export function isBinaryData(data: Uint8Array | ArrayBuffer): boolean {
     }
 
     // Control character checks (ASCII < 7 or 14..31 or 127)
-    if ((b < 7 || (b > 14 && b < 32)) || b === 127) {
+    if (b < 7 || (b > 14 && b < 32) || b === 127) {
       // Check multi-byte UTF-8 sequences
       if (b >= 0xc0 && b <= 0xdf && i + 1 < maxScan) {
         if (bytes[i + 1] >= 0x80 && bytes[i + 1] <= 0xbf) {
@@ -113,7 +116,7 @@ export async function isBinaryDomFile(file: File): Promise<boolean> {
  */
 export async function checkIsBinaryFilePath(
   filePath: string,
-  readFileBytes?: (path: string) => Promise<Uint8Array>
+  readFileBytes?: (path: string) => Promise<Uint8Array>,
 ): Promise<boolean> {
   if (!filePath) return false;
 

@@ -78,7 +78,8 @@ export const en = {
     experimentalTitle: "Experimental Features",
     experimentalDescription: "Features under active testing.",
     enableYamlWarnings: "YAML Detection & Warnings",
-    enableYamlWarningsDescription: "Scan YAML files for duplicate triggers and potential syntax warnings.",
+    enableYamlWarningsDescription:
+      "Scan YAML files for duplicate triggers and potential syntax warnings.",
   },
   stats: {
     totalSnippets: "Total Snippets",
@@ -203,11 +204,11 @@ export const en = {
     emptyFolderBadge: "(empty)",
     openFileInDefaultApp: "Open {{file}} in default app",
     fileNameRequired: "File name cannot be empty.",
-    fileNameInvalidChars: "File name contains invalid characters (/ \\ : * ? \" < > |).",
-    fileAlreadyExists: "File \"{{name}}\" already exists in the selected directory.",
+    fileNameInvalidChars: 'File name contains invalid characters (/ \\ : * ? " < > |).',
+    fileAlreadyExists: 'File "{{name}}" already exists in the selected directory.',
     folderNameRequired: "Folder name cannot be empty.",
-    folderNameInvalidChars: "Folder name contains invalid characters (/ \\ : * ? \" < > |).",
-    folderAlreadyExists: "Folder \"{{name}}\" already exists in the selected directory.",
+    folderNameInvalidChars: 'Folder name contains invalid characters (/ \\ : * ? " < > |).',
+    folderAlreadyExists: 'Folder "{{name}}" already exists in the selected directory.',
     folderReserved: "'{{name}}' is a reserved Espanso directory name and cannot be used.",
   },
   table: {
@@ -223,13 +224,16 @@ export const en = {
   },
   empty: {
     noSelection: "No config or directory selected",
-    noSelectionDescription: "Select a YAML config or directory from the collection list to preview its contents.",
+    noSelectionDescription:
+      "Select a YAML config or directory from the collection list to preview its contents.",
     noYamlFilesTitle: "No YAML Config Files Found",
     noYamlFilesMessage: "Your Espanso match directory does not contain any YAML files yet.",
     noSupportedSnippets: "No supported snippets",
-    noSupportedSnippetsDescription: "This YAML file was found, but no supported Espanso matches could be previewed.",
+    noSupportedSnippetsDescription:
+      "This YAML file was found, but no supported Espanso matches could be previewed.",
     directoryEmpty: "This directory is empty",
-    directoryEmptyDescription: "Create a new YAML file or subdirectory to start organizing snippets.",
+    directoryEmptyDescription:
+      "Create a new YAML file or subdirectory to start organizing snippets.",
   },
   dialogs: {
     about: {
@@ -268,7 +272,7 @@ export const en = {
     },
     confirmDelete: {
       title: "Delete Snippet",
-      message: "Are you sure you want to delete trigger \"{{trigger}}\" from {{file}}?",
+      message: 'Are you sure you want to delete trigger "{{trigger}}" from {{file}}?',
       confirmBtn: "Delete",
     },
     confirmBatchDelete: {
@@ -288,17 +292,21 @@ export const en = {
     failedToReadFile: "[{{file}}] Failed to read file: {{message}}",
     triggerRequired: "Trigger is required and cannot be empty.",
     replaceRequired: "Replacement text is required.",
-    duplicateTrigger: "Trigger \"{{trigger}}\" is already defined in {{file}}.",
+    duplicateTrigger: 'Trigger "{{trigger}}" is already defined in {{file}}.',
     scanFailed: "Failed to scan Espanso directory.",
     failedToScanEspansoConfigs: "Failed to scan Espanso configs: {{message}}",
-    espansoPathBlocked: "Espanso path was resolved, but Tauri blocked file access. Add the Espanso match directory to the filesystem scope, then restart the app. ({{message}})",
+    espansoPathBlocked:
+      "Espanso path was resolved, but Tauri blocked file access. Add the Espanso match directory to the filesystem scope, then restart the app. ({{message}})",
     restartFailed: "Failed to restart Espanso daemon.",
     espansoMatchDirUnavailable: "Espanso match directory path is unavailable.",
     failedToCreateFile: "Failed to create file: {{message}}",
     failedToCreateDirectory: "Failed to create directory: {{message}}",
-    imageFileNotAllowed: "Selected file is an image. The File tab only supports plain text files. Please switch to the Image tab to add an image snippet.",
-    nonImageFileNotAllowed: "Selected file is not an image. The Image tab only supports image files.",
-    binaryFileNotAllowed: "Selected file is a binary file. The File tab only supports plain text files.",
+    imageFileNotAllowed:
+      "Selected file is an image. The File tab only supports plain text files. Please switch to the Image tab to add an image snippet.",
+    nonImageFileNotAllowed:
+      "Selected file is not an image. The Image tab only supports image files.",
+    binaryFileNotAllowed:
+      "Selected file is a binary file. The File tab only supports plain text files.",
     dropYamlFile: "Please drop an Espanso YAML file.",
     selectConfigBeforeAddingSnippet: "Please select a YAML config before adding a snippet.",
     noConfigSelected: "No Config Selected",

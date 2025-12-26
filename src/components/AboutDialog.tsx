@@ -1,12 +1,6 @@
 import { Info, ExternalLink, Heart } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "./ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
 import { ScrollArea } from "./ui/scroll-area";
 import { Button } from "./ui/button";
 import { OPEN_SOURCE_LIBRARIES, OpenSourceLibrary } from "../logic/openSourceLibraries";

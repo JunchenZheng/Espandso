@@ -5,7 +5,10 @@ import {
   batchDeleteSnippetsFromYamlFile,
 } from "./snippetYamlRepository";
 import { writeTextFile } from "@tauri-apps/plugin-fs";
-import { markSearchIndexWrite, refreshSearchIndexForFile } from "../services/searchIndexSyncService";
+import {
+  markSearchIndexWrite,
+  refreshSearchIndexForFile,
+} from "../services/searchIndexSyncService";
 import type { Snippet } from "../logic/types";
 
 // Mock Tauri plugin-fs
@@ -55,7 +58,10 @@ describe("snippetYamlRepository", () => {
     expect(markSearchIndexWrite).toHaveBeenCalledWith(dummyPath);
 
     expect(writeTextFile).toHaveBeenCalledTimes(1);
-    expect(writeTextFile).toHaveBeenCalledWith(dummyPath, expect.stringContaining("trigger: :world"));
+    expect(writeTextFile).toHaveBeenCalledWith(
+      dummyPath,
+      expect.stringContaining("trigger: :world"),
+    );
 
     expect(refreshSearchIndexForFile).toHaveBeenCalledTimes(1);
     expect(refreshSearchIndexForFile).toHaveBeenCalledWith(dummyPath, dummyMatchDir);
@@ -82,11 +88,7 @@ describe("snippetYamlRepository", () => {
     const dummyPath = "/dummy/path.yml";
     const dummyMatchDir = "/dummy/match/dir";
 
-    const updatedContent = await batchDeleteSnippetsFromYamlFile(
-      dummyPath,
-      [0],
-      dummyMatchDir,
-    );
+    const updatedContent = await batchDeleteSnippetsFromYamlFile(dummyPath, [0], dummyMatchDir);
 
     expect(updatedContent).not.toContain("trigger: :hello");
 

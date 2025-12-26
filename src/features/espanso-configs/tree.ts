@@ -104,7 +104,9 @@ export function buildEspansoConfigPreviewTree(
             fileCount: 1,
             preview,
           });
-          currentNodes.sort((a, b) => Number(b.isDir) - Number(a.isDir) || a.name.localeCompare(b.name));
+          currentNodes.sort(
+            (a, b) => Number(b.isDir) - Number(a.isDir) || a.name.localeCompare(b.name),
+          );
         }
       } else {
         const dir = getOrCreateDir(currentNodes, part, currentPath, currentRelPath);

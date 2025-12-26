@@ -1,5 +1,8 @@
 import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
-import { markSearchIndexWrite, refreshSearchIndexForFile } from "../services/searchIndexSyncService";
+import {
+  markSearchIndexWrite,
+  refreshSearchIndexForFile,
+} from "../services/searchIndexSyncService";
 import {
   appendSnippetToYamlContent,
   replaceSnippetInYamlContent,
@@ -19,7 +22,11 @@ export async function readYamlFile(path: string): Promise<string> {
   return await readTextFile(path);
 }
 
-export async function writeYamlFile(path: string, content: string, matchDir?: string): Promise<void> {
+export async function writeYamlFile(
+  path: string,
+  content: string,
+  matchDir?: string,
+): Promise<void> {
   await markSearchIndexWrite(path);
   await writeTextFile(path, content);
   if (matchDir) {
@@ -34,9 +41,10 @@ export async function saveSnippetToYamlFile(
   matchDir?: string,
 ): Promise<string> {
   const content = await readYamlFile(path);
-  const updatedContent = typeof originalMatchIndex === "number"
-    ? replaceSnippetInYamlContent(content, originalMatchIndex, snippet)
-    : appendSnippetToYamlContent(content, snippet);
+  const updatedContent =
+    typeof originalMatchIndex === "number"
+      ? replaceSnippetInYamlContent(content, originalMatchIndex, snippet)
+      : appendSnippetToYamlContent(content, snippet);
   await writeYamlFile(path, updatedContent, matchDir);
   return updatedContent;
 }

@@ -4,9 +4,10 @@ import { Snippet, SnippetVar } from "./types";
 const FORM_VAR_NAME = "form1";
 
 function formLayoutToReplacement(form: string): string {
-  return form.replace(/\[\[([^\][\n]+)\]\]/g, (_placeholder, fieldName) => (
-    `{{${FORM_VAR_NAME}.${String(fieldName).trim()}}}`
-  ));
+  return form.replace(
+    /\[\[([^\][\n]+)\]\]/g,
+    (_placeholder, fieldName) => `{{${FORM_VAR_NAME}.${String(fieldName).trim()}}}`,
+  );
 }
 
 function buildFormVar(snippet: Snippet): SnippetVar {
@@ -51,10 +52,7 @@ export function snippetToYamlMatch(snippet: Snippet): Record<string, any> {
     const formDateVars = snippet.vars || [];
     if (formDateVars.length > 0) {
       match.replace = formLayoutToReplacement(snippet.form);
-      match.vars = [
-        ...formDateVars,
-        buildFormVar(snippet),
-      ];
+      match.vars = [...formDateVars, buildFormVar(snippet)];
     } else {
       match.form = snippet.form;
       if (snippet.form_fields && Object.keys(snippet.form_fields).length > 0) {
@@ -78,9 +76,7 @@ export function snippetToYamlMatch(snippet: Snippet): Record<string, any> {
 type EditableYamlDocument = Document<any, true>;
 
 function parseYamlDocument(yamlContent: string): EditableYamlDocument {
-  const doc = yamlContent.trim()
-    ? YAML.parseDocument(yamlContent)
-    : new Document({ matches: [] });
+  const doc = yamlContent.trim() ? YAML.parseDocument(yamlContent) : new Document({ matches: [] });
 
   if (doc.errors.length > 0) {
     throw new Error(doc.errors[0].message);
@@ -132,7 +128,7 @@ export function ensureBlankLinesBetweenMatches(yamlContent: string): string {
       inMatches = false;
     }
 
-    if (inMatches && /^  - /.test(line)) {
+    if (inMatches && /^ {2}- /.test(line)) {
       matchItemCount++;
       if (matchItemCount > 1 && result.length > 0 && result[result.length - 1].trim() !== "") {
         result.push("");
@@ -165,7 +161,11 @@ export function appendSnippetToYamlContent(yamlContent: string, snippet: Snippet
   return formatYamlDocument(doc);
 }
 
-export function replaceSnippetInYamlContent(yamlContent: string, matchIndex: number, snippet: Snippet): string {
+export function replaceSnippetInYamlContent(
+  yamlContent: string,
+  matchIndex: number,
+  snippet: Snippet,
+): string {
   const doc = parseYamlDocument(yamlContent);
   const matchesNode = getMatchesNode(doc, "edited");
 
@@ -191,7 +191,10 @@ export function deleteSnippetFromYamlContent(yamlContent: string, matchIndex: nu
   return formatYamlDocument(doc);
 }
 
-export function deleteMultipleSnippetsFromYamlContent(yamlContent: string, matchIndices: number[]): string {
+export function deleteMultipleSnippetsFromYamlContent(
+  yamlContent: string,
+  matchIndices: number[],
+): string {
   if (matchIndices.length === 0) return yamlContent;
 
   const doc = parseYamlDocument(yamlContent);
@@ -214,7 +217,9 @@ export interface DeleteTriggerSelection {
   triggerIndex: number;
 }
 
-function getSelectedTriggerIndicesByMatch(selections: DeleteTriggerSelection[]): Map<number, Set<number>> {
+function getSelectedTriggerIndicesByMatch(
+  selections: DeleteTriggerSelection[],
+): Map<number, Set<number>> {
   const selectedByMatch = new Map<number, Set<number>>();
 
   for (const selection of selections) {
@@ -297,7 +302,10 @@ function getNodeLineRange(yamlContent: string, node: any): SnippetLineRange | nu
   return { startLine, endLine };
 }
 
-export function findSnippetLineRangeInYaml(yamlContent: string, matchIndex: number): SnippetLineRange | null {
+export function findSnippetLineRangeInYaml(
+  yamlContent: string,
+  matchIndex: number,
+): SnippetLineRange | null {
   try {
     if (!yamlContent || matchIndex < 0) return null;
     const ranges = collectSnippetLineRangesInYaml(yamlContent);
@@ -310,7 +318,10 @@ export function findSnippetLineRangeInYaml(yamlContent: string, matchIndex: numb
   }
 }
 
-export function findSnippetLineRangesInYaml(yamlContent: string, matchIndices: number[]): SnippetLineRange[] {
+export function findSnippetLineRangesInYaml(
+  yamlContent: string,
+  matchIndices: number[],
+): SnippetLineRange[] {
   try {
     if (!yamlContent || matchIndices.length === 0) return [];
     const ranges = collectSnippetLineRangesInYaml(yamlContent);

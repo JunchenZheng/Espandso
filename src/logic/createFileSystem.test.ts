@@ -37,8 +37,12 @@ describe("createFileSystem logic", () => {
 
     it("returns error for duplicate file names (case-insensitive)", () => {
       const existing = ["base.yml", "work.yaml"];
-      expect(validateFileName("base", existing)).toBe('File "base.yml" already exists in the selected directory.');
-      expect(validateFileName("WORK.YAML", existing)).toBe('File "WORK.YAML" already exists in the selected directory.');
+      expect(validateFileName("base", existing)).toBe(
+        'File "base.yml" already exists in the selected directory.',
+      );
+      expect(validateFileName("WORK.YAML", existing)).toBe(
+        'File "WORK.YAML" already exists in the selected directory.',
+      );
     });
 
     it("returns null for valid new file name", () => {
@@ -61,7 +65,9 @@ describe("createFileSystem logic", () => {
     });
 
     it("returns error for duplicate folder names", () => {
-      expect(validateFolderName("work", ["work", "personal"])).toBe('Folder "work" already exists in the selected directory.');
+      expect(validateFolderName("work", ["work", "personal"])).toBe(
+        'Folder "work" already exists in the selected directory.',
+      );
     });
 
     it("returns null for valid new folder name", () => {
@@ -79,7 +85,9 @@ describe("createFileSystem logic", () => {
   describe("resolveTargetPath", () => {
     it("resolves paths correctly without double slashes", () => {
       expect(resolveTargetPath("/path/to/match/", "work")).toBe("/path/to/match/work");
-      expect(resolveTargetPath("/path/to/match", "/work/email.yml")).toBe("/path/to/match/work/email.yml");
+      expect(resolveTargetPath("/path/to/match", "/work/email.yml")).toBe(
+        "/path/to/match/work/email.yml",
+      );
     });
   });
 });
