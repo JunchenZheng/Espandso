@@ -1,0 +1,46 @@
+matches:
+  - trigger: ":hello"
+    replace: "Hello world"
+    description: "Greeting message"
+
+  - triggers:
+      - ":date"
+      - ":today"
+    replace: "YYYY-MM-DD"
+    description: "Current date format"
+
+  - trigger: ":file"
+    description: "External data"
+    vars:
+      - name: path
+        type: echo
+        params:
+          echo: "/tmp/customer.json"
+      - name: output
+        type: shell
+        params:
+          cmd: "cat $path"
+
+  - trigger: ":image"
+    image_path: "/tmp/logo.png"
+    description: "Company logo"
+
+  - trigger: ":form"
+    form: "Name: [[name]]"
+    form_fields:
+      name:
+        multiline: true
+
+  - trigger: ":verbose"
+    vars:
+      - name: form1
+        type: form
+        params:
+          layout: "Date: [[date]]"
+          fields:
+            date:
+              type: text
+      - name: date
+        type: date
+        params:
+          format: "%Y-%m-%d"

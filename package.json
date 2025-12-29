@@ -12,6 +12,10 @@
     "tauri": "tauri",
     "tauri:dev": "npm run generate:icons && npm run tauri -- dev",
     "tauri:build": "npm run generate:icons && npm run tauri -- build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:unit:ts": "vitest run",
+    "test:unit:rs": "cargo test --manifest-path src-tauri/Cargo.toml",
     "type-check": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit",
     "type-check:rs": "cargo check --manifest-path src-tauri/Cargo.toml",
     "lint": "eslint .",
@@ -20,6 +24,7 @@
     "format:write": "prettier --write \"*.{js,json,ts}\" \"src/**/*.{ts,tsx,css}\"",
     "format:check:rs": "cargo fmt --manifest-path src-tauri/Cargo.toml -- --check",
     "format:write:rs": "cargo fmt --manifest-path src-tauri/Cargo.toml",
+    "check:unit": "npm run test:unit:ts && npm run test:unit:rs",
     "check:static": "npm run type-check && npm run type-check:rs && npm run lint && npm run lint:rs && npm run format:check && npm run format:check:rs"
   },
   "dependencies": {

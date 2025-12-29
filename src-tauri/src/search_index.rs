@@ -1519,59 +1519,36 @@ matches:
 
     #[test]
     fn test_yaml_parser_supported_shapes() {
-        let yaml = r#"
-matches:
-  - trigger: ':file'
-    description: 'External data'
-    vars:
-      - name: path
-        type: echo
-        params:
-          echo: '/tmp/customer.json'
-      - name: output
-        type: shell
-        params:
-          cmd: 'cat $path'
-  - trigger: ':image'
-    image_path: '/tmp/logo.png'
-    description: 'Company logo'
-  - triggers:
-      - ':form'
-      - ':form2'
-    form: 'Name: [[name]]'
-    form_fields:
-      name:
-        multiline: true
-  - trigger: ':verbose'
-    vars:
-      - name: form1
-        type: form
-        params:
-          layout: 'Date: [[date]]'
-          fields:
-            date:
-              type: text
-      - name: date
-        type: date
-        params:
-          format: '%Y-%m-%d'
-"#;
+        let yaml = include_str!("../../test_data/yaml/search-index-shapes.yml");
         let parsed = parse_yaml_content(yaml, "shapes.yml");
-        assert_eq!(parsed.matches.len(), 5);
+        assert_eq!(parsed.matches.len(), 7);
 
         let include_snippet: serde_json::Value =
-            serde_json::from_str(&parsed.matches[0].snippet_json).unwrap();
+            serde_json::from_str(&parsed.matches[3].snippet_json).unwrap();
         assert_eq!(include_snippet["include_file"], "customer_data.json");
         assert_eq!(
-            parsed.matches[0].resource_name.as_deref(),
+            parsed.matches[3].resource_name.as_deref(),
             Some("customer_data.json")
         );
-        assert_eq!(parsed.matches[1].kind, "image_path");
-        assert_eq!(parsed.matches[2].trigger, ":form");
-        assert_eq!(parsed.matches[3].trigger, ":form2");
-        assert_eq!(parsed.matches[4].kind, "form");
-        assert!(parsed.matches[4].snippet_json.contains("form_fields"));
-        assert!(parsed.matches[4].snippet_json.contains("vars"));
+        assert_eq!(parsed.matches[4].kind, "image_path");
+        assert_eq!(parsed.matches[5].trigger, ":form");
+        assert_eq!(parsed.matches[6].kind, "form");
+        assert!(parsed.matches[6].snippet_json.contains("form_fields"));
+        assert!(parsed.matches[6].snippet_json.contains("vars"));
+    }
+
+    #[test]
+    fn test_path_helpers_normalize_and_escape_match_dirs() {
+        assert_eq!(normalize_match_dir("/tmp/match/"), "/tmp/match");
+        assert_eq!(normalize_match_dir(" C:\\match\\ "), "C:\\match");
+        assert_eq!(
+            match_dir_like_pattern("/tmp/100%_match"),
+            "/tmp/100\\%\\_match/%"
+        );
+        assert_eq!(match_dir_exact("/tmp/match/"), "/tmp/match");
+        assert!(is_yaml_path(Path::new("base.yml")));
+        assert!(is_yaml_path(Path::new("base.YAML")));
+        assert!(!is_yaml_path(Path::new("notes.txt")));
     }
 
     #[test]
