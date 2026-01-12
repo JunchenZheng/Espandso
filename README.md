@@ -41,6 +41,22 @@ Run the Tauri app in development mode:
 npm run tauri dev
 ```
 
+Run focused test layers:
+
+```bash
+npm run test:unit:ts
+npm run test:component
+npm run test:integration
+npm run test:unit:rs
+```
+
+Run the cross-layer unit checks or the full local test suite:
+
+```bash
+npm run check:unit
+npm run check:all
+```
+
 ## Build And Install On macOS
 
 Build the Tauri `.app` bundle and install it to `/Applications`:
