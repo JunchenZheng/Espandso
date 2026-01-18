@@ -10,6 +10,7 @@
     "frontendDist": "../dist-gui"
   },
   "app": {
+    "withGlobalTauri": false,
     "windows": [
       {
         "title": "Expandso",

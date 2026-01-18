@@ -260,6 +260,9 @@ export function EspansoConfigDetail({
                 return (
                   <button
                     key={`${triggers.join("-")}-${index}`}
+                    data-testid="snippet-row"
+                    data-snippet-index={index}
+                    data-snippet-trigger={displayTrigger}
                     className={cn(
                       "grid h-9 w-full items-center px-3 text-left text-sm transition-all hover:bg-secondary/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
                       isBatchMode
@@ -288,8 +291,9 @@ export function EspansoConfigDetail({
                   >
                     {isBatchMode && (
                       <div className="flex items-center justify-center pointer-events-none">
-                        <input
-                          type="checkbox"
+            <input
+              data-testid="batch-select-all"
+              type="checkbox"
                           readOnly
                           className="h-3.5 w-3.5 rounded border-emerald-500/50 text-emerald-600 focus:ring-emerald-500 accent-emerald-600"
                           checked={isSelected}
