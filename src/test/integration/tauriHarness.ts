@@ -215,6 +215,7 @@ vi.mock("@tauri-apps/api/event", () => ({
 
 vi.mock("@tauri-apps/api/path", () => ({
   homeDir: vi.fn(async () => "/tmp/expandso-integration/home"),
+  tempDir: vi.fn(async () => "/tmp"),
 }));
 
 vi.mock("@tauri-apps/plugin-shell", () => ({

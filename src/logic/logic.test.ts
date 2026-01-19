@@ -13,6 +13,7 @@ import {
   snippetToYamlMatch,
 } from "./yamlEditor";
 import {
+  getE2eEspansoMatchDir,
   isEspansoYamlConfigFile,
   parseEspansoConfigDir,
   sortEspansoConfigFiles,
@@ -791,6 +792,13 @@ describe("espansoPaths", () => {
     ]);
 
     expect(files.map((file) => file.relativePath)).toEqual(["nested/a.yml", "z.yml"]);
+  });
+
+  it("should build the E2E match directory from the platform temp directory", () => {
+    expect(getE2eEspansoMatchDir("/tmp/")).toBe("/tmp/expandso-e2e/espanso-config/match");
+    expect(getE2eEspansoMatchDir("C:\\Temp\\")).toBe(
+      "C:\\Temp/expandso-e2e/espanso-config/match",
+    );
   });
 });
 
