@@ -122,6 +122,9 @@ export const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
       )}
     >
       <button
+        data-testid="espanso-config-file"
+        data-config-path={node.preview?.config.path || ""}
+        data-config-relative-path={node.preview?.config.relativePath || node.name}
         className="flex min-w-0 flex-1 items-center gap-2 rounded-l-md px-2 py-1.5 text-left"
         onClick={() => node.preview && onSelect(node.preview.config.path)}
       >

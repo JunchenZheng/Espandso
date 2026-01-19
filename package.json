@@ -12,11 +12,14 @@
     "tauri": "tauri",
     "tauri:dev": "npm run generate:icons && npm run tauri -- dev",
     "tauri:build": "npm run generate:icons && npm run tauri -- build",
+    "build:e2e": "npm run generate:icons && VITE_EXPANDSO_E2E=1 npm run tauri -- build --debug --features e2e --config e2e/tauri.e2e.conf.json",
+    "test:e2e": "npm run build:e2e && wdio run e2e/wdio.conf.ts",
     "test": "npm run test:unit:ts && npm run test:component",
     "test:watch": "vitest --config vitest.unit.config.ts",
     "test:unit:ts": "vitest run --config vitest.unit.config.ts",
     "test:unit:rs": "cargo test --manifest-path src-tauri/Cargo.toml",
     "test:component": "vitest run --config vitest.component.config.ts",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:component:watch": "vitest --config vitest.component.config.ts",
     "type-check": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit",
     "type-check:rs": "cargo check --manifest-path src-tauri/Cargo.toml",
@@ -28,6 +31,8 @@
     "format:write:rs": "cargo fmt --manifest-path src-tauri/Cargo.toml",
     "check:unit": "npm run test:unit:ts && npm run test:unit:rs",
     "check:component": "npm run test:component",
+    "check:integration": "npm run test:integration",
+    "check:all": "npm run check:unit && npm run test:component && npm run test:integration",
     "check:static": "npm run type-check && npm run type-check:rs && npm run lint && npm run lint:rs && npm run format:check && npm run format:check:rs"
   },
   "dependencies": {
@@ -60,6 +65,14 @@
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.6.0",
+    "@wdio/cli": "9.27.1",
+    "@wdio/globals": "9.27.1",
+    "@wdio/local-runner": "9.27.1",
+    "@wdio/mocha-framework": "9.27.1",
+    "@wdio/native-utils": "2.5.0",
+    "@wdio/spec-reporter": "9.27.1",
+    "@wdio/tauri-plugin": "1.2.0",
+    "@wdio/tauri-service": "1.2.0",
     "autoprefixer": "^10.5.4",
     "eslint": "^10.7.0",
     "eslint-config-prettier": "^10.1.8",
@@ -75,5 +88,8 @@
     "typescript-eslint": "^8.65.0",
     "vite": "^7.0.4",
     "vitest": "^4.1.10"
+  },
+  "overrides": {
+    "@wdio/native-utils": "2.5.0"
   }
 }

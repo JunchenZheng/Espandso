@@ -37,7 +37,9 @@
         { "path": "$CONFIG/espanso/match" },
         { "path": "$CONFIG/espanso/match/**" },
         { "path": "$DATA/espanso/match" },
-        { "path": "$DATA/espanso/match/**" }
+        { "path": "$DATA/espanso/match/**" },
+        { "path": "$TEMP/expandso-e2e/espanso-config/match" },
+        { "path": "$TEMP/expandso-e2e/espanso-config/match/**" }
       ]
     },
     "dialog:default",

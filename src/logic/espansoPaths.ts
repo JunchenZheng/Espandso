@@ -1,4 +1,4 @@
-import { homeDir } from "@tauri-apps/api/path";
+import { homeDir, tempDir } from "@tauri-apps/api/path";
 import { readDir } from "@tauri-apps/plugin-fs";
 import { Command } from "@tauri-apps/plugin-shell";
 
@@ -42,6 +42,11 @@ export function parseEspansoConfigDir(pathOutput: string): string | null {
   return configDir || null;
 }
 
+export function getE2eEspansoMatchDir(tempPath: string): string {
+  const temp = tempPath.replace(/[\\/]+$/u, "");
+  return `${temp}/expandso-e2e/espanso-config/match`;
+}
+
 async function getDefaultEspansoMatchDir(): Promise<string> {
   const home = await homeDir();
   const userAgent = navigator.userAgent.toLowerCase();
@@ -65,6 +70,13 @@ export async function getEspansoMatchDir(): Promise<string> {
 }
 
 export async function getEspansoMatchDirDetails(): Promise<EspansoMatchDirResult> {
+  if (import.meta.env.VITE_EXPANDSO_E2E === "1") {
+    return {
+      matchDir: getE2eEspansoMatchDir(await tempDir()),
+      source: "default",
+    };
+  }
+
   try {
     const command = Command.create("espanso", ["path"]);
     const output = await command.execute();
