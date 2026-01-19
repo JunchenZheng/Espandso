@@ -10,6 +10,12 @@ async function snippetRow(trigger: string) {
   return $(`//*[@data-testid="snippet-row" and @data-snippet-trigger="${trigger}"]`);
 }
 
+async function expectSnippetRowDisplayed(trigger: string) {
+  const row = await snippetRow(trigger);
+  await row.waitForDisplayed({ timeout: 20000 });
+  return row;
+}
+
 async function waitForYaml(predicate: (yaml: string) => boolean, timeoutMsg: string) {
   const deadline = Date.now() + 10000;
 
@@ -25,8 +31,8 @@ describe("Expandso CRUD E2E", () => {
   it("shows snippets, adds a snippet, and batch deletes selected snippets", async () => {
     await expect(await byText("Collection")).toBeDisplayed();
     await expect(await byText("base")).toBeDisplayed();
-    await expect(await snippetRow(":hello")).toBeDisplayed();
-    await expect(await snippetRow(":bye")).toBeDisplayed();
+    await expectSnippetRowDisplayed(":hello");
+    await expectSnippetRowDisplayed(":bye");
 
     await (await byText("Add Snippet")).click();
     await expect(await byText("Add Text Snippet")).toBeDisplayed();
@@ -39,12 +45,12 @@ describe("Expandso CRUD E2E", () => {
       (yaml) => yaml.includes("trigger: :e2e-added"),
       "Expected added snippet to be written to YAML",
     );
-    await expect(await snippetRow(":e2e-added")).toBeDisplayed();
+    await expectSnippetRowDisplayed(":e2e-added");
     assert.match(readBaseYaml(), /replace: Added by the E2E suite/);
 
     await (await byText("Batch Delete")).click();
-    await (await snippetRow(":hello")).click();
-    await (await snippetRow(":bye")).click();
+    await (await expectSnippetRowDisplayed(":hello")).click();
+    await (await expectSnippetRowDisplayed(":bye")).click();
     await (await byText("Delete Selected (2)")).click();
     await expect(await byText("Batch Delete Snippets")).toBeDisplayed();
     await (await byText("Delete Selected")).click();

@@ -1,11 +1,12 @@
 import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { resolve } from "node:path";
 
-const repoRoot = resolve(dirname(new URL(import.meta.url).pathname), "../..");
+const e2eTmpDir = resolve(tmpdir(), "expandso-e2e");
 
 export const e2ePaths = {
-  matchDir: resolve(repoRoot, "e2e/.tmp/espanso-config/match"),
-  baseYaml: resolve(repoRoot, "e2e/.tmp/espanso-config/match/base.yml"),
+  matchDir: resolve(e2eTmpDir, "espanso-config/match"),
+  baseYaml: resolve(e2eTmpDir, "espanso-config/match/base.yml"),
 };
 
 export function readBaseYaml() {

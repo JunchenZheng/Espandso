@@ -1,8 +1,9 @@
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 
 const repoRoot = resolve(dirname(new URL(import.meta.url).pathname), "..");
-const e2eTmpDir = resolve(repoRoot, "e2e/.tmp");
+const e2eTmpDir = resolve(tmpdir(), "expandso-e2e");
 const configDir = resolve(e2eTmpDir, "espanso-config");
 const matchDir = resolve(configDir, "match");
 const fakeBinDir = resolve(e2eTmpDir, "bin");
