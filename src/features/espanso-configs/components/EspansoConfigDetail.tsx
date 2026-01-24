@@ -4,6 +4,7 @@ import {
   Check,
   Columns,
   Copy,
+  FileDown,
   FileText,
   ListChecks,
   Plus,
@@ -23,6 +24,7 @@ export interface EspansoConfigDetailProps {
   onViewSnippet: (match: ImportedMatch, index: number) => void;
   onAddSnippet: () => void;
   onOpenVisualEditor?: () => void;
+  onOpenImportAlfred?: () => void;
   onOpenWarnings?: (path: string) => void;
   onBatchDelete?: (matchIndices: number[], onComplete: () => void) => void;
 }
@@ -33,6 +35,7 @@ export function EspansoConfigDetail({
   onViewSnippet,
   onAddSnippet,
   onOpenVisualEditor,
+  onOpenImportAlfred,
   onOpenWarnings,
   onBatchDelete,
 }: EspansoConfigDetailProps) {
@@ -182,6 +185,17 @@ export function EspansoConfigDetail({
                 <ListChecks className="h-4 w-4" />
                 {t("actions.batchSelect")}
               </Button>
+              {onOpenImportAlfred && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  data-testid="import-alfred-btn"
+                  onClick={onOpenImportAlfred}
+                >
+                  <FileDown className="h-4 w-4" />
+                  {t("actions.importAlfred")}
+                </Button>
+              )}
               <Button size="sm" onClick={onAddSnippet}>
                 <Plus className="h-4 w-4" />
                 {t("actions.addSnippet")}

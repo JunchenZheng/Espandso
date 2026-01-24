@@ -8,6 +8,7 @@ import { checkIsBinaryFilePath } from "../../../logic/fileCheck";
 import { getErrorMessage } from "../../../logic/errors";
 import type { EspansoConfigFile } from "../../../logic/espansoPaths";
 import type { Snippet, ValidationError } from "../../../logic/types";
+import type { ParsedAlfredSnippet } from "../../../logic/alfredImporter";
 import type { InterpolationParams } from "../../../i18n/types";
 import type { EspansoConfigPreview } from "../../espanso-configs/types";
 import type { SnippetEditTarget } from "../types";
@@ -370,6 +371,64 @@ export function useSnippetCommands({
     }
   }, [showAlert, t]);
 
+  const importAlfredSnippetsToYaml = useCallback(
+    async (snippetsToImport: ParsedAlfredSnippet[], targetConfigPath: string) => {
+      if (snippetsToImport.length === 0 || !targetConfigPath) return;
+
+      if (mutationLockRef.current) return;
+      mutationLockRef.current = true;
+      setIsSavingSnippet(true);
+
+      try {
+        for (const item of snippetsToImport) {
+          const newSnippet: Snippet = {
+            trigger: item.trigger || undefined,
+            replace: item.replace,
+            description: item.name || undefined,
+          };
+          await saveSnippetToYamlFile(
+            targetConfigPath,
+            newSnippet,
+            undefined,
+            espansoMatchDir || undefined,
+          );
+        }
+
+        const targetConfig = espansoConfigs.find((config) => config.path === targetConfigPath);
+        if (targetConfig) {
+          await loadEspansoConfigPreview(targetConfig);
+        }
+        setSelectedEspansoConfigPath(targetConfigPath);
+        if (isVisualEditorOpen) {
+          await loadVisualEditorYaml(targetConfigPath);
+        }
+        showAlert(
+          t("alfredImport.importSuccess", { count: snippetsToImport.length }),
+          t("actions.importAlfred"),
+        );
+      } catch (error: unknown) {
+        showAlert(
+          t("errors.failedToSaveSnippet", { message: getErrorMessage(error) }),
+          t("errors.genericError"),
+        );
+      } finally {
+        mutationLockRef.current = false;
+        setIsSavingSnippet(false);
+      }
+    },
+    [
+      espansoConfigs,
+      espansoMatchDir,
+      isVisualEditorOpen,
+      loadEspansoConfigPreview,
+      loadVisualEditorYaml,
+      setIsSavingSnippet,
+      setSelectedEspansoConfigPath,
+      showAlert,
+      t,
+    ],
+  );
+
   return {
     chooseSnippetFile,
     chooseSnippetImageFile,
@@ -378,5 +437,6 @@ export function useSnippetCommands({
     deleteSnippetFromYaml,
     batchDeleteSnippetsFromYaml,
     openYamlFileInDefaultApp,
+    importAlfredSnippetsToYaml,
   };
 }
