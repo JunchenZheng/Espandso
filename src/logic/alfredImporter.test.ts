@@ -1,9 +1,45 @@
 import JSZip from "jszip";
 import { describe, expect, it } from "vitest";
-import { parseAlfredSnippetsZip } from "./alfredImporter";
+import { parseAlfredInfoPlist, parseAlfredSnippetsZip } from "./alfredImporter";
+
+describe("parseAlfredInfoPlist", () => {
+  it("parses snippetkeywordprefix and snippetkeywordsuffix from valid plist XML", () => {
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>snippetkeywordprefix</key>
+	<string>:</string>
+	<key>snippetkeywordsuffix</key>
+	<string>!</string>
+</dict>
+</plist>`;
+
+    const result = parseAlfredInfoPlist(xml);
+    expect(result).toEqual({
+      snippetkeywordprefix: ":",
+      snippetkeywordsuffix: "!",
+    });
+  });
+
+  it("handles unescaping XML entities and empty strings", () => {
+    const xml = `<dict>
+	<key>snippetkeywordprefix</key>
+	<string>&amp;</string>
+	<key>snippetkeywordsuffix</key>
+	<string></string>
+</dict>`;
+
+    const result = parseAlfredInfoPlist(xml);
+    expect(result).toEqual({
+      snippetkeywordprefix: "&",
+      snippetkeywordsuffix: "",
+    });
+  });
+});
 
 describe("parseAlfredSnippetsZip", () => {
-  it("extracts valid alfredsnippets entries from a zip archive", async () => {
+  it("extracts valid alfredsnippets entries from a zip archive without info.plist", async () => {
     const zip = new JSZip();
 
     // Valid snippet JSON inside a folder
@@ -53,6 +89,49 @@ describe("parseAlfredSnippetsZip", () => {
       replace: "Email body",
       name: "Email Template",
       jsonPath: "snippet2.json",
+    });
+  });
+
+  it("applies prefix and suffix from info.plist to snippet keywords", async () => {
+    const zip = new JSZip();
+
+    // info.plist with prefix ":" and suffix ""
+    zip.file(
+      "info.plist",
+      `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>snippetkeywordprefix</key>
+	<string>:</string>
+	<key>snippetkeywordsuffix</key>
+	<string></string>
+</dict>
+</plist>`,
+    );
+
+    zip.file(
+      "snippet1.json",
+      JSON.stringify({
+        alfredsnippet: {
+          snippet: "Alfred snippet content",
+          keyword: "omg",
+          name: "OMG",
+          uid: "uid-omg",
+        },
+      }),
+    );
+
+    const zipBuffer = await zip.generateAsync({ type: "uint8array" });
+    const results = await parseAlfredSnippetsZip(zipBuffer);
+
+    expect(results).toHaveLength(1);
+    expect(results[0]).toEqual({
+      id: "uid-omg",
+      trigger: ":omg",
+      replace: "Alfred snippet content",
+      name: "OMG",
+      jsonPath: "snippet1.json",
     });
   });
 
