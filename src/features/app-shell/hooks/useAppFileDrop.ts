@@ -25,6 +25,7 @@ interface AppFileDropOptions {
   onDropIncludeFile: (path: string) => void;
   onDropImage: (path: string) => void;
   onDropYaml: (path: string) => void;
+  onDropAlfredFile?: (path: string) => void;
   setIsDragging: (isDragging: boolean) => void;
   showAlert: (description: string, title?: string) => void;
 }
@@ -89,8 +90,15 @@ export function useAppFileDrop(options: AppFileDropOptions) {
       }
 
       const lowerPath = path.toLowerCase();
+      if (lowerPath.endsWith(".alfredsnippets")) {
+        optionsRef.current.onDropAlfredFile?.(path);
+        setIsDragging(false);
+        return;
+      }
+
       if (!lowerPath.endsWith(".yml") && !lowerPath.endsWith(".yaml")) {
         showAlert(messages.dropYamlFile, messages.invalidFile);
+        setIsDragging(false);
         return;
       }
 

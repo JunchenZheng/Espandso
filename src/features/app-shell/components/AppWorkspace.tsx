@@ -44,6 +44,7 @@ interface AppWorkspaceProps {
   onOpenSnippet: (target: SnippetEditTarget) => void;
   onAddSnippet: () => void;
   onOpenVisualEditor: () => void;
+  onOpenImportAlfred?: () => void;
   onOpenWarnings: (path: string) => void;
   onBatchDelete: (matchIndices: number[], onComplete: () => void) => void;
   onCollectionResizeStart: (event: PointerEvent<HTMLButtonElement>) => void;
@@ -80,6 +81,7 @@ export function AppWorkspace({
   onOpenSnippet,
   onAddSnippet,
   onOpenVisualEditor,
+  onOpenImportAlfred,
   onOpenWarnings,
   onBatchDelete,
   onCollectionResizeStart,
@@ -196,6 +198,7 @@ export function AppWorkspace({
                     }
                     onAddSnippet={onAddSnippet}
                     onOpenVisualEditor={onOpenVisualEditor}
+                    onOpenImportAlfred={onOpenImportAlfred}
                     onOpenWarnings={onOpenWarnings}
                     onBatchDelete={onBatchDelete}
                   />

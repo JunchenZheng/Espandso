@@ -23,6 +23,7 @@ import { VisualYamlEditorDialog } from "./features/snippets/components/VisualYam
 import { SnippetEditDialog } from "./features/snippets/components/SnippetEditDialog";
 import { useSnippetEditor } from "./features/snippets/hooks/useSnippetEditor";
 import { useSnippetCommands } from "./features/snippets/hooks/useSnippetCommands";
+import { ImportAlfredSnippetsDialog } from "./features/snippets/components/ImportAlfredSnippetsDialog";
 export type { EspansoConfigPreview } from "./features/espanso-configs/types";
 
 const DEFAULT_COLLECTION_PANE_WIDTH = 20;
@@ -102,6 +103,8 @@ function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isLogOpen, setIsLogOpen] = useState<boolean>(false);
   const [isAboutOpen, setIsAboutOpen] = useState<boolean>(false);
+  const [isImportAlfredOpen, setIsImportAlfredOpen] = useState<boolean>(false);
+  const [alfredInitialFilePath, setAlfredInitialFilePath] = useState<string | null>(null);
 
   const snippetEditor = useSnippetEditor();
 
@@ -198,6 +201,7 @@ function App() {
     deleteSnippetFromYaml,
     batchDeleteSnippetsFromYaml,
     openYamlFileInDefaultApp,
+    importAlfredSnippetsToYaml,
   } = useSnippetCommands({
     selectedEspansoPreview,
     snippetEditTarget: snippetEditor.editTarget,
@@ -257,6 +261,10 @@ function App() {
     onDropIncludeFile: snippetEditor.setIncludeFile,
     onDropImage: setSnippetImagePathSafely,
     onDropYaml: addDroppedYamlFile,
+    onDropAlfredFile: (path: string) => {
+      setAlfredInitialFilePath(path);
+      setIsImportAlfredOpen(true);
+    },
     setIsDragging,
     showAlert,
   });
@@ -367,6 +375,7 @@ function App() {
         onOpenSnippet={snippetEditor.openEdit}
         onAddSnippet={openAddSnippetDialog}
         onOpenVisualEditor={openVisualEditorDialog}
+        onOpenImportAlfred={() => setIsImportAlfredOpen(true)}
         onOpenWarnings={openWarningsDialog}
         onBatchDelete={(matchIndices, onComplete) => {
           if (!selectedEspansoPreview) return;
@@ -488,6 +497,20 @@ function App() {
         isCreatingFolder={isCreatingFolder}
         espansoDirectories={espansoDirectories}
         onCreateFolder={handleCreateFolder}
+      />
+
+      <ImportAlfredSnippetsDialog
+        isOpen={isImportAlfredOpen}
+        onClose={() => {
+          setIsImportAlfredOpen(false);
+          setAlfredInitialFilePath(null);
+        }}
+        configPaths={espansoConfigs.map((c) => c.path)}
+        defaultConfigPath={selectedEspansoConfigPath}
+        initialFilePath={alfredInitialFilePath}
+        onImport={async (selectedSnippets, targetPath) => {
+          await importAlfredSnippetsToYaml(selectedSnippets, targetPath);
+        }}
       />
     </div>
   );
