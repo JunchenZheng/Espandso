@@ -12,6 +12,8 @@
     "tauri": "tauri",
     "tauri:dev": "npm run generate:icons && npm run tauri -- dev",
     "tauri:build": "npm run generate:icons && npm run tauri -- build",
+    "build:windows": "./scripts/build-windows-cross.sh",
+    "build:windows:native": "powershell -ExecutionPolicy Bypass -File scripts/build-windows.ps1",
     "build:e2e": "npm run generate:icons && VITE_EXPANDSO_E2E=1 npm run tauri -- build --debug --features e2e --config e2e/tauri.e2e.conf.json",
     "test:e2e": "npm run build:e2e && wdio run e2e/wdio.conf.ts",
     "test": "npm run test:unit:ts && npm run test:component",
