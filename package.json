@@ -9,6 +9,7 @@
     "build:frontend": "vite build",
     "preview": "vite preview",
     "generate:icons": "./scripts/generate_icons.sh",
+    "setup:windows": "./scripts/setup-windows-cross-build.sh",
     "tauri": "tauri",
     "tauri:dev": "npm run generate:icons && npm run tauri -- dev",
     "tauri:build": "npm run generate:icons && npm run tauri -- build",
