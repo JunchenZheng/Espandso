@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TARGET="${WINDOWS_TARGET:-x86_64-pc-windows-msvc}"
 BUNDLE="${WINDOWS_BUNDLE:-nsis}"
+ARTIFACT_DIR="${WINDOWS_ARTIFACT_DIR:-dist-installers/windows}"
 
 cd "$ROOT_DIR"
 
@@ -57,6 +58,22 @@ npm run generate:icons
 echo "Building Windows $BUNDLE bundle for $TARGET with cargo-xwin..."
 npm run tauri -- build --runner cargo-xwin --target "$TARGET" --bundles "$BUNDLE"
 
+bundle_dir="src-tauri/target/$TARGET/release/bundle/$BUNDLE"
+shopt -s nullglob
+installers=("$bundle_dir"/*setup.exe)
+shopt -u nullglob
+
+if [[ "${#installers[@]}" -eq 0 ]]; then
+  echo "Error: Windows installer was not found in $bundle_dir." >&2
+  echo "The raw release executable is not the distributable installer; check the Tauri bundle output above." >&2
+  exit 1
+fi
+
+mkdir -p "$ARTIFACT_DIR"
+cp "${installers[@]}" "$ARTIFACT_DIR/"
+
 echo ""
-echo "Windows bundle output:"
-echo "  src-tauri/target/$TARGET/release/bundle/$BUNDLE/"
+echo "Windows installer output:"
+for installer in "$ARTIFACT_DIR"/*setup.exe; do
+  echo "  $installer"
+done
