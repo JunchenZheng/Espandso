@@ -1,0 +1,93 @@
+name: Manual Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_unit_checks:
+        description: "Run TypeScript and Rust unit checks before building"
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  build-macos:
+    name: Build macOS app
+    runs-on: macos-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit checks
+        if: ${{ inputs.run_unit_checks }}
+        run: npm run check:unit
+
+      - name: Build Tauri app
+        run: npm run tauri:build
+
+      - name: Upload macOS app bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: Expandso-macos-app
+          path: src-tauri/target/release/bundle/macos/*.app
+          if-no-files-found: error
+
+  build-windows:
+    name: Build Windows installer
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit checks
+        if: ${{ inputs.run_unit_checks }}
+        run: npm run check:unit
+
+      - name: Build Windows installer
+        shell: pwsh
+        run: ./scripts/build-windows.ps1 -SkipInstall -ArtifactDir dist-installers/windows
+
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Expandso-windows-installer
+          path: dist-installers/windows/*setup.exe
+          if-no-files-found: error

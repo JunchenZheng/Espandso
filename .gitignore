@@ -85,6 +85,11 @@ docs/_build/
 .pybuilder/
 target/
 
+# Tauri build and installer artifacts
+src-tauri/target/
+src-tauri/gen/schemas/
+dist-installers/
+
 # Jupyter Notebook
 .ipynb_checkpoints
 
