@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import "./App.css";
 
@@ -24,6 +24,11 @@ import { SnippetEditDialog } from "./features/snippets/components/SnippetEditDia
 import { useSnippetEditor } from "./features/snippets/hooks/useSnippetEditor";
 import { useSnippetCommands } from "./features/snippets/hooks/useSnippetCommands";
 import { ImportAlfredSnippetsDialog } from "./features/snippets/components/ImportAlfredSnippetsDialog";
+import { TriggerConflictsDialog } from "./features/snippets/components/TriggerConflictsDialog";
+import {
+  detectTriggerPrefixConflicts,
+  filterTriggerConflictsByConfigPath,
+} from "./logic/triggerConflicts";
 export type { EspansoConfigPreview } from "./features/espanso-configs/types";
 
 const DEFAULT_COLLECTION_PANE_WIDTH = 20;
@@ -104,6 +109,7 @@ function App() {
   const [isLogOpen, setIsLogOpen] = useState<boolean>(false);
   const [isAboutOpen, setIsAboutOpen] = useState<boolean>(false);
   const [isImportAlfredOpen, setIsImportAlfredOpen] = useState<boolean>(false);
+  const [isTriggerConflictsOpen, setIsTriggerConflictsOpen] = useState<boolean>(false);
   const [alfredInitialFilePath, setAlfredInitialFilePath] = useState<string | null>(null);
 
   const snippetEditor = useSnippetEditor();
@@ -227,6 +233,19 @@ function App() {
     showConfirm,
     t,
   });
+
+  const triggerPrefixConflicts = useMemo(
+    () => detectTriggerPrefixConflicts(espansoConfigPreviews),
+    [espansoConfigPreviews],
+  );
+
+  const selectedTriggerPrefixConflicts = useMemo(() => {
+    if (!selectedEspansoPreview) return [];
+    return filterTriggerConflictsByConfigPath(
+      triggerPrefixConflicts,
+      selectedEspansoPreview.config.path,
+    );
+  }, [selectedEspansoPreview, triggerPrefixConflicts]);
 
   useEffect(() => {
     let active = true;
@@ -374,6 +393,8 @@ function App() {
         onCreateFolder={openCreateFolderDialog}
         onOpenSnippet={snippetEditor.openEdit}
         onAddSnippet={openAddSnippetDialog}
+        onOpenTriggerConflicts={() => setIsTriggerConflictsOpen(true)}
+        triggerConflictCount={selectedTriggerPrefixConflicts.length}
         onOpenVisualEditor={openVisualEditorDialog}
         onOpenImportAlfred={() => setIsImportAlfredOpen(true)}
         onOpenWarnings={openWarningsDialog}
@@ -462,6 +483,13 @@ function App() {
           setSelectedEspansoConfigPath(path);
         }}
         onOpenFileExternal={openYamlFileInDefaultApp}
+      />
+
+      <TriggerConflictsDialog
+        open={isTriggerConflictsOpen}
+        onOpenChange={setIsTriggerConflictsOpen}
+        conflicts={selectedTriggerPrefixConflicts}
+        relativePath={selectedEspansoPreview?.config.relativePath}
       />
 
       <ConfirmAlertDialog

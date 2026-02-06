@@ -27,6 +27,8 @@ export const en = {
     addSnippet: "Add Snippet",
     batchSelect: "Batch Delete",
     batchDelete: "Delete Selected ({{count}})",
+    triggerConflicts: "Conflicts",
+    triggerConflictsTitle: "{{count}} prefix trigger conflicts",
     visualEditor: "Visual Editor",
     viewLogs: "View Logs",
     viewWarnings: "View Warnings",
@@ -288,6 +290,18 @@ export const en = {
       viewInApp: "View In App",
       viewYaml: "View YAML",
       openYamlExternalTitle: "Open YAML file in default external application",
+    },
+    triggerConflicts: {
+      title: "Trigger Conflicts",
+      description:
+        "Find triggers where a shorter trigger can expand before a longer trigger is reachable.",
+      fileDescription:
+        "Prefix conflicts involving {{file}}. Exact duplicate triggers are allowed and are not shown here.",
+      noConflicts: "No prefix trigger conflicts detected.",
+      blockingTrigger: "Expands First",
+      blockedTrigger: "Blocked Trigger",
+      explanation:
+        "{{blocking}} is a prefix of {{blocked}}, so Espanso may expand the shorter trigger before the longer one can be completed.",
     },
     confirmDelete: {
       title: "Delete Snippet",

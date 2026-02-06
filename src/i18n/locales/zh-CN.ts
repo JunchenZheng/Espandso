@@ -29,6 +29,8 @@ export const zhCN: TranslationTree = {
     addSnippet: "添加片段",
     batchSelect: "批量删除",
     batchDelete: "删除所选 ({{count}})",
+    triggerConflicts: "冲突检测",
+    triggerConflictsTitle: "{{count}} 个前缀触发词冲突",
     visualEditor: "可视化编辑器",
     viewLogs: "查看日志",
     viewWarnings: "查看警告",
@@ -286,6 +288,16 @@ export const zhCN: TranslationTree = {
       viewInApp: "在应用中查看",
       viewYaml: "查看 YAML",
       openYamlExternalTitle: "在默认外部应用中打开 YAML 文件",
+    },
+    triggerConflicts: {
+      title: "触发词冲突",
+      description: "检测较短触发词可能先展开，导致较长触发词无法完整输入的情况。",
+      fileDescription: "与 {{file}} 相关的前缀冲突。完全相同的触发词是允许的，不会在这里显示。",
+      noConflicts: "未检测到前缀触发词冲突。",
+      blockingTrigger: "先展开的触发词",
+      blockedTrigger: "被阻挡的触发词",
+      explanation:
+        "{{blocking}} 是 {{blocked}} 的前缀，因此 Espanso 可能会先展开较短触发词，导致较长触发词无法被完整触发。",
     },
     confirmDelete: {
       title: "删除片段",

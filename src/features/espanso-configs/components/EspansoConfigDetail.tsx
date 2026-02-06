@@ -6,6 +6,7 @@ import {
   Copy,
   FileDown,
   FileText,
+  GitCompareArrows,
   ListChecks,
   Plus,
   Trash2,
@@ -23,6 +24,8 @@ export interface EspansoConfigDetailProps {
   highlightedIndex?: number | null;
   onViewSnippet: (match: ImportedMatch, index: number) => void;
   onAddSnippet: () => void;
+  onOpenTriggerConflicts?: () => void;
+  triggerConflictCount?: number;
   onOpenVisualEditor?: () => void;
   onOpenImportAlfred?: () => void;
   onOpenWarnings?: (path: string) => void;
@@ -34,6 +37,8 @@ export function EspansoConfigDetail({
   highlightedIndex,
   onViewSnippet,
   onAddSnippet,
+  onOpenTriggerConflicts,
+  triggerConflictCount = 0,
   onOpenVisualEditor,
   onOpenImportAlfred,
   onOpenWarnings,
@@ -175,6 +180,22 @@ export function EspansoConfigDetail({
             </>
           ) : (
             <>
+              {onOpenTriggerConflicts && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={onOpenTriggerConflicts}
+                  title={t("actions.triggerConflictsTitle", { count: triggerConflictCount })}
+                >
+                  <GitCompareArrows className="h-4 w-4" />
+                  {t("actions.triggerConflicts")}
+                  {triggerConflictCount > 0 && (
+                    <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-800">
+                      {triggerConflictCount}
+                    </span>
+                  )}
+                </Button>
+              )}
               {onOpenVisualEditor && (
                 <Button size="sm" variant="outline" onClick={onOpenVisualEditor}>
                   <Columns className="h-4 w-4" />
