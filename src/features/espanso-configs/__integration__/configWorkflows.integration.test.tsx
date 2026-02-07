@@ -36,6 +36,35 @@ describe("Espanso config integration workflows", () => {
     );
   });
 
+  it("detects prefix trigger conflicts across all YAML files after scanning", async () => {
+    const user = userEvent.setup();
+    const matchDir = tauriHarness.getMatchDir();
+    tauriHarness.reset({
+      files: {
+        [`${matchDir}/base.yml`]: ["matches:", "  - trigger: :esp", "    replace: short", ""].join(
+          "\n",
+        ),
+        [`${matchDir}/work.yml`]: [
+          "matches:",
+          "  - trigger: :espanso",
+          "    replace: long",
+          "",
+        ].join("\n"),
+      },
+    });
+
+    renderWithProviders(<App />);
+
+    expect(await screen.findByText(":esp")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /conflicts/i }));
+
+    const dialog = await screen.findByRole("dialog", { name: /trigger conflicts/i });
+    expect(within(dialog).getByText(":esp")).toBeInTheDocument();
+    expect(within(dialog).getByText(":espanso")).toBeInTheDocument();
+    expect(within(dialog).getByText("base.yml")).toBeInTheDocument();
+    expect(within(dialog).getByText("work.yml")).toBeInTheDocument();
+  });
+
   it("creates a YAML file through the app workflow and refreshes the collection", async () => {
     const user = userEvent.setup();
     renderWithProviders(<App />);

@@ -106,13 +106,19 @@ export function useEspansoConfigs(options: UseEspansoConfigsOptions = {}) {
     [t],
   );
 
+  const getReadErrorMessage = useCallback(
+    (config: EspansoConfigFile, error: unknown): string =>
+      t("errors.failedToReadFile", {
+        file: config.name,
+        message: error instanceof Error ? error.message : String(error),
+      }),
+    [t],
+  );
+
   const loadEspansoConfigPreview = useCallback(
     async (config: EspansoConfigFile): Promise<EspansoConfigPreview> => {
       const preview = await loadEspansoConfigPreviewFromRepository(config, (error) =>
-        t("errors.failedToReadFile", {
-          file: config.name,
-          message: error instanceof Error ? error.message : String(error),
-        }),
+        getReadErrorMessage(config, error),
       );
       setEspansoConfigPreviews((current) => [
         ...current.filter((item) => item.config.path !== config.path),
@@ -120,7 +126,7 @@ export function useEspansoConfigs(options: UseEspansoConfigsOptions = {}) {
       ]);
       return preview;
     },
-    [t],
+    [getReadErrorMessage],
   );
 
   const scanDefaultEspansoConfigDir = useCallback(
@@ -136,8 +142,15 @@ export function useEspansoConfigs(options: UseEspansoConfigsOptions = {}) {
         setEspansoPathSource(result.pathSource);
         setEspansoConfigs(result.files);
         setEspansoDirectories(result.directories || []);
-        setEspansoConfigPreviews([]);
         setSelectedPreviewError("");
+        const previews = await Promise.all(
+          result.files.map((config) =>
+            loadEspansoConfigPreviewFromRepository(config, (error) =>
+              getReadErrorMessage(config, error),
+            ),
+          ),
+        );
+        setEspansoConfigPreviews(previews);
         setSelectedEspansoConfigPath((current) => {
           if (current && result.files.some((file) => file.path === current)) return current;
           return result.files[0]?.path || "";
@@ -156,7 +169,7 @@ export function useEspansoConfigs(options: UseEspansoConfigsOptions = {}) {
         setIsScanningEspanso(false);
       }
     },
-    [t],
+    [getReadErrorMessage, t],
   );
 
   const addDroppedYamlFile = useCallback((path: string) => {
@@ -332,8 +345,15 @@ export function useEspansoConfigs(options: UseEspansoConfigsOptions = {}) {
       (preview) => preview.config.path === selectedConfig.path,
     );
     if (hasLoadedPreview) {
+      const loadedPreview = espansoConfigPreviews.find(
+        (preview) => preview.config.path === selectedConfig.path,
+      );
       setIsLoadingSelectedPreview(false);
-      setSelectedPreviewError("");
+      setSelectedPreviewError(
+        loadedPreview && loadedPreview.warnings.length > 0 && loadedPreview.snippets.length === 0
+          ? loadedPreview.warnings[0]
+          : "",
+      );
       return;
     }
 
