@@ -36,7 +36,7 @@ describe("Espanso config integration workflows", () => {
     );
   });
 
-  it("detects prefix trigger conflicts across all YAML files after scanning", async () => {
+  it("detects current-file prefix trigger conflicts through the SQLite index", async () => {
     const user = userEvent.setup();
     const matchDir = tauriHarness.getMatchDir();
     tauriHarness.reset({
@@ -63,6 +63,13 @@ describe("Espanso config integration workflows", () => {
     expect(within(dialog).getByText(":espanso")).toBeInTheDocument();
     expect(within(dialog).getByText("base.yml")).toBeInTheDocument();
     expect(within(dialog).getByText("work.yml")).toBeInTheDocument();
+    expect(tauriHarness.readTextFile).not.toHaveBeenCalledWith(`${matchDir}/work.yml`);
+    expect(tauriHarness.invoke).toHaveBeenCalledWith("detect_trigger_prefix_conflicts", {
+      request: expect.objectContaining({
+        matchDir,
+        localTriggers: [expect.objectContaining({ trigger: ":esp" })],
+      }),
+    });
   });
 
   it("creates a YAML file through the app workflow and refreshes the collection", async () => {

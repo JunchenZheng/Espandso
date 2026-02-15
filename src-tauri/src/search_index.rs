@@ -60,6 +60,38 @@ pub struct SearchIndexResponse {
     pub index_status: SearchIndexStatus,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct TriggerConflictSource {
+    pub trigger: String,
+    pub config_path: String,
+    pub relative_path: String,
+    pub snippet_index: usize,
+    pub trigger_index: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct TriggerPrefixConflict {
+    pub blocking: TriggerConflictSource,
+    pub blocked: TriggerConflictSource,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TriggerConflictsRequest {
+    pub match_dir: String,
+    pub local_triggers: Vec<TriggerConflictSource>,
+    pub limit: Option<usize>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TriggerConflictsResponse {
+    pub conflicts: Vec<TriggerPrefixConflict>,
+    pub index_status: SearchIndexStatus,
+}
+
 #[derive(Debug, Clone)]
 pub struct ParsedMatchRow {
     pub display_index: usize,
@@ -1219,6 +1251,155 @@ pub fn query_snippet_index(
     })
 }
 
+pub fn query_trigger_prefix_conflicts(
+    db_path: &Path,
+    req: &TriggerConflictsRequest,
+) -> Result<TriggerConflictsResponse, String> {
+    let mut conn = open_and_init_db(db_path).map_err(|e| e.to_string())?;
+    let index_status = get_status_from_conn(&conn, Some(&req.match_dir))?;
+
+    conn.execute_batch(
+        "
+        CREATE TEMP TABLE IF NOT EXISTS local_trigger_conflict_sources (
+            trigger TEXT PRIMARY KEY,
+            file_path TEXT NOT NULL,
+            relative_path TEXT NOT NULL,
+            snippet_index INTEGER NOT NULL,
+            trigger_index INTEGER NOT NULL
+        );
+        DELETE FROM local_trigger_conflict_sources;
+        ",
+    )
+    .map_err(|e| format!("Failed to prepare trigger conflict query: {}", e))?;
+
+    {
+        let tx = conn
+            .transaction()
+            .map_err(|e| format!("Failed to start trigger conflict query: {}", e))?;
+        let mut seen_triggers = HashSet::new();
+
+        for source in &req.local_triggers {
+            let trigger = source.trigger.trim();
+            if trigger.is_empty() || !seen_triggers.insert(trigger.to_string()) {
+                continue;
+            }
+
+            tx.execute(
+                "INSERT INTO local_trigger_conflict_sources (trigger, file_path, relative_path, snippet_index, trigger_index)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![
+                    trigger,
+                    source.config_path,
+                    source.relative_path,
+                    source.snippet_index as i64,
+                    source.trigger_index as i64,
+                ],
+            )
+            .map_err(|e| format!("Failed to stage trigger conflict source: {}", e))?;
+        }
+
+        tx.commit()
+            .map_err(|e| format!("Failed to stage trigger conflict sources: {}", e))?;
+    }
+
+    let path_exact = match_dir_exact(&req.match_dir);
+    let path_like = match_dir_like_pattern(&req.match_dir);
+    let mut stmt = conn
+        .prepare(
+            "
+            SELECT
+                l.trigger AS blocking_trigger,
+                l.file_path AS blocking_file_path,
+                l.relative_path AS blocking_relative_path,
+                l.snippet_index AS blocking_snippet_index,
+                l.trigger_index AS blocking_trigger_index,
+                m.trigger AS blocked_trigger,
+                m.file_path AS blocked_file_path,
+                m.relative_path AS blocked_relative_path,
+                m.display_index AS blocked_snippet_index,
+                m.trigger_index AS blocked_trigger_index
+            FROM local_trigger_conflict_sources l
+            JOIN matches m
+              ON m.trigger <> l.trigger
+             AND length(m.trigger) > length(l.trigger)
+             AND substr(m.trigger, 1, length(l.trigger)) = l.trigger
+            WHERE (m.file_path = ?1 OR m.file_path LIKE ?2 ESCAPE '\\')
+
+            UNION ALL
+
+            SELECT
+                m.trigger AS blocking_trigger,
+                m.file_path AS blocking_file_path,
+                m.relative_path AS blocking_relative_path,
+                m.display_index AS blocking_snippet_index,
+                m.trigger_index AS blocking_trigger_index,
+                l.trigger AS blocked_trigger,
+                l.file_path AS blocked_file_path,
+                l.relative_path AS blocked_relative_path,
+                l.snippet_index AS blocked_snippet_index,
+                l.trigger_index AS blocked_trigger_index
+            FROM local_trigger_conflict_sources l
+            JOIN matches m
+              ON m.trigger <> l.trigger
+             AND length(l.trigger) > length(m.trigger)
+             AND substr(l.trigger, 1, length(m.trigger)) = m.trigger
+            WHERE (m.file_path = ?1 OR m.file_path LIKE ?2 ESCAPE '\\')
+            ORDER BY blocking_trigger, blocked_trigger, blocking_relative_path, blocked_relative_path
+            ",
+        )
+        .map_err(|e| format!("Failed to prepare trigger conflict SQL: {}", e))?;
+
+    let rows = stmt
+        .query_map(params![path_exact, path_like], |row| {
+            let blocking = TriggerConflictSource {
+                trigger: row.get(0)?,
+                config_path: row.get(1)?,
+                relative_path: row.get(2)?,
+                snippet_index: row.get::<_, i64>(3)? as usize,
+                trigger_index: row.get::<_, i64>(4)? as usize,
+            };
+            let blocked = TriggerConflictSource {
+                trigger: row.get(5)?,
+                config_path: row.get(6)?,
+                relative_path: row.get(7)?,
+                snippet_index: row.get::<_, i64>(8)? as usize,
+                trigger_index: row.get::<_, i64>(9)? as usize,
+            };
+
+            Ok(TriggerPrefixConflict { blocking, blocked })
+        })
+        .map_err(|e| format!("Failed to query trigger conflicts: {}", e))?;
+
+    let limit = req.limit.unwrap_or(1_000);
+    let mut conflicts = Vec::new();
+    let mut seen_pairs = HashSet::new();
+
+    for row in rows {
+        let conflict = row.map_err(|e| format!("Failed to read trigger conflict: {}", e))?;
+        let pair_key = format!(
+            "{}\u{0}{}\u{0}{}\u{0}{}\u{0}{}\u{0}{}",
+            conflict.blocking.trigger,
+            conflict.blocking.config_path,
+            conflict.blocking.snippet_index,
+            conflict.blocked.trigger,
+            conflict.blocked.config_path,
+            conflict.blocked.snippet_index,
+        );
+        if !seen_pairs.insert(pair_key) {
+            continue;
+        }
+        conflicts.push(conflict);
+        if conflicts.len() >= limit {
+            break;
+        }
+    }
+
+    Ok(TriggerConflictsResponse {
+        conflicts,
+        index_status,
+    })
+}
+
 // Tauri commands
 #[tauri::command]
 pub fn start_search_index_sync(
@@ -1246,6 +1427,15 @@ pub fn search_snippet_index(
 ) -> Result<SearchIndexResponse, String> {
     let db_path = resolve_db_path(&app_handle)?;
     query_snippet_index(&db_path, &request)
+}
+
+#[tauri::command]
+pub fn detect_trigger_prefix_conflicts(
+    app_handle: tauri::AppHandle,
+    request: TriggerConflictsRequest,
+) -> Result<TriggerConflictsResponse, String> {
+    let db_path = resolve_db_path(&app_handle)?;
+    query_trigger_prefix_conflicts(&db_path, &request)
 }
 
 #[tauri::command]
@@ -1685,5 +1875,60 @@ matches:
 
         assert_eq!(res.total, 1);
         assert!(res.results[0].file_path.ends_with("match-b/base.yml"));
+    }
+
+    #[test]
+    fn test_trigger_prefix_conflicts_query_uses_indexed_matches() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("test.sqlite");
+        let match_dir = dir.path().join("match");
+        fs::create_dir_all(&match_dir).unwrap();
+
+        let base_file = match_dir.join("base.yml");
+        let work_file = match_dir.join("work.yml");
+        fs::write(
+            &base_file,
+            "matches:\n  - trigger: ':esp'\n    replace: 'short'\n  - trigger: ':same'\n    replace: 'one'\n",
+        )
+        .unwrap();
+        fs::write(
+            &work_file,
+            "matches:\n  - trigger: ':espanso'\n    replace: 'long'\n  - trigger: ':same'\n    replace: 'two'\n",
+        )
+        .unwrap();
+
+        let status = sync_match_dir(&db_path, match_dir.to_str().unwrap()).unwrap();
+        assert_eq!(status.indexed_files, 2);
+        assert_eq!(status.indexed_matches, 4);
+
+        let res = query_trigger_prefix_conflicts(
+            &db_path,
+            &TriggerConflictsRequest {
+                match_dir: match_dir.to_string_lossy().to_string(),
+                local_triggers: vec![
+                    TriggerConflictSource {
+                        trigger: ":esp".to_string(),
+                        config_path: base_file.to_string_lossy().to_string(),
+                        relative_path: "base.yml".to_string(),
+                        snippet_index: 0,
+                        trigger_index: 0,
+                    },
+                    TriggerConflictSource {
+                        trigger: ":same".to_string(),
+                        config_path: base_file.to_string_lossy().to_string(),
+                        relative_path: "base.yml".to_string(),
+                        snippet_index: 1,
+                        trigger_index: 0,
+                    },
+                ],
+                limit: Some(10),
+            },
+        )
+        .unwrap();
+
+        assert_eq!(res.conflicts.len(), 1);
+        assert_eq!(res.conflicts[0].blocking.trigger, ":esp");
+        assert_eq!(res.conflicts[0].blocked.trigger, ":espanso");
+        assert!(res.conflicts[0].blocked.config_path.ends_with("work.yml"));
     }
 }

@@ -142,15 +142,8 @@ export function useEspansoConfigs(options: UseEspansoConfigsOptions = {}) {
         setEspansoPathSource(result.pathSource);
         setEspansoConfigs(result.files);
         setEspansoDirectories(result.directories || []);
+        setEspansoConfigPreviews([]);
         setSelectedPreviewError("");
-        const previews = await Promise.all(
-          result.files.map((config) =>
-            loadEspansoConfigPreviewFromRepository(config, (error) =>
-              getReadErrorMessage(config, error),
-            ),
-          ),
-        );
-        setEspansoConfigPreviews(previews);
         setSelectedEspansoConfigPath((current) => {
           if (current && result.files.some((file) => file.path === current)) return current;
           return result.files[0]?.path || "";
@@ -169,7 +162,7 @@ export function useEspansoConfigs(options: UseEspansoConfigsOptions = {}) {
         setIsScanningEspanso(false);
       }
     },
-    [getReadErrorMessage, t],
+    [t],
   );
 
   const addDroppedYamlFile = useCallback((path: string) => {

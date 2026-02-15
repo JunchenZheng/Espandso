@@ -25,10 +25,8 @@ import { useSnippetEditor } from "./features/snippets/hooks/useSnippetEditor";
 import { useSnippetCommands } from "./features/snippets/hooks/useSnippetCommands";
 import { ImportAlfredSnippetsDialog } from "./features/snippets/components/ImportAlfredSnippetsDialog";
 import { TriggerConflictsDialog } from "./features/snippets/components/TriggerConflictsDialog";
-import {
-  detectTriggerPrefixConflicts,
-  filterTriggerConflictsByConfigPath,
-} from "./logic/triggerConflicts";
+import { getTriggerConflictSources, type TriggerPrefixConflict } from "./logic/triggerConflicts";
+import { detectTriggerPrefixConflictsFromIndex } from "./tauri/searchIndex";
 export type { EspansoConfigPreview } from "./features/espanso-configs/types";
 
 const DEFAULT_COLLECTION_PANE_WIDTH = 20;
@@ -110,6 +108,9 @@ function App() {
   const [isAboutOpen, setIsAboutOpen] = useState<boolean>(false);
   const [isImportAlfredOpen, setIsImportAlfredOpen] = useState<boolean>(false);
   const [isTriggerConflictsOpen, setIsTriggerConflictsOpen] = useState<boolean>(false);
+  const [selectedTriggerPrefixConflicts, setSelectedTriggerPrefixConflicts] = useState<
+    TriggerPrefixConflict[]
+  >([]);
   const [alfredInitialFilePath, setAlfredInitialFilePath] = useState<string | null>(null);
 
   const snippetEditor = useSnippetEditor();
@@ -234,18 +235,39 @@ function App() {
     t,
   });
 
-  const triggerPrefixConflicts = useMemo(
-    () => detectTriggerPrefixConflicts(espansoConfigPreviews),
-    [espansoConfigPreviews],
+  const selectedTriggerConflictSources = useMemo(
+    () => (selectedEspansoPreview ? getTriggerConflictSources([selectedEspansoPreview]) : []),
+    [selectedEspansoPreview],
   );
 
-  const selectedTriggerPrefixConflicts = useMemo(() => {
-    if (!selectedEspansoPreview) return [];
-    return filterTriggerConflictsByConfigPath(
-      triggerPrefixConflicts,
-      selectedEspansoPreview.config.path,
-    );
-  }, [selectedEspansoPreview, triggerPrefixConflicts]);
+  useEffect(() => {
+    if (!espansoMatchDir || !selectedEspansoPreview || selectedTriggerConflictSources.length === 0) {
+      setSelectedTriggerPrefixConflicts([]);
+      return;
+    }
+
+    let cancelled = false;
+    detectTriggerPrefixConflictsFromIndex({
+      matchDir: espansoMatchDir,
+      localTriggers: selectedTriggerConflictSources,
+      limit: 1000,
+    })
+      .then((response) => {
+        if (!cancelled) {
+          setSelectedTriggerPrefixConflicts(response.conflicts);
+        }
+      })
+      .catch((error) => {
+        console.warn("Trigger conflict detection failed:", error);
+        if (!cancelled) {
+          setSelectedTriggerPrefixConflicts([]);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [espansoMatchDir, selectedEspansoPreview, selectedTriggerConflictSources]);
 
   useEffect(() => {
     let active = true;

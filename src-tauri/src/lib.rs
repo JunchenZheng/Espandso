@@ -185,6 +185,7 @@ pub fn run() {
             search_index::start_search_index_sync,
             search_index::get_search_index_status,
             search_index::search_snippet_index,
+            search_index::detect_trigger_prefix_conflicts,
             search_index::refresh_search_index_file,
             search_index::mark_search_index_internal_write,
             search_index::start_search_index_watcher,
