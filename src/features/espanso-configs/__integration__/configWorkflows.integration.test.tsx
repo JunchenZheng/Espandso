@@ -70,6 +70,13 @@ describe("Espanso config integration workflows", () => {
         localTriggers: [expect.objectContaining({ trigger: ":esp" })],
       }),
     });
+
+    const editButtons = within(dialog).getAllByRole("button", { name: /edit/i });
+    await user.click(editButtons[1]);
+
+    expect(tauriHarness.readTextFile).toHaveBeenCalledWith(`${matchDir}/work.yml`);
+    expect(await screen.findByRole("dialog", { name: /edit text snippet/i })).toBeInTheDocument();
+    expect(screen.getByDisplayValue(":espanso")).toBeInTheDocument();
   });
 
   it("creates a YAML file through the app workflow and refreshes the collection", async () => {

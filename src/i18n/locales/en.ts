@@ -300,6 +300,9 @@ export const en = {
       noConflicts: "No prefix trigger conflicts detected.",
       blockingTrigger: "Expands First",
       blockedTrigger: "Blocked Trigger",
+      editTrigger: "Edit",
+      editTriggerTitle: "Edit {{trigger}}",
+      targetNotFound: 'Could not find trigger "{{trigger}}" in the indexed YAML preview.',
       explanation:
         "{{blocking}} is a prefix of {{blocked}}, so Espanso may expand the shorter trigger before the longer one can be completed.",
     },

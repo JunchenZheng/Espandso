@@ -1,4 +1,5 @@
-import { AlertTriangle, CheckCircle2, FileText } from "lucide-react";
+import { AlertTriangle, CheckCircle2, FileText, Pencil } from "lucide-react";
+import { Button } from "../../../components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -8,13 +9,14 @@ import {
 } from "../../../components/ui/dialog";
 import { ScrollArea } from "../../../components/ui/scroll-area";
 import { useI18n } from "../../../i18n/useI18n";
-import type { TriggerPrefixConflict } from "../../../logic/triggerConflicts";
+import type { TriggerConflictSource, TriggerPrefixConflict } from "../../../logic/triggerConflicts";
 
 export interface TriggerConflictsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   conflicts: TriggerPrefixConflict[];
   relativePath?: string;
+  onOpenSource?: (source: TriggerConflictSource) => void;
 }
 
 export function TriggerConflictsDialog({
@@ -22,6 +24,7 @@ export function TriggerConflictsDialog({
   onOpenChange,
   conflicts,
   relativePath,
+  onOpenSource,
 }: TriggerConflictsDialogProps) {
   const { t } = useI18n();
   const conflictCount = conflicts.length;
@@ -77,6 +80,20 @@ export function TriggerConflictsDialog({
                         <FileText className="h-3.5 w-3.5 shrink-0" />
                         <span className="truncate">{conflict.blocking.relativePath}</span>
                       </div>
+                      {onOpenSource && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="mt-2 h-7 px-2 text-xs"
+                          onClick={() => onOpenSource(conflict.blocking)}
+                          title={t("dialogs.triggerConflicts.editTriggerTitle", {
+                            trigger: conflict.blocking.trigger,
+                          })}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                          {t("dialogs.triggerConflicts.editTrigger")}
+                        </Button>
+                      )}
                     </div>
                     <div className="min-w-0">
                       <div className="mb-1 text-[11px] font-semibold uppercase text-red-700">
@@ -89,6 +106,20 @@ export function TriggerConflictsDialog({
                         <FileText className="h-3.5 w-3.5 shrink-0" />
                         <span className="truncate">{conflict.blocked.relativePath}</span>
                       </div>
+                      {onOpenSource && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="mt-2 h-7 px-2 text-xs"
+                          onClick={() => onOpenSource(conflict.blocked)}
+                          title={t("dialogs.triggerConflicts.editTriggerTitle", {
+                            trigger: conflict.blocked.trigger,
+                          })}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                          {t("dialogs.triggerConflicts.editTrigger")}
+                        </Button>
+                      )}
                     </div>
                   </div>
                   <p className="mt-3 text-xs leading-relaxed text-red-900">

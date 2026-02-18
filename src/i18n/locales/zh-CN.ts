@@ -296,6 +296,9 @@ export const zhCN: TranslationTree = {
       noConflicts: "未检测到前缀触发词冲突。",
       blockingTrigger: "先展开的触发词",
       blockedTrigger: "被阻挡的触发词",
+      editTrigger: "编辑",
+      editTriggerTitle: "编辑 {{trigger}}",
+      targetNotFound: '未能在已索引的 YAML 预览中找到触发词 "{{trigger}}"。',
       explanation:
         "{{blocking}} 是 {{blocked}} 的前缀，因此 Espanso 可能会先展开较短触发词，导致较长触发词无法被完整触发。",
     },

@@ -25,7 +25,11 @@ import { useSnippetEditor } from "./features/snippets/hooks/useSnippetEditor";
 import { useSnippetCommands } from "./features/snippets/hooks/useSnippetCommands";
 import { ImportAlfredSnippetsDialog } from "./features/snippets/components/ImportAlfredSnippetsDialog";
 import { TriggerConflictsDialog } from "./features/snippets/components/TriggerConflictsDialog";
-import { getTriggerConflictSources, type TriggerPrefixConflict } from "./logic/triggerConflicts";
+import {
+  getTriggerConflictSources,
+  type TriggerConflictSource,
+  type TriggerPrefixConflict,
+} from "./logic/triggerConflicts";
 import { detectTriggerPrefixConflictsFromIndex } from "./tauri/searchIndex";
 export type { EspansoConfigPreview } from "./features/espanso-configs/types";
 
@@ -268,6 +272,68 @@ function App() {
       cancelled = true;
     };
   }, [espansoMatchDir, selectedEspansoPreview, selectedTriggerConflictSources]);
+
+  const openTriggerConflictSource = useCallback(
+    async (source: TriggerConflictSource) => {
+      const targetConfig = espansoConfigs.find((config) => config.path === source.configPath);
+      if (!targetConfig) {
+        showAlert(t("errors.failedToLoadConfig", { message: source.configPath }));
+        return;
+      }
+
+      try {
+        const loadedPreview =
+          espansoConfigPreviews.find((preview) => preview.config.path === source.configPath) ||
+          (selectedEspansoPreview?.config.path === source.configPath
+            ? selectedEspansoPreview
+            : null) ||
+          (await loadEspansoConfigPreview(targetConfig));
+
+        const targetMatch =
+          loadedPreview.importedMatches[source.snippetIndex] ||
+          loadedPreview.importedMatches.find(
+            (match) =>
+              match.originalMatchIndex === source.snippetIndex &&
+              match.triggerIndex === source.triggerIndex,
+          );
+
+        if (!targetMatch) {
+          showAlert(
+            t("errors.failedToLoadConfig", {
+              message: t("dialogs.triggerConflicts.targetNotFound", {
+                trigger: source.trigger,
+              }),
+            }),
+          );
+          return;
+        }
+
+        setSelectedEspansoConfigPath(source.configPath);
+        setIsTriggerConflictsOpen(false);
+        snippetEditor.openEdit({
+          preview: loadedPreview,
+          match: targetMatch,
+          displayIndex: source.snippetIndex,
+        });
+      } catch (error: unknown) {
+        showAlert(
+          t("errors.failedToLoadConfig", {
+            message: error instanceof Error ? error.message : String(error),
+          }),
+        );
+      }
+    },
+    [
+      espansoConfigPreviews,
+      espansoConfigs,
+      loadEspansoConfigPreview,
+      selectedEspansoPreview,
+      setSelectedEspansoConfigPath,
+      showAlert,
+      snippetEditor,
+      t,
+    ],
+  );
 
   useEffect(() => {
     let active = true;
@@ -512,6 +578,7 @@ function App() {
         onOpenChange={setIsTriggerConflictsOpen}
         conflicts={selectedTriggerPrefixConflicts}
         relativePath={selectedEspansoPreview?.config.relativePath}
+        onOpenSource={openTriggerConflictSource}
       />
 
       <ConfirmAlertDialog
