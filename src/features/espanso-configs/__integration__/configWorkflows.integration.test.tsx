@@ -1,8 +1,12 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useCallback, useMemo, useState, type ReactElement, type ReactNode } from "react";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import App from "../../../App";
+import { translate } from "../../../i18n/translate";
+import type { Locale } from "../../../i18n/types";
+import { I18nContext } from "../../../i18n/useI18n";
 import { renderWithProviders } from "../../../test/render";
 import { tauriHarness } from "../../../test/integration/tauriHarness";
 
@@ -12,6 +16,30 @@ const baseYaml = [
   "    replace: Hello from integration",
   "",
 ].join("\n");
+
+function renderWithSwitchableLocale(ui: ReactElement) {
+  function SwitchableLocaleProvider({ children }: { children: ReactNode }) {
+    const [locale, setLocaleState] = useState<Locale>("en");
+    const setLocale = useCallback(async (nextLocale: Locale) => {
+      setLocaleState(nextLocale);
+    }, []);
+    const value = useMemo(
+      () => ({
+        locale,
+        setLocale,
+        t: (key: string, params?: Parameters<typeof translate>[2]) =>
+          translate(locale, key, params),
+      }),
+      [locale, setLocale],
+    );
+
+    return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
+  }
+
+  return render(ui, {
+    wrapper: ({ children }) => <SwitchableLocaleProvider>{children}</SwitchableLocaleProvider>,
+  });
+}
 
 describe("Espanso config integration workflows", () => {
   beforeEach(() => {
@@ -34,6 +62,21 @@ describe("Espanso config integration workflows", () => {
     expect(tauriHarness.readTextFile).toHaveBeenCalledWith(
       `${tauriHarness.getMatchDir()}/base.yml`,
     );
+  });
+
+  it("does not rescan the Espanso directory when the Settings language changes", async () => {
+    const user = userEvent.setup();
+    renderWithSwitchableLocale(<App />);
+
+    await screen.findByText(":hello");
+    expect(tauriHarness.readDir).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    const settingsDialog = await screen.findByRole("dialog", { name: "Settings" });
+    await user.click(within(settingsDialog).getByRole("button", { name: "中文" }));
+
+    expect(await screen.findByRole("dialog", { name: "设置" })).toBeInTheDocument();
+    expect(tauriHarness.readDir).toHaveBeenCalledTimes(1);
   });
 
   it("detects current-file prefix trigger conflicts through the SQLite index", async () => {

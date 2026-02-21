@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useI18n } from "../../../i18n/useI18n";
 import {
@@ -41,6 +41,7 @@ export interface UseEspansoConfigsOptions {
 export function useEspansoConfigs(options: UseEspansoConfigsOptions = {}) {
   const { isYamlWarningsEnabled = true } = options;
   const { t } = useI18n();
+  const tRef = useRef(t);
 
   const [espansoMatchDir, setEspansoMatchDir] = useState<string>("");
   const [espansoPathSource, setEspansoPathSource] = useState<EspansoPathSource | "">("");
@@ -52,6 +53,10 @@ export function useEspansoConfigs(options: UseEspansoConfigsOptions = {}) {
   const [isLoadingSelectedPreview, setIsLoadingSelectedPreview] = useState<boolean>(false);
   const [selectedPreviewError, setSelectedPreviewError] = useState<string>("");
   const [espansoScanMessage, setEspansoScanMessage] = useState<string>("");
+
+  useEffect(() => {
+    tRef.current = t;
+  }, [t]);
 
   // Create File State
   const [isCreateFileOpen, setIsCreateFileOpen] = useState<boolean>(false);
@@ -131,8 +136,9 @@ export function useEspansoConfigs(options: UseEspansoConfigsOptions = {}) {
 
   const scanDefaultEspansoConfigDir = useCallback(
     async (options?: { skipIndexSync?: boolean }) => {
+      const translateCurrent = tRef.current;
       setIsScanningEspanso(true);
-      setEspansoScanMessage(t("status.scanningEspansoConfigs"));
+      setEspansoScanMessage(translateCurrent("status.scanningEspansoConfigs"));
       try {
         const result = await scanEspansoConfigDirectory();
         setEspansoMatchDir(result.matchDir);
@@ -148,12 +154,14 @@ export function useEspansoConfigs(options: UseEspansoConfigsOptions = {}) {
           if (current && result.files.some((file) => file.path === current)) return current;
           return result.files[0]?.path || "";
         });
-        setEspansoScanMessage(result.files.length > 0 ? "" : t("empty.noYamlFilesMessage"));
+        setEspansoScanMessage(
+          result.files.length > 0 ? "" : translateCurrent("empty.noYamlFilesMessage"),
+        );
       } catch (e: any) {
         const message = e?.message || String(e);
         const permissionHint = message.toLowerCase().includes("forbidden")
-          ? t("errors.espansoPathBlocked", { message })
-          : t("errors.failedToScanEspansoConfigs", { message });
+          ? translateCurrent("errors.espansoPathBlocked", { message })
+          : translateCurrent("errors.failedToScanEspansoConfigs", { message });
         setEspansoConfigs([]);
         setEspansoDirectories([]);
         setEspansoConfigPreviews([]);
@@ -162,7 +170,7 @@ export function useEspansoConfigs(options: UseEspansoConfigsOptions = {}) {
         setIsScanningEspanso(false);
       }
     },
-    [t],
+    [],
   );
 
   const addDroppedYamlFile = useCallback((path: string) => {
