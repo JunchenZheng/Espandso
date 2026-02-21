@@ -102,6 +102,9 @@ export const zhCN: TranslationTree = {
     experimentalDescription: "尚在测试中的试验性功能。",
     enableYamlWarnings: "YAML 文件检测与警告",
     enableYamlWarningsDescription: "自动扫描 YAML 文件中的重复触发词与潜在语法警告。",
+    enablePreSaveConflictCheck: "保存时阻止触发词冲突",
+    enablePreSaveConflictCheckDescription:
+      "例如：:hello 可能会挡住 :helloworld，导致较长触发词无法触发。",
   },
   stats: {
     totalSnippets: "片段总数",
@@ -341,6 +344,8 @@ export const zhCN: TranslationTree = {
     selectConfigBeforeAddingSnippet: "添加片段前请先选择 YAML 配置。",
     noConfigSelected: "未选择配置",
     validationError: "校验错误",
+    triggerConflictOnSave:
+      "{{trigger}} 与 {{file}} 中的 {{otherTrigger}} 冲突。请先重命名其中一个触发词再保存。",
     failedToSelectFile: "选择文件失败：{{message}}",
     failedToOpenYamlFile: "打开 YAML 文件失败：{{message}}",
     failedToRetrieveLogs: "获取 Espanso 日志失败。",

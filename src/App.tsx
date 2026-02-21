@@ -31,6 +31,10 @@ import {
   type TriggerPrefixConflict,
 } from "./logic/triggerConflicts";
 import { detectTriggerPrefixConflictsFromIndex } from "./tauri/searchIndex";
+import {
+  getPreSaveConflictCheckEnabled,
+  setPreSaveConflictCheckEnabled,
+} from "./logic/features";
 export type { EspansoConfigPreview } from "./features/espanso-configs/types";
 
 const DEFAULT_COLLECTION_PANE_WIDTH = 20;
@@ -111,6 +115,9 @@ function App() {
   const [isLogOpen, setIsLogOpen] = useState<boolean>(false);
   const [isAboutOpen, setIsAboutOpen] = useState<boolean>(false);
   const [isImportAlfredOpen, setIsImportAlfredOpen] = useState<boolean>(false);
+  const [enablePreSaveConflictCheck, setEnablePreSaveConflictCheck] = useState<boolean>(() =>
+    getPreSaveConflictCheckEnabled(),
+  );
   const [isTriggerConflictsOpen, setIsTriggerConflictsOpen] = useState<boolean>(false);
   const [selectedTriggerPrefixConflicts, setSelectedTriggerPrefixConflicts] = useState<
     TriggerPrefixConflict[]
@@ -222,6 +229,7 @@ function App() {
     visualEditorMode,
     isSavingSnippet: snippetEditor.isSaving,
     setIsSavingSnippet: snippetEditor.setIsSaving,
+    enablePreSaveConflictCheck,
     buildFormSnippet: snippetEditor.buildSnippetObject,
     setAddErrors: snippetEditor.setErrors,
     setAddWarnings: snippetEditor.setWarnings,
@@ -546,6 +554,11 @@ function App() {
         onRefreshScan={scanDefaultEspansoConfigDir}
         enableExperimentalYamlWarnings={enableExperimentalYamlWarnings}
         onToggleExperimentalYamlWarnings={handleToggleExperimentalYamlWarnings}
+        enablePreSaveConflictCheck={enablePreSaveConflictCheck}
+        onTogglePreSaveConflictCheck={(checked) => {
+          setEnablePreSaveConflictCheck(checked);
+          setPreSaveConflictCheckEnabled(checked);
+        }}
         onOpenAbout={() => setIsAboutOpen(true)}
       />
 

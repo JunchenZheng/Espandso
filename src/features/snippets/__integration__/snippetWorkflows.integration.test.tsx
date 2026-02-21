@@ -15,6 +15,7 @@ const baseYaml = [
 
 describe("Snippet integration workflows", () => {
   beforeEach(() => {
+    window.localStorage.clear();
     const matchDir = tauriHarness.getMatchDir();
     tauriHarness.reset({
       files: {
@@ -50,6 +51,38 @@ describe("Snippet integration workflows", () => {
     expect(tauriHarness.invoke).toHaveBeenCalledWith("refresh_search_index_file", {
       filePath: path,
       matchDir: tauriHarness.getMatchDir(),
+    });
+  });
+
+  it("blocks saving a snippet that would create a trigger prefix conflict when enabled", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<App />);
+
+    await screen.findByText(":hello");
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+
+    const settingsDialog = await screen.findByRole("dialog", { name: "Settings" });
+    await user.click(
+      within(settingsDialog).getByRole("switch", { name: "Block Trigger Conflicts on Save" }),
+    );
+    await user.click(within(settingsDialog).getByRole("button", { name: "Done" }));
+
+    await user.click(screen.getByRole("button", { name: "Add Snippet" }));
+    const dialog = await screen.findByRole("dialog", { name: "Add Text Snippet" });
+    await user.type(within(dialog).getByLabelText(/Trigger/u), ":helloworld");
+    await user.type(within(dialog).getByLabelText(/Replace Content/u), "Blocked");
+    await user.click(within(dialog).getByRole("button", { name: "Save to YAML" }));
+
+    expect(
+      await screen.findAllByText(/:helloworld conflicts with :hello in base.yml/i),
+    ).not.toHaveLength(0);
+    expect(tauriHarness.getFile(`${tauriHarness.getMatchDir()}/base.yml`)).not.toContain(
+      ":helloworld",
+    );
+    expect(tauriHarness.invoke).toHaveBeenCalledWith("detect_trigger_prefix_conflicts", {
+      request: expect.objectContaining({
+        localTriggers: [expect.objectContaining({ trigger: ":helloworld" })],
+      }),
     });
   });
 });

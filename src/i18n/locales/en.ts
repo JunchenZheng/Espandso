@@ -101,6 +101,9 @@ export const en = {
     enableYamlWarnings: "YAML Detection & Warnings",
     enableYamlWarningsDescription:
       "Scan YAML files for duplicate triggers and potential syntax warnings.",
+    enablePreSaveConflictCheck: "Block Trigger Conflicts on Save",
+    enablePreSaveConflictCheckDescription:
+      "Example: :hello can block :helloworld, so the longer trigger may never run.",
   },
   stats: {
     totalSnippets: "Total Snippets",
@@ -347,6 +350,8 @@ export const en = {
     selectConfigBeforeAddingSnippet: "Please select a YAML config before adding a snippet.",
     noConfigSelected: "No Config Selected",
     validationError: "Validation Error",
+    triggerConflictOnSave:
+      "{{trigger}} conflicts with {{otherTrigger}} in {{file}}. Rename one trigger before saving.",
     failedToSelectFile: "Failed to select file: {{message}}",
     failedToOpenYamlFile: "Failed to open YAML file: {{message}}",
     failedToRetrieveLogs: "Failed to retrieve Espanso logs.",

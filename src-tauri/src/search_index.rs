@@ -1323,6 +1323,11 @@ pub fn query_trigger_prefix_conflicts(
               ON m.trigger <> l.trigger
              AND length(m.trigger) > length(l.trigger)
              AND substr(m.trigger, 1, length(l.trigger)) = l.trigger
+             AND NOT (
+                m.file_path = l.file_path
+                AND m.display_index = l.snippet_index
+                AND m.trigger_index = l.trigger_index
+             )
             WHERE (m.file_path = ?1 OR m.file_path LIKE ?2 ESCAPE '\\')
 
             UNION ALL
@@ -1343,6 +1348,11 @@ pub fn query_trigger_prefix_conflicts(
               ON m.trigger <> l.trigger
              AND length(l.trigger) > length(m.trigger)
              AND substr(l.trigger, 1, length(m.trigger)) = m.trigger
+             AND NOT (
+                m.file_path = l.file_path
+                AND m.display_index = l.snippet_index
+                AND m.trigger_index = l.trigger_index
+             )
             WHERE (m.file_path = ?1 OR m.file_path LIKE ?2 ESCAPE '\\')
             ORDER BY blocking_trigger, blocked_trigger, blocking_relative_path, blocked_relative_path
             ",
@@ -1930,5 +1940,40 @@ matches:
         assert_eq!(res.conflicts[0].blocking.trigger, ":esp");
         assert_eq!(res.conflicts[0].blocked.trigger, ":espanso");
         assert!(res.conflicts[0].blocked.config_path.ends_with("work.yml"));
+    }
+
+    #[test]
+    fn test_trigger_prefix_conflicts_query_excludes_current_edited_row() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("test.sqlite");
+        let match_dir = dir.path().join("match");
+        fs::create_dir_all(&match_dir).unwrap();
+
+        let base_file = match_dir.join("base.yml");
+        fs::write(
+            &base_file,
+            "matches:\n  - trigger: ':esp'\n    replace: 'short'\n",
+        )
+        .unwrap();
+
+        sync_match_dir(&db_path, match_dir.to_str().unwrap()).unwrap();
+
+        let res = query_trigger_prefix_conflicts(
+            &db_path,
+            &TriggerConflictsRequest {
+                match_dir: match_dir.to_string_lossy().to_string(),
+                local_triggers: vec![TriggerConflictSource {
+                    trigger: ":espresso".to_string(),
+                    config_path: base_file.to_string_lossy().to_string(),
+                    relative_path: "base.yml".to_string(),
+                    snippet_index: 0,
+                    trigger_index: 0,
+                }],
+                limit: Some(10),
+            },
+        )
+        .unwrap();
+
+        assert!(res.conflicts.is_empty());
     }
 }
