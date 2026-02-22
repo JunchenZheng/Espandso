@@ -43,6 +43,8 @@ interface AppWorkspaceProps {
   onCreateFolder: (parentRelPath?: string) => void;
   onOpenSnippet: (target: SnippetEditTarget) => void;
   onAddSnippet: () => void;
+  onOpenTriggerConflicts: () => void;
+  triggerConflictCount: number;
   onOpenVisualEditor: () => void;
   onOpenImportAlfred?: () => void;
   onOpenWarnings: (path: string) => void;
@@ -80,6 +82,8 @@ export function AppWorkspace({
   onCreateFolder,
   onOpenSnippet,
   onAddSnippet,
+  onOpenTriggerConflicts,
+  triggerConflictCount,
   onOpenVisualEditor,
   onOpenImportAlfred,
   onOpenWarnings,
@@ -197,6 +201,8 @@ export function AppWorkspace({
                       })
                     }
                     onAddSnippet={onAddSnippet}
+                    onOpenTriggerConflicts={onOpenTriggerConflicts}
+                    triggerConflictCount={triggerConflictCount}
                     onOpenVisualEditor={onOpenVisualEditor}
                     onOpenImportAlfred={onOpenImportAlfred}
                     onOpenWarnings={onOpenWarnings}

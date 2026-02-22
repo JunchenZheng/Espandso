@@ -27,6 +27,8 @@ export const en = {
     addSnippet: "Add Snippet",
     batchSelect: "Batch Delete",
     batchDelete: "Delete Selected ({{count}})",
+    triggerConflicts: "Conflicts",
+    triggerConflictsTitle: "{{count}} prefix trigger conflicts",
     visualEditor: "Visual Editor",
     viewLogs: "View Logs",
     viewWarnings: "View Warnings",
@@ -99,6 +101,9 @@ export const en = {
     enableYamlWarnings: "YAML Detection & Warnings",
     enableYamlWarningsDescription:
       "Scan YAML files for duplicate triggers and potential syntax warnings.",
+    enablePreSaveConflictCheck: "Block Trigger Conflicts on Save",
+    enablePreSaveConflictCheckDescription:
+      "Example: :hello can block :helloworld, so the longer trigger may never run.",
   },
   stats: {
     totalSnippets: "Total Snippets",
@@ -289,6 +294,21 @@ export const en = {
       viewYaml: "View YAML",
       openYamlExternalTitle: "Open YAML file in default external application",
     },
+    triggerConflicts: {
+      title: "Trigger Conflicts",
+      description:
+        "Find triggers where a shorter trigger can expand before a longer trigger is reachable.",
+      fileDescription:
+        "Prefix conflicts involving {{file}}. Exact duplicate triggers are allowed and are not shown here.",
+      noConflicts: "No prefix trigger conflicts detected.",
+      blockingTrigger: "Expands First",
+      blockedTrigger: "Blocked Trigger",
+      editTrigger: "Edit",
+      editTriggerTitle: "Edit {{trigger}}",
+      targetNotFound: 'Could not find trigger "{{trigger}}" in the indexed YAML preview.',
+      explanation:
+        "{{blocking}} is a prefix of {{blocked}}, so Espanso may expand the shorter trigger before the longer one can be completed.",
+    },
     confirmDelete: {
       title: "Delete Snippet",
       message: 'Are you sure you want to delete trigger "{{trigger}}" from {{file}}?',
@@ -330,6 +350,8 @@ export const en = {
     selectConfigBeforeAddingSnippet: "Please select a YAML config before adding a snippet.",
     noConfigSelected: "No Config Selected",
     validationError: "Validation Error",
+    triggerConflictOnSave:
+      "{{trigger}} conflicts with {{otherTrigger}} in {{file}}. Rename one trigger before saving.",
     failedToSelectFile: "Failed to select file: {{message}}",
     failedToOpenYamlFile: "Failed to open YAML file: {{message}}",
     failedToRetrieveLogs: "Failed to retrieve Espanso logs.",

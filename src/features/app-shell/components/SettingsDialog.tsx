@@ -1,4 +1,4 @@
-import { FileSearch, FlaskConical, Globe, Info, Loader2 } from "lucide-react";
+import { FileSearch, FlaskConical, Globe, Info, Loader2, ShieldAlert } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import {
   Dialog,
@@ -23,6 +23,8 @@ interface SettingsDialogProps {
   onRefreshScan: () => void;
   enableExperimentalYamlWarnings: boolean;
   onToggleExperimentalYamlWarnings: (checked: boolean) => void;
+  enablePreSaveConflictCheck: boolean;
+  onTogglePreSaveConflictCheck: (checked: boolean) => void;
   onOpenAbout: () => void;
 }
 
@@ -35,6 +37,8 @@ export function SettingsDialog({
   onRefreshScan,
   enableExperimentalYamlWarnings,
   onToggleExperimentalYamlWarnings,
+  enablePreSaveConflictCheck,
+  onTogglePreSaveConflictCheck,
   onOpenAbout,
 }: SettingsDialogProps) {
   const { t, locale, setLocale } = useI18n();
@@ -121,6 +125,33 @@ export function SettingsDialog({
                       : t("settings.usingPlatformDefault")}
                   </p>
                 )}
+              </div>
+            </div>
+          </div>
+
+          {/* Save Protection Block */}
+          <div className="rounded-lg border bg-secondary/40 p-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-background text-primary">
+                <ShieldAlert className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-3">
+                  <Label
+                    htmlFor="pre-save-conflict-check"
+                    className="text-sm font-semibold cursor-pointer"
+                  >
+                    {t("settings.enablePreSaveConflictCheck")}
+                  </Label>
+                  <Switch
+                    id="pre-save-conflict-check"
+                    checked={enablePreSaveConflictCheck}
+                    onCheckedChange={onTogglePreSaveConflictCheck}
+                  />
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {t("settings.enablePreSaveConflictCheckDescription")}
+                </p>
               </div>
             </div>
           </div>

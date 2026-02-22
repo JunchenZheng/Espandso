@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { Snippet } from "../logic/types";
+import type { TriggerConflictSource, TriggerPrefixConflict } from "../logic/triggerConflicts";
 
 export interface SearchScope {
   trigger: boolean;
@@ -44,6 +45,17 @@ export interface SearchIndexResponse {
   indexStatus: SearchIndexStatus;
 }
 
+export interface TriggerConflictsRequest {
+  matchDir: string;
+  localTriggers: TriggerConflictSource[];
+  limit?: number;
+}
+
+export interface TriggerConflictsResponse {
+  conflicts: TriggerPrefixConflict[];
+  indexStatus: SearchIndexStatus;
+}
+
 export async function startSearchIndexSync(matchDir: string): Promise<SearchIndexStatus> {
   return await invoke<SearchIndexStatus>("start_search_index_sync", { matchDir });
 }
@@ -56,6 +68,12 @@ export async function searchSnippetIndex(
   request: SearchIndexRequest,
 ): Promise<SearchIndexResponse> {
   return await invoke<SearchIndexResponse>("search_snippet_index", { request });
+}
+
+export async function detectTriggerPrefixConflictsFromIndex(
+  request: TriggerConflictsRequest,
+): Promise<TriggerConflictsResponse> {
+  return await invoke<TriggerConflictsResponse>("detect_trigger_prefix_conflicts", { request });
 }
 
 export async function refreshSearchIndexFile(

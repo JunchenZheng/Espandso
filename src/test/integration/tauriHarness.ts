@@ -119,7 +119,44 @@ const harnessState = vi.hoisted(() => {
   const openDialog = vi.fn(async () => null);
   const saveDialog = vi.fn(async () => null);
 
-  const invoke = vi.fn(async (command: string) => {
+  function getIndexedTriggerSources() {
+    const sources: Array<{
+      trigger: string;
+      configPath: string;
+      relativePath: string;
+      snippetIndex: number;
+      triggerIndex: number;
+    }> = [];
+
+    for (const [filePath, content] of files.entries()) {
+      if (!filePath.startsWith(`${matchDir}/`)) continue;
+      const relativePath = filePath.slice(matchDir.length + 1);
+      const lines = content.split(/\r?\n/u);
+      let snippetIndex = -1;
+
+      for (const line of lines) {
+        if (/^\s*-\s+/u.test(line)) {
+          snippetIndex += 1;
+        }
+
+        const single = line.match(/^\s*-\s*trigger:\s*["']?([^"'\n]+)["']?\s*$/u);
+        if (single) {
+          if (snippetIndex < 0) snippetIndex = 0;
+          sources.push({
+            trigger: single[1].trim(),
+            configPath: filePath,
+            relativePath,
+            snippetIndex,
+            triggerIndex: 0,
+          });
+        }
+      }
+    }
+
+    return sources;
+  }
+
+  const invoke = vi.fn(async (command: string, args?: any) => {
     if (
       command === "set_app_language" ||
       command === "mark_search_index_internal_write" ||
@@ -151,6 +188,48 @@ const harnessState = vi.hoisted(() => {
           indexedFiles: files.size,
           totalFiles: files.size,
           indexedMatches: 0,
+        },
+      };
+    }
+
+    if (command === "detect_trigger_prefix_conflicts") {
+      const localTriggers = args?.request?.localTriggers || [];
+      const indexedSources = getIndexedTriggerSources();
+      const conflicts: Array<{ blocking: any; blocked: any }> = [];
+      const seenPairs = new Set<string>();
+
+      for (const local of localTriggers) {
+        for (const indexed of indexedSources) {
+          if (local.trigger === indexed.trigger) continue;
+
+          const conflict = indexed.trigger.startsWith(local.trigger)
+            ? { blocking: local, blocked: indexed }
+            : local.trigger.startsWith(indexed.trigger)
+              ? { blocking: indexed, blocked: local }
+              : null;
+
+          if (!conflict) continue;
+          const pairKey = [
+            conflict.blocking.trigger,
+            conflict.blocking.configPath,
+            conflict.blocking.snippetIndex,
+            conflict.blocked.trigger,
+            conflict.blocked.configPath,
+            conflict.blocked.snippetIndex,
+          ].join("\0");
+          if (seenPairs.has(pairKey)) continue;
+          seenPairs.add(pairKey);
+          conflicts.push(conflict);
+        }
+      }
+
+      return {
+        conflicts,
+        indexStatus: {
+          state: "ready",
+          indexedFiles: files.size,
+          totalFiles: files.size,
+          indexedMatches: indexedSources.length,
         },
       };
     }

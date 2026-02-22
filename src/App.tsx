@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import "./App.css";
 
@@ -24,6 +24,17 @@ import { SnippetEditDialog } from "./features/snippets/components/SnippetEditDia
 import { useSnippetEditor } from "./features/snippets/hooks/useSnippetEditor";
 import { useSnippetCommands } from "./features/snippets/hooks/useSnippetCommands";
 import { ImportAlfredSnippetsDialog } from "./features/snippets/components/ImportAlfredSnippetsDialog";
+import { TriggerConflictsDialog } from "./features/snippets/components/TriggerConflictsDialog";
+import {
+  getTriggerConflictSources,
+  type TriggerConflictSource,
+  type TriggerPrefixConflict,
+} from "./logic/triggerConflicts";
+import { detectTriggerPrefixConflictsFromIndex } from "./tauri/searchIndex";
+import {
+  getPreSaveConflictCheckEnabled,
+  setPreSaveConflictCheckEnabled,
+} from "./logic/features";
 export type { EspansoConfigPreview } from "./features/espanso-configs/types";
 
 const DEFAULT_COLLECTION_PANE_WIDTH = 20;
@@ -104,6 +115,13 @@ function App() {
   const [isLogOpen, setIsLogOpen] = useState<boolean>(false);
   const [isAboutOpen, setIsAboutOpen] = useState<boolean>(false);
   const [isImportAlfredOpen, setIsImportAlfredOpen] = useState<boolean>(false);
+  const [enablePreSaveConflictCheck, setEnablePreSaveConflictCheck] = useState<boolean>(() =>
+    getPreSaveConflictCheckEnabled(),
+  );
+  const [isTriggerConflictsOpen, setIsTriggerConflictsOpen] = useState<boolean>(false);
+  const [selectedTriggerPrefixConflicts, setSelectedTriggerPrefixConflicts] = useState<
+    TriggerPrefixConflict[]
+  >([]);
   const [alfredInitialFilePath, setAlfredInitialFilePath] = useState<string | null>(null);
 
   const snippetEditor = useSnippetEditor();
@@ -211,6 +229,7 @@ function App() {
     visualEditorMode,
     isSavingSnippet: snippetEditor.isSaving,
     setIsSavingSnippet: snippetEditor.setIsSaving,
+    enablePreSaveConflictCheck,
     buildFormSnippet: snippetEditor.buildSnippetObject,
     setAddErrors: snippetEditor.setErrors,
     setAddWarnings: snippetEditor.setWarnings,
@@ -227,6 +246,102 @@ function App() {
     showConfirm,
     t,
   });
+
+  const selectedTriggerConflictSources = useMemo(
+    () => (selectedEspansoPreview ? getTriggerConflictSources([selectedEspansoPreview]) : []),
+    [selectedEspansoPreview],
+  );
+
+  useEffect(() => {
+    if (!espansoMatchDir || !selectedEspansoPreview || selectedTriggerConflictSources.length === 0) {
+      setSelectedTriggerPrefixConflicts([]);
+      return;
+    }
+
+    let cancelled = false;
+    detectTriggerPrefixConflictsFromIndex({
+      matchDir: espansoMatchDir,
+      localTriggers: selectedTriggerConflictSources,
+      limit: 1000,
+    })
+      .then((response) => {
+        if (!cancelled) {
+          setSelectedTriggerPrefixConflicts(response.conflicts);
+        }
+      })
+      .catch((error) => {
+        console.warn("Trigger conflict detection failed:", error);
+        if (!cancelled) {
+          setSelectedTriggerPrefixConflicts([]);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [espansoMatchDir, selectedEspansoPreview, selectedTriggerConflictSources]);
+
+  const openTriggerConflictSource = useCallback(
+    async (source: TriggerConflictSource) => {
+      const targetConfig = espansoConfigs.find((config) => config.path === source.configPath);
+      if (!targetConfig) {
+        showAlert(t("errors.failedToLoadConfig", { message: source.configPath }));
+        return;
+      }
+
+      try {
+        const loadedPreview =
+          espansoConfigPreviews.find((preview) => preview.config.path === source.configPath) ||
+          (selectedEspansoPreview?.config.path === source.configPath
+            ? selectedEspansoPreview
+            : null) ||
+          (await loadEspansoConfigPreview(targetConfig));
+
+        const targetMatch =
+          loadedPreview.importedMatches[source.snippetIndex] ||
+          loadedPreview.importedMatches.find(
+            (match) =>
+              match.originalMatchIndex === source.snippetIndex &&
+              match.triggerIndex === source.triggerIndex,
+          );
+
+        if (!targetMatch) {
+          showAlert(
+            t("errors.failedToLoadConfig", {
+              message: t("dialogs.triggerConflicts.targetNotFound", {
+                trigger: source.trigger,
+              }),
+            }),
+          );
+          return;
+        }
+
+        setSelectedEspansoConfigPath(source.configPath);
+        setIsTriggerConflictsOpen(false);
+        snippetEditor.openEdit({
+          preview: loadedPreview,
+          match: targetMatch,
+          displayIndex: source.snippetIndex,
+        });
+      } catch (error: unknown) {
+        showAlert(
+          t("errors.failedToLoadConfig", {
+            message: error instanceof Error ? error.message : String(error),
+          }),
+        );
+      }
+    },
+    [
+      espansoConfigPreviews,
+      espansoConfigs,
+      loadEspansoConfigPreview,
+      selectedEspansoPreview,
+      setSelectedEspansoConfigPath,
+      showAlert,
+      snippetEditor,
+      t,
+    ],
+  );
 
   useEffect(() => {
     let active = true;
@@ -374,6 +489,8 @@ function App() {
         onCreateFolder={openCreateFolderDialog}
         onOpenSnippet={snippetEditor.openEdit}
         onAddSnippet={openAddSnippetDialog}
+        onOpenTriggerConflicts={() => setIsTriggerConflictsOpen(true)}
+        triggerConflictCount={selectedTriggerPrefixConflicts.length}
         onOpenVisualEditor={openVisualEditorDialog}
         onOpenImportAlfred={() => setIsImportAlfredOpen(true)}
         onOpenWarnings={openWarningsDialog}
@@ -437,6 +554,11 @@ function App() {
         onRefreshScan={scanDefaultEspansoConfigDir}
         enableExperimentalYamlWarnings={enableExperimentalYamlWarnings}
         onToggleExperimentalYamlWarnings={handleToggleExperimentalYamlWarnings}
+        enablePreSaveConflictCheck={enablePreSaveConflictCheck}
+        onTogglePreSaveConflictCheck={(checked) => {
+          setEnablePreSaveConflictCheck(checked);
+          setPreSaveConflictCheckEnabled(checked);
+        }}
         onOpenAbout={() => setIsAboutOpen(true)}
       />
 
@@ -462,6 +584,14 @@ function App() {
           setSelectedEspansoConfigPath(path);
         }}
         onOpenFileExternal={openYamlFileInDefaultApp}
+      />
+
+      <TriggerConflictsDialog
+        open={isTriggerConflictsOpen}
+        onOpenChange={setIsTriggerConflictsOpen}
+        conflicts={selectedTriggerPrefixConflicts}
+        relativePath={selectedEspansoPreview?.config.relativePath}
+        onOpenSource={openTriggerConflictSource}
       />
 
       <ConfirmAlertDialog

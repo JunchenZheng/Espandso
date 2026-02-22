@@ -10,6 +10,8 @@ import type { EspansoConfigFile } from "../../../logic/espansoPaths";
 import type { Snippet, ValidationError } from "../../../logic/types";
 import type { ParsedAlfredSnippet } from "../../../logic/alfredImporter";
 import type { InterpolationParams } from "../../../i18n/types";
+import type { TriggerConflictSource } from "../../../logic/triggerConflicts";
+import { detectTriggerPrefixConflictsFromIndex } from "../../../tauri/searchIndex";
 import type { EspansoConfigPreview } from "../../espanso-configs/types";
 import type { SnippetEditTarget } from "../types";
 import {
@@ -31,6 +33,7 @@ interface UseSnippetCommandsProps {
   visualEditorMode: VisualEditorMode;
   isSavingSnippet: boolean;
   setIsSavingSnippet: (isSaving: boolean) => void;
+  enablePreSaveConflictCheck: boolean;
   buildFormSnippet: () => Snippet;
   setAddErrors: (errors: ValidationError[]) => void;
   setAddWarnings: (warnings: string[]) => void;
@@ -66,6 +69,23 @@ function getSelectedPath(selection: DialogSelection): string | null {
   return null;
 }
 
+function buildDraftTriggerConflictSources(
+  snippet: Snippet,
+  preview: EspansoConfigPreview,
+  displayIndex: number,
+): TriggerConflictSource[] {
+  return getSnippetTriggers(snippet)
+    .map((trigger) => trigger.trim())
+    .filter((trigger) => trigger.length > 0)
+    .map((trigger, triggerIndex) => ({
+      trigger,
+      configPath: preview.config.path,
+      relativePath: preview.config.relativePath,
+      snippetIndex: displayIndex,
+      triggerIndex,
+    }));
+}
+
 export function useSnippetCommands({
   selectedEspansoPreview,
   snippetEditTarget,
@@ -75,6 +95,7 @@ export function useSnippetCommands({
   visualEditorMode,
   isSavingSnippet,
   setIsSavingSnippet,
+  enablePreSaveConflictCheck,
   buildFormSnippet,
   setAddErrors,
   setAddWarnings,
@@ -200,6 +221,39 @@ export function useSnippetCommands({
         return;
       }
 
+      if (enablePreSaveConflictCheck && espansoMatchDir) {
+        const draftSources = buildDraftTriggerConflictSources(
+          snippet,
+          targetPreview,
+          snippetEditTarget?.displayIndex ?? targetPreview.snippets.length,
+        );
+
+        if (draftSources.length > 0) {
+          const conflictResult = await detectTriggerPrefixConflictsFromIndex({
+            matchDir: espansoMatchDir,
+            localTriggers: draftSources,
+            limit: 1,
+          });
+          const conflict = conflictResult.conflicts[0];
+
+          if (conflict) {
+            const localTriggers = new Set(draftSources.map((source) => source.trigger));
+            const localSide = localTriggers.has(conflict.blocking.trigger)
+              ? conflict.blocking
+              : conflict.blocked;
+            const otherSide = localSide === conflict.blocking ? conflict.blocked : conflict.blocking;
+            const message = t("errors.triggerConflictOnSave", {
+              trigger: localSide.trigger,
+              otherTrigger: otherSide.trigger,
+              file: otherSide.relativePath,
+            });
+            setAddErrors([{ message }]);
+            showAlert(message, t("errors.validationError"));
+            return;
+          }
+        }
+      }
+
       await saveSnippetToYamlFile(
         targetPreview.config.path,
         snippet,
@@ -227,6 +281,7 @@ export function useSnippetCommands({
   }, [
     applyPendingDeleteWorkflow,
     buildFormSnippet,
+    enablePreSaveConflictCheck,
     espansoMatchDir,
     isSavingSnippet,
     isVisualEditorOpen,

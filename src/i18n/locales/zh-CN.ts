@@ -29,6 +29,8 @@ export const zhCN: TranslationTree = {
     addSnippet: "添加片段",
     batchSelect: "批量删除",
     batchDelete: "删除所选 ({{count}})",
+    triggerConflicts: "冲突检测",
+    triggerConflictsTitle: "{{count}} 个前缀触发词冲突",
     visualEditor: "可视化编辑器",
     viewLogs: "查看日志",
     viewWarnings: "查看警告",
@@ -100,6 +102,9 @@ export const zhCN: TranslationTree = {
     experimentalDescription: "尚在测试中的试验性功能。",
     enableYamlWarnings: "YAML 文件检测与警告",
     enableYamlWarningsDescription: "自动扫描 YAML 文件中的重复触发词与潜在语法警告。",
+    enablePreSaveConflictCheck: "保存时阻止触发词冲突",
+    enablePreSaveConflictCheckDescription:
+      "例如：:hello 可能会挡住 :helloworld，导致较长触发词无法触发。",
   },
   stats: {
     totalSnippets: "片段总数",
@@ -287,6 +292,19 @@ export const zhCN: TranslationTree = {
       viewYaml: "查看 YAML",
       openYamlExternalTitle: "在默认外部应用中打开 YAML 文件",
     },
+    triggerConflicts: {
+      title: "触发词冲突",
+      description: "检测较短触发词可能先展开，导致较长触发词无法完整输入的情况。",
+      fileDescription: "与 {{file}} 相关的前缀冲突。完全相同的触发词是允许的，不会在这里显示。",
+      noConflicts: "未检测到前缀触发词冲突。",
+      blockingTrigger: "先展开的触发词",
+      blockedTrigger: "被阻挡的触发词",
+      editTrigger: "编辑",
+      editTriggerTitle: "编辑 {{trigger}}",
+      targetNotFound: '未能在已索引的 YAML 预览中找到触发词 "{{trigger}}"。',
+      explanation:
+        "{{blocking}} 是 {{blocked}} 的前缀，因此 Espanso 可能会先展开较短触发词，导致较长触发词无法被完整触发。",
+    },
     confirmDelete: {
       title: "删除片段",
       message: '确定要从 {{file}} 中删除触发词 "{{trigger}}" 吗？',
@@ -326,6 +344,8 @@ export const zhCN: TranslationTree = {
     selectConfigBeforeAddingSnippet: "添加片段前请先选择 YAML 配置。",
     noConfigSelected: "未选择配置",
     validationError: "校验错误",
+    triggerConflictOnSave:
+      "{{trigger}} 与 {{file}} 中的 {{otherTrigger}} 冲突。请先重命名其中一个触发词再保存。",
     failedToSelectFile: "选择文件失败：{{message}}",
     failedToOpenYamlFile: "打开 YAML 文件失败：{{message}}",
     failedToRetrieveLogs: "获取 Espanso 日志失败。",
