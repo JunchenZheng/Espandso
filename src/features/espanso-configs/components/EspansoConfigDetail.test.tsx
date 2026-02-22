@@ -24,6 +24,22 @@ function makePreview(): EspansoConfigPreview {
 }
 
 describe("EspansoConfigDetail", () => {
+  it("uses fixed trigger and type columns with remaining preview columns split 1 to 2", () => {
+    renderWithProviders(
+      <EspansoConfigDetail
+        preview={makePreview()}
+        onViewSnippet={vi.fn()}
+        onAddSnippet={vi.fn()}
+      />,
+    );
+
+    const triggerHeader = screen.getByText("Trigger").parentElement;
+    const row = screen.getByTestId("snippet-row");
+
+    expect(triggerHeader).toHaveClass("grid-cols-[12ch_10ch_minmax(0,1fr)_minmax(0,2fr)]");
+    expect(row).toHaveClass("grid-cols-[12ch_10ch_minmax(0,1fr)_minmax(0,2fr)]");
+  });
+
   it("shows the trigger conflicts button before Visual Editor", () => {
     renderWithProviders(
       <EspansoConfigDetail

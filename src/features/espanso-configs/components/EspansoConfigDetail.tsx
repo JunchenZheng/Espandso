@@ -46,6 +46,8 @@ export function EspansoConfigDetail({
 }: EspansoConfigDetailProps) {
   const { t } = useI18n();
   const ROW_HEIGHT = 36;
+  const previewGridColumns = "grid-cols-[12ch_10ch_minmax(0,1fr)_minmax(0,2fr)]";
+  const batchPreviewGridColumns = "grid-cols-[2.25rem_12ch_10ch_minmax(0,1fr)_minmax(0,2fr)]";
 
   const OVERSCAN_ROWS = 8;
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -229,9 +231,7 @@ export function EspansoConfigDetail({
       <div
         className={cn(
           "grid h-9 shrink-0 items-center border-b bg-secondary/40 px-3 text-xs font-semibold text-muted-foreground",
-          isBatchMode
-            ? "grid-cols-[2.25rem_minmax(7rem,0.8fr)_minmax(4.5rem,0.45fr)_minmax(8rem,1fr)_minmax(12rem,2fr)]"
-            : "grid-cols-[minmax(7rem,0.8fr)_minmax(4.5rem,0.45fr)_minmax(8rem,1fr)_minmax(12rem,2fr)]",
+          isBatchMode ? batchPreviewGridColumns : previewGridColumns,
         )}
       >
         {isBatchMode && (
@@ -300,9 +300,7 @@ export function EspansoConfigDetail({
                     data-snippet-trigger={displayTrigger}
                     className={cn(
                       "grid h-9 w-full items-center px-3 text-left text-sm transition-all hover:bg-secondary/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-                      isBatchMode
-                        ? "grid-cols-[2.25rem_minmax(7rem,0.8fr)_minmax(4.5rem,0.45fr)_minmax(8rem,1fr)_minmax(12rem,2fr)]"
-                        : "grid-cols-[minmax(7rem,0.8fr)_minmax(4.5rem,0.45fr)_minmax(8rem,1fr)_minmax(12rem,2fr)]",
+                      isBatchMode ? batchPreviewGridColumns : previewGridColumns,
                       isSelected &&
                         "bg-emerald-500/15 hover:bg-emerald-500/20 border-l-2 border-l-emerald-500",
                       isHighlighted &&
@@ -326,9 +324,9 @@ export function EspansoConfigDetail({
                   >
                     {isBatchMode && (
                       <div className="flex items-center justify-center pointer-events-none">
-            <input
-              data-testid="batch-select-all"
-              type="checkbox"
+                        <input
+                          data-testid="batch-select-all"
+                          type="checkbox"
                           readOnly
                           className="h-3.5 w-3.5 rounded border-emerald-500/50 text-emerald-600 focus:ring-emerald-500 accent-emerald-600"
                           checked={isSelected}
