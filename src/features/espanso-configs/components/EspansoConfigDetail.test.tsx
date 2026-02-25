@@ -34,10 +34,16 @@ describe("EspansoConfigDetail", () => {
     );
 
     const triggerHeader = screen.getByText("Trigger").parentElement;
+    const typeHeader = screen.getByText("Type").parentElement;
     const row = screen.getByTestId("snippet-row");
 
-    expect(triggerHeader).toHaveClass("grid-cols-[12ch_10ch_minmax(0,1fr)_minmax(0,2fr)]");
-    expect(row).toHaveClass("grid-cols-[12ch_10ch_minmax(0,1fr)_minmax(0,2fr)]");
+    expect(triggerHeader).toHaveClass(
+      "grid-cols-[7.5rem_5.5rem_minmax(0,1fr)_minmax(0,2fr)]",
+    );
+    expect(triggerHeader).toHaveClass("gap-x-4");
+    expect(typeHeader).toHaveClass("gap-1.5");
+    expect(row).toHaveClass("grid-cols-[7.5rem_5.5rem_minmax(0,1fr)_minmax(0,2fr)]");
+    expect(row).toHaveClass("gap-x-4");
   });
 
   it("shows the trigger conflicts button before Visual Editor", () => {
