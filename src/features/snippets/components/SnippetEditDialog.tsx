@@ -256,7 +256,7 @@ export function SnippetEditDialog({
           <div className="grid grid-cols-4 rounded-md border bg-secondary/60 p-1 shrink-0">
             <Button
               type="button"
-              variant={activeSnippetKind === "text" ? "secondary" : "ghost"}
+              variant={activeSnippetKind === "text" ? "default" : "ghost"}
               className="h-8"
               onClick={() => {
                 setAddSnippetKind("text");
@@ -268,7 +268,7 @@ export function SnippetEditDialog({
             </Button>
             <Button
               type="button"
-              variant={activeSnippetKind === "file" ? "secondary" : "ghost"}
+              variant={activeSnippetKind === "file" ? "default" : "ghost"}
               className="h-8"
               onClick={() => {
                 setAddSnippetKind("file");
@@ -280,7 +280,7 @@ export function SnippetEditDialog({
             </Button>
             <Button
               type="button"
-              variant={activeSnippetKind === "image" ? "secondary" : "ghost"}
+              variant={activeSnippetKind === "image" ? "default" : "ghost"}
               className="h-8"
               onClick={() => {
                 setAddSnippetKind("image");
@@ -292,7 +292,7 @@ export function SnippetEditDialog({
             </Button>
             <Button
               type="button"
-              variant={activeSnippetKind === "form" ? "secondary" : "ghost"}
+              variant={activeSnippetKind === "form" ? "default" : "ghost"}
               className="h-8"
               onClick={() => {
                 setAddSnippetKind("form");
