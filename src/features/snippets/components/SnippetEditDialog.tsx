@@ -1,4 +1,4 @@
-import type { RefObject } from "react";
+import type { KeyboardEvent, RefObject } from "react";
 import type { DateFormatOption } from "../../../logic/dateFormats";
 import {
   AlertTriangle,
@@ -163,6 +163,36 @@ export function SnippetEditDialog({
     ? t("snippets.editKindSnippetTitle", { kind: snippetKindLabel(activeSnippetKind, t) })
     : t("snippets.addKindSnippetTitle", { kind: snippetKindLabel(activeSnippetKind, t) });
 
+  const handleDialogKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "Enter" || event.nativeEvent.isComposing || isSavingSnippet) {
+      return;
+    }
+
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+
+    if (
+      target.tagName === "TEXTAREA" ||
+      target.tagName === "BUTTON" ||
+      target.tagName === "SELECT" ||
+      target.isContentEditable
+    ) {
+      return;
+    }
+
+    if (
+      target instanceof HTMLInputElement &&
+      ["button", "checkbox", "file", "radio", "reset", "submit"].includes(target.type)
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    saveSnippetToYaml();
+  };
+
   return (
     <Dialog open={open} onOpenChange={(val) => {
       onOpenChange(val);
@@ -173,6 +203,7 @@ export function SnippetEditDialog({
     }}>
       <DialogContent
         className="grid h-[calc(100vh-3rem)] max-h-[calc(100vh-3rem)] w-[50vw] min-w-[min(36rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden"
+        onKeyDown={handleDialogKeyDown}
       >
         <DialogHeader className="shrink-0">
           <DialogTitle>{snippetDialogTitle}</DialogTitle>

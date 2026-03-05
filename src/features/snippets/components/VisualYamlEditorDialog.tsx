@@ -199,6 +199,36 @@ export function VisualYamlEditorDialog({
     setSnippetEditTarget,
   } = actions;
 
+  const handleDialogKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "Enter" || event.nativeEvent.isComposing || isSavingSnippet) {
+      return;
+    }
+
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+
+    if (
+      target.tagName === "TEXTAREA" ||
+      target.tagName === "BUTTON" ||
+      target.tagName === "SELECT" ||
+      target.isContentEditable
+    ) {
+      return;
+    }
+
+    if (
+      target instanceof HTMLInputElement &&
+      ["button", "checkbox", "file", "radio", "reset", "submit"].includes(target.type)
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    saveSnippetToYaml();
+  };
+
   return (
     <Dialog
       open={isOpen}
@@ -210,7 +240,10 @@ export function VisualYamlEditorDialog({
         }
       }}
     >
-      <DialogContent className="fixed inset-0 top-0 left-0 translate-x-0 translate-y-0 w-full max-w-none h-full max-h-none rounded-none border-none grid grid-rows-[auto_minmax(0,1fr)] overflow-hidden p-6 gap-4">
+      <DialogContent
+        className="fixed inset-0 top-0 left-0 translate-x-0 translate-y-0 w-full max-w-none h-full max-h-none rounded-none border-none grid grid-rows-[auto_minmax(0,1fr)] overflow-hidden p-6 gap-4"
+        onKeyDown={handleDialogKeyDown}
+      >
         <DialogHeader className="shrink-0">
           <DialogTitle className="flex items-center gap-2 text-xl font-bold">
             <Columns className="h-5 w-5 text-primary" />
