@@ -79,16 +79,20 @@ function renderDialog(
   actions = createActionProps(),
   formOverrides: Partial<SnippetEditDialogFormProps> = {},
 ) {
+  const onOpenChange = vi.fn();
+
   renderWithProviders(
     <SnippetEditDialog
       open
-      onOpenChange={vi.fn()}
+      onOpenChange={onOpenChange}
       snippetEditTarget={null}
       selectedEspansoPreview={preview}
       form={createFormProps(formOverrides)}
       actions={actions}
     />,
   );
+
+  return { onOpenChange };
 }
 
 describe("SnippetEditDialog", () => {
@@ -132,7 +136,7 @@ describe("SnippetEditDialog", () => {
   it("uses Tab and Escape for the add text snippet focus path without stealing textarea indentation", async () => {
     const user = userEvent.setup();
     const setEditReplace = vi.fn();
-    renderDialog(createActionProps(), { editReplace: "hello", setEditReplace });
+    const { onOpenChange } = renderDialog(createActionProps(), { editReplace: "hello", setEditReplace });
 
     const triggerInput = screen.getByLabelText(/Trigger/u);
     const replaceTextarea = screen.getByLabelText(/Replace Content/u);
@@ -149,6 +153,7 @@ describe("SnippetEditDialog", () => {
 
     await user.keyboard("{Escape}");
     expect(descriptionInput).toHaveFocus();
+    expect(onOpenChange).not.toHaveBeenCalled();
 
     await user.tab();
     expect(saveButton).toHaveFocus();
@@ -157,7 +162,7 @@ describe("SnippetEditDialog", () => {
   it("uses Tab and Escape for the add form snippet focus path without stealing textarea indentation", async () => {
     const user = userEvent.setup();
     const setEditForm = vi.fn();
-    renderDialog(createActionProps(), {
+    const { onOpenChange } = renderDialog(createActionProps(), {
       activeSnippetKind: "form",
       editForm: "title",
       setEditForm,
@@ -178,6 +183,7 @@ describe("SnippetEditDialog", () => {
 
     await user.keyboard("{Escape}");
     expect(descriptionInput).toHaveFocus();
+    expect(onOpenChange).not.toHaveBeenCalled();
 
     await user.tab();
     expect(saveButton).toHaveFocus();

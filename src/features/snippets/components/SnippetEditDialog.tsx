@@ -172,6 +172,11 @@ export function SnippetEditDialog({
     textarea?.focus();
   };
 
+  const isActiveSnippetTextarea = (target: EventTarget | null) => {
+    const textarea = activeSnippetKind === "form" ? formTextareaRef.current : replaceTextareaRef.current;
+    return shouldUseAddSnippetTabFlow && target instanceof HTMLTextAreaElement && target === textarea;
+  };
+
   const insertTabIndent = (
     textarea: HTMLTextAreaElement,
     value: string,
@@ -261,6 +266,12 @@ export function SnippetEditDialog({
       <DialogContent
         className="grid h-[calc(100vh-3rem)] max-h-[calc(100vh-3rem)] w-[50vw] min-w-[min(36rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden"
         onKeyDown={handleDialogKeyDown}
+        onEscapeKeyDown={(event) => {
+          if (isActiveSnippetTextarea(event.target)) {
+            event.preventDefault();
+            descriptionInputRef.current?.focus();
+          }
+        }}
       >
         <DialogHeader className="shrink-0">
           <DialogTitle>{snippetDialogTitle}</DialogTitle>
