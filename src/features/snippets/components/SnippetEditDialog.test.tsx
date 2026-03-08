@@ -25,7 +25,7 @@ const preview: EspansoConfigPreview = {
   importedMatches: [],
 };
 
-function createFormProps(): SnippetEditDialogFormProps {
+function createFormProps(overrides: Partial<SnippetEditDialogFormProps> = {}): SnippetEditDialogFormProps {
   return {
     isYamlWarningsEnabled: true,
     addErrors: [],
@@ -60,6 +60,7 @@ function createFormProps(): SnippetEditDialogFormProps {
     replaceTextareaRef: createRef<HTMLTextAreaElement>(),
     editDescription: "",
     setEditDescription: vi.fn(),
+    ...overrides,
   };
 }
 
@@ -74,21 +75,24 @@ function createActionProps(saveSnippetToYaml = vi.fn()): SnippetEditDialogAction
   };
 }
 
-function renderDialog(actions = createActionProps()) {
+function renderDialog(
+  actions = createActionProps(),
+  formOverrides: Partial<SnippetEditDialogFormProps> = {},
+) {
   renderWithProviders(
     <SnippetEditDialog
       open
       onOpenChange={vi.fn()}
       snippetEditTarget={null}
       selectedEspansoPreview={preview}
-      form={createFormProps()}
+      form={createFormProps(formOverrides)}
       actions={actions}
     />,
   );
 }
 
 describe("SnippetEditDialog", () => {
-  it("saves the snippet when Enter is pressed in a single-line field", async () => {
+  it("does not save the snippet when plain Enter is pressed in a single-line field", async () => {
     const user = userEvent.setup();
     const saveSnippetToYaml = vi.fn();
     renderDialog(createActionProps(saveSnippetToYaml));
@@ -96,7 +100,7 @@ describe("SnippetEditDialog", () => {
     await user.click(screen.getByLabelText(/Trigger/u));
     await user.keyboard("{Enter}");
 
-    expect(saveSnippetToYaml).toHaveBeenCalledTimes(1);
+    expect(saveSnippetToYaml).not.toHaveBeenCalled();
   });
 
   it("keeps Enter available for multi-line snippet content", () => {
@@ -106,5 +110,76 @@ describe("SnippetEditDialog", () => {
     fireEvent.keyDown(screen.getByLabelText(/Replace Content/u), { key: "Enter" });
 
     expect(saveSnippetToYaml).not.toHaveBeenCalled();
+  });
+
+  it("saves from input and textarea fields with the platform submit shortcut", async () => {
+    const user = userEvent.setup();
+    const saveSnippetToYaml = vi.fn();
+    renderDialog(createActionProps(saveSnippetToYaml));
+
+    const triggerInput = screen.getByLabelText(/Trigger/u);
+    const replaceTextarea = screen.getByLabelText(/Replace Content/u);
+
+    await user.click(triggerInput);
+    await user.keyboard("{Control>}{Enter}{/Control}");
+    expect(saveSnippetToYaml).toHaveBeenCalledTimes(1);
+
+    await user.click(replaceTextarea);
+    await user.keyboard("{Meta>}{Enter}{/Meta}");
+    expect(saveSnippetToYaml).toHaveBeenCalledTimes(2);
+  });
+
+  it("uses Tab and Escape for the add text snippet focus path without stealing textarea indentation", async () => {
+    const user = userEvent.setup();
+    const setEditReplace = vi.fn();
+    renderDialog(createActionProps(), { editReplace: "hello", setEditReplace });
+
+    const triggerInput = screen.getByLabelText(/Trigger/u);
+    const replaceTextarea = screen.getByLabelText(/Replace Content/u);
+    const descriptionInput = screen.getByLabelText(/Description/u);
+    const saveButton = screen.getByRole("button", { name: /Save to YAML/u });
+
+    await user.click(triggerInput);
+    await user.tab();
+    expect(replaceTextarea).toHaveFocus();
+
+    await user.keyboard("{Tab}");
+    expect(setEditReplace).toHaveBeenCalledWith("\thello");
+    expect(replaceTextarea).toHaveFocus();
+
+    await user.keyboard("{Escape}");
+    expect(descriptionInput).toHaveFocus();
+
+    await user.tab();
+    expect(saveButton).toHaveFocus();
+  });
+
+  it("uses Tab and Escape for the add form snippet focus path without stealing textarea indentation", async () => {
+    const user = userEvent.setup();
+    const setEditForm = vi.fn();
+    renderDialog(createActionProps(), {
+      activeSnippetKind: "form",
+      editForm: "title",
+      setEditForm,
+    });
+
+    const triggerInput = screen.getByLabelText(/Trigger/u);
+    const formTextarea = screen.getByLabelText(/Form Layout/u);
+    const descriptionInput = screen.getByLabelText(/Description/u);
+    const saveButton = screen.getByRole("button", { name: /Save to YAML/u });
+
+    await user.click(triggerInput);
+    await user.tab();
+    expect(formTextarea).toHaveFocus();
+
+    await user.keyboard("{Tab}");
+    expect(setEditForm).toHaveBeenCalledWith("\ttitle");
+    expect(formTextarea).toHaveFocus();
+
+    await user.keyboard("{Escape}");
+    expect(descriptionInput).toHaveFocus();
+
+    await user.tab();
+    expect(saveButton).toHaveFocus();
   });
 });

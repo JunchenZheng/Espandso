@@ -1,4 +1,4 @@
-import type { KeyboardEvent, RefObject } from "react";
+import { useRef, type KeyboardEvent, type RefObject } from "react";
 import type { DateFormatOption } from "../../../logic/dateFormats";
 import {
   AlertTriangle,
@@ -162,9 +162,71 @@ export function SnippetEditDialog({
   const snippetDialogTitle = snippetEditTarget
     ? t("snippets.editKindSnippetTitle", { kind: snippetKindLabel(activeSnippetKind, t) })
     : t("snippets.addKindSnippetTitle", { kind: snippetKindLabel(activeSnippetKind, t) });
+  const shouldUseAddSnippetTabFlow =
+    !snippetEditTarget && (activeSnippetKind === "text" || activeSnippetKind === "form");
+  const descriptionInputRef = useRef<HTMLInputElement | null>(null);
+  const saveButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  const focusActiveSnippetTextarea = () => {
+    const textarea = activeSnippetKind === "form" ? formTextareaRef.current : replaceTextareaRef.current;
+    textarea?.focus();
+  };
+
+  const insertTabIndent = (
+    textarea: HTMLTextAreaElement,
+    value: string,
+    setValue: (val: string) => void,
+  ) => {
+    const start = textarea.selectionStart ?? value.length;
+    const end = textarea.selectionEnd ?? value.length;
+    const nextValue = `${value.slice(0, start)}\t${value.slice(end)}`;
+    const nextCursor = start + 1;
+
+    setValue(nextValue);
+    requestAnimationFrame(() => {
+      textarea.focus();
+      textarea.setSelectionRange(nextCursor, nextCursor);
+    });
+  };
+
+  const handleSnippetTextareaKeyDown = (
+    event: KeyboardEvent<HTMLTextAreaElement>,
+    value: string,
+    setValue: (val: string) => void,
+  ) => {
+    if ((event.metaKey || event.ctrlKey) && event.key === "Enter" && !event.nativeEvent.isComposing) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (!isSavingSnippet) {
+        saveSnippetToYaml();
+      }
+      return true;
+    }
+
+    if (event.key === "Tab" && !event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey) {
+      event.preventDefault();
+      event.stopPropagation();
+      insertTabIndent(event.currentTarget, value, setValue);
+      return true;
+    }
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      descriptionInputRef.current?.focus();
+      return true;
+    }
+
+    return false;
+  };
 
   const handleDialogKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== "Enter" || event.nativeEvent.isComposing || isSavingSnippet) {
+    if (
+      event.key !== "Enter" ||
+      event.nativeEvent.isComposing ||
+      isSavingSnippet ||
+      (!event.metaKey && !event.ctrlKey)
+    ) {
       return;
     }
 
@@ -173,12 +235,7 @@ export function SnippetEditDialog({
       return;
     }
 
-    if (
-      target.tagName === "TEXTAREA" ||
-      target.tagName === "BUTTON" ||
-      target.tagName === "SELECT" ||
-      target.isContentEditable
-    ) {
+    if (!(target instanceof HTMLInputElement) && !(target instanceof HTMLTextAreaElement)) {
       return;
     }
 
@@ -255,6 +312,20 @@ export function SnippetEditDialog({
                       const newLines = [...lines];
                       newLines[idx] = e.target.value;
                       setEditTriggersText(newLines.join("\n"));
+                    }}
+                    onKeyDown={(event) => {
+                      if (
+                        shouldUseAddSnippetTabFlow &&
+                        idx === 0 &&
+                        event.key === "Tab" &&
+                        !event.shiftKey &&
+                        !event.metaKey &&
+                        !event.ctrlKey &&
+                        !event.altKey
+                      ) {
+                        event.preventDefault();
+                        focusActiveSnippetTextarea();
+                      }
                     }}
                   />
                   {lines.length > 1 && (
@@ -437,6 +508,10 @@ export function SnippetEditDialog({
                     setFormSelection(null);
                   }}
                   onKeyDown={(event) => {
+                    if (handleSnippetTextareaKeyDown(event, editForm, setEditForm)) {
+                      setFormSelection(null);
+                      return;
+                    }
                     if (event.key !== "Shift" && event.key !== "ArrowLeft" && event.key !== "ArrowRight" && event.key !== "ArrowUp" && event.key !== "ArrowDown") {
                       setFormSelection(null);
                     }
@@ -620,6 +695,7 @@ export function SnippetEditDialog({
                 placeholder={t("snippets.replaceContentPlaceholder")}
                 value={editReplace}
                 onChange={(e) => setEditReplace(e.target.value)}
+                onKeyDown={(event) => handleSnippetTextareaKeyDown(event, editReplace, setEditReplace)}
               />
               <DateVariableList vars={editVars} onRemove={handleRemoveDateVar} />
             </div>
@@ -631,9 +707,23 @@ export function SnippetEditDialog({
             </Label>
             <Input
               id="description"
+              ref={descriptionInputRef}
               placeholder={t("snippets.descriptionPlaceholder")}
               value={editDescription}
               onChange={(e) => setEditDescription(e.target.value)}
+              onKeyDown={(event) => {
+                if (
+                  shouldUseAddSnippetTabFlow &&
+                  event.key === "Tab" &&
+                  !event.shiftKey &&
+                  !event.metaKey &&
+                  !event.ctrlKey &&
+                  !event.altKey
+                ) {
+                  event.preventDefault();
+                  saveButtonRef.current?.focus();
+                }
+              }}
             />
           </div>
         </div>
@@ -652,7 +742,11 @@ export function SnippetEditDialog({
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               {t("actions.cancel")}
             </Button>
-            <Button onClick={saveSnippetToYaml} disabled={isSavingSnippet}>
+            <Button
+              ref={saveButtonRef}
+              onClick={saveSnippetToYaml}
+              disabled={isSavingSnippet}
+            >
               {isSavingSnippet ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               {snippetEditTarget ? t("actions.updateYaml") : t("actions.saveToYaml")}
             </Button>
