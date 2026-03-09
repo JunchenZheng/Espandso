@@ -162,8 +162,7 @@ export function SnippetEditDialog({
   const snippetDialogTitle = snippetEditTarget
     ? t("snippets.editKindSnippetTitle", { kind: snippetKindLabel(activeSnippetKind, t) })
     : t("snippets.addKindSnippetTitle", { kind: snippetKindLabel(activeSnippetKind, t) });
-  const shouldUseAddSnippetTabFlow =
-    !snippetEditTarget && (activeSnippetKind === "text" || activeSnippetKind === "form");
+  const shouldUseSnippetTabFlow = activeSnippetKind === "text" || activeSnippetKind === "form";
   const descriptionInputRef = useRef<HTMLInputElement | null>(null);
   const saveButtonRef = useRef<HTMLButtonElement | null>(null);
 
@@ -174,7 +173,7 @@ export function SnippetEditDialog({
 
   const isActiveSnippetTextarea = (target: EventTarget | null) => {
     const textarea = activeSnippetKind === "form" ? formTextareaRef.current : replaceTextareaRef.current;
-    return shouldUseAddSnippetTabFlow && target instanceof HTMLTextAreaElement && target === textarea;
+    return shouldUseSnippetTabFlow && target instanceof HTMLTextAreaElement && target === textarea;
   };
 
   const insertTabIndent = (
@@ -326,7 +325,7 @@ export function SnippetEditDialog({
                     }}
                     onKeyDown={(event) => {
                       if (
-                        shouldUseAddSnippetTabFlow &&
+                        shouldUseSnippetTabFlow &&
                         idx === 0 &&
                         event.key === "Tab" &&
                         !event.shiftKey &&
@@ -724,7 +723,7 @@ export function SnippetEditDialog({
               onChange={(e) => setEditDescription(e.target.value)}
               onKeyDown={(event) => {
                 if (
-                  shouldUseAddSnippetTabFlow &&
+                  shouldUseSnippetTabFlow &&
                   event.key === "Tab" &&
                   !event.shiftKey &&
                   !event.metaKey &&

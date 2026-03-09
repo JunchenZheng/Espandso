@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { renderWithProviders } from "../../../test/render";
 import type { EspansoConfigPreview } from "../../espanso-configs/types";
+import type { SnippetEditTarget } from "../types";
 import type { SnippetEditDialogActionProps, SnippetEditDialogFormProps } from "./SnippetEditDialog";
 import { SnippetEditDialog } from "./SnippetEditDialog";
 
@@ -23,6 +24,19 @@ const preview: EspansoConfigPreview = {
   warnings: [],
   snippets: [],
   importedMatches: [],
+};
+
+const editTarget: SnippetEditTarget = {
+  preview,
+  match: {
+    snippet: {
+      trigger: ":hello",
+      replace: "hello",
+    },
+    originalMatchIndex: 0,
+    triggerIndex: 0,
+  },
+  displayIndex: 0,
 };
 
 function createFormProps(overrides: Partial<SnippetEditDialogFormProps> = {}): SnippetEditDialogFormProps {
@@ -78,6 +92,7 @@ function createActionProps(saveSnippetToYaml = vi.fn()): SnippetEditDialogAction
 function renderDialog(
   actions = createActionProps(),
   formOverrides: Partial<SnippetEditDialogFormProps> = {},
+  snippetEditTarget: SnippetEditTarget | null = null,
 ) {
   const onOpenChange = vi.fn();
 
@@ -85,7 +100,7 @@ function renderDialog(
     <SnippetEditDialog
       open
       onOpenChange={onOpenChange}
-      snippetEditTarget={null}
+      snippetEditTarget={snippetEditTarget}
       selectedEspansoPreview={preview}
       form={createFormProps(formOverrides)}
       actions={actions}
@@ -187,5 +202,70 @@ describe("SnippetEditDialog", () => {
 
     await user.tab();
     expect(saveButton).toHaveFocus();
+  });
+
+  it("uses the same focus path for editing text snippets", async () => {
+    const user = userEvent.setup();
+    const setEditReplace = vi.fn();
+    const { onOpenChange } = renderDialog(
+      createActionProps(),
+      { editTriggersText: ":hello", editReplace: "hello", setEditReplace },
+      editTarget,
+    );
+
+    const triggerInput = screen.getByLabelText(/Trigger/u);
+    const replaceTextarea = screen.getByLabelText(/Replace Content/u);
+    const descriptionInput = screen.getByLabelText(/Description/u);
+    const updateButton = screen.getByRole("button", { name: /Update YAML/u });
+
+    await user.click(triggerInput);
+    await user.tab();
+    expect(replaceTextarea).toHaveFocus();
+
+    await user.keyboard("{Tab}");
+    expect(setEditReplace).toHaveBeenCalledWith("\thello");
+    expect(replaceTextarea).toHaveFocus();
+
+    await user.keyboard("{Escape}");
+    expect(descriptionInput).toHaveFocus();
+    expect(onOpenChange).not.toHaveBeenCalled();
+
+    await user.tab();
+    expect(updateButton).toHaveFocus();
+  });
+
+  it("uses the same focus path for editing form snippets", async () => {
+    const user = userEvent.setup();
+    const setEditForm = vi.fn();
+    const { onOpenChange } = renderDialog(
+      createActionProps(),
+      {
+        activeSnippetKind: "form",
+        editTriggersText: ":ticket",
+        editForm: "title",
+        setEditForm,
+      },
+      editTarget,
+    );
+
+    const triggerInput = screen.getByLabelText(/Trigger/u);
+    const formTextarea = screen.getByLabelText(/Form Layout/u);
+    const descriptionInput = screen.getByLabelText(/Description/u);
+    const updateButton = screen.getByRole("button", { name: /Update YAML/u });
+
+    await user.click(triggerInput);
+    await user.tab();
+    expect(formTextarea).toHaveFocus();
+
+    await user.keyboard("{Tab}");
+    expect(setEditForm).toHaveBeenCalledWith("\ttitle");
+    expect(formTextarea).toHaveFocus();
+
+    await user.keyboard("{Escape}");
+    expect(descriptionInput).toHaveFocus();
+    expect(onOpenChange).not.toHaveBeenCalled();
+
+    await user.tab();
+    expect(updateButton).toHaveFocus();
   });
 });
