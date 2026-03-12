@@ -315,6 +315,12 @@ export const zhCN: TranslationTree = {
       message: "确定要从 {{file}} 中删除选中的 {{count}} 个片段吗？",
       confirmBtn: "确认批量删除",
     },
+    discardSnippetChanges: {
+      title: "丢弃未保存的变更？",
+      message: "此片段中未保存的变更都会丢失。确定要丢弃这些变更吗？",
+      confirmBtn: "丢弃变更",
+      cancelBtn: "继续修改",
+    },
   },
   errors: {
     genericError: "错误",

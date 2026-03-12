@@ -31,9 +31,9 @@ import { Textarea } from "../../../components/ui/textarea";
 import { OptionalMark, RequiredMark } from "../../../components/shared/FormMarks";
 import { useI18n } from "../../../i18n/useI18n";
 import { cn } from "../../../lib/utils";
-import { isImageFilePath } from "../../../logic/snippetUtils";
+import { buildTriggerInput, isImageFilePath } from "../../../logic/snippetUtils";
 import { isBinaryDomFile } from "../../../logic/fileCheck";
-import type { SnippetVar, ValidationError } from "../../../logic/types";
+import type { Snippet, SnippetVar, ValidationError } from "../../../logic/types";
 import { DateInsertMenu } from "./DateInsertMenu";
 import { DateVariableList } from "./DateVariableList";
 import type { EspansoConfigPreview } from "../../espanso-configs/types";
@@ -47,6 +47,7 @@ import type {
 import {
   getFormFieldCategory,
   getTextFieldMode,
+  formFieldsToConfigs,
   snippetKindLabel,
 } from "../formSnippet";
 
@@ -91,6 +92,13 @@ export interface SnippetEditDialogActionProps {
   saveSnippetToYaml: () => void;
   isSavingSnippet: boolean;
   showAlert: (description: string, title?: string) => void;
+  showConfirm: (
+    description: string,
+    onConfirm: () => void | Promise<void>,
+    title?: string,
+    confirmText?: string,
+    cancelText?: string,
+  ) => void;
   resetSnippetForm: () => void;
   setSnippetEditTarget: (target: SnippetEditTarget | null) => void;
 }
@@ -155,6 +163,7 @@ export function SnippetEditDialog({
     saveSnippetToYaml,
     isSavingSnippet,
     showAlert,
+    showConfirm,
     resetSnippetForm,
     setSnippetEditTarget,
   } = actions;
@@ -165,6 +174,76 @@ export function SnippetEditDialog({
   const shouldUseSnippetTabFlow = activeSnippetKind === "text" || activeSnippetKind === "form";
   const descriptionInputRef = useRef<HTMLInputElement | null>(null);
   const saveButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  const getSnippetKind = (snippet: Snippet): AddSnippetKind => {
+    if (snippet.include_file) return "file";
+    if (snippet.image_path !== undefined) return "image";
+    if (snippet.form !== undefined) return "form";
+    return "text";
+  };
+
+  const areJsonEqual = (left: unknown, right: unknown) => JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
+
+  const hasUnsavedChanges = () => {
+    if (!snippetEditTarget) {
+      return (
+        editTriggersText.length > 0 ||
+        editReplace.length > 0 ||
+        editIncludeFile.length > 0 ||
+        editImagePath.length > 0 ||
+        editForm.length > 0 ||
+        editDescription.length > 0 ||
+        editVars.length > 0 ||
+        editFormFieldConfigs.length > 0
+      );
+    }
+
+    const originalSnippet = snippetEditTarget.match.originalSnippet || snippetEditTarget.match.snippet;
+    const originalKind = getSnippetKind(originalSnippet);
+
+    if (activeSnippetKind !== originalKind) return true;
+    if (editTriggersText !== buildTriggerInput(originalSnippet).multiline) return true;
+    if (editDescription !== (originalSnippet.description || "")) return true;
+
+    if (activeSnippetKind === "file") {
+      return editIncludeFile !== (snippetEditTarget.match.resourcePath || originalSnippet.include_file || "");
+    }
+
+    if (activeSnippetKind === "image") {
+      return editImagePath !== (originalSnippet.image_path || "");
+    }
+
+    if (activeSnippetKind === "form") {
+      return (
+        editForm !== (originalSnippet.form || "") ||
+        !areJsonEqual(editVars, originalSnippet.vars || []) ||
+        !areJsonEqual(editFormFieldConfigs, formFieldsToConfigs(originalSnippet.form_fields))
+      );
+    }
+
+    return editReplace !== (originalSnippet.replace || "") || !areJsonEqual(editVars, originalSnippet.vars || []);
+  };
+
+  const closeSnippetDialog = () => {
+    onOpenChange(false);
+    resetSnippetForm();
+    setSnippetEditTarget(null);
+  };
+
+  const requestCloseSnippetDialog = () => {
+    if (!hasUnsavedChanges()) {
+      closeSnippetDialog();
+      return;
+    }
+
+    showConfirm(
+      t("dialogs.discardSnippetChanges.message"),
+      closeSnippetDialog,
+      t("dialogs.discardSnippetChanges.title"),
+      t("dialogs.discardSnippetChanges.confirmBtn"),
+      t("dialogs.discardSnippetChanges.cancelBtn"),
+    );
+  };
 
   const focusActiveSnippetTextarea = () => {
     const textarea = activeSnippetKind === "form" ? formTextareaRef.current : replaceTextareaRef.current;
@@ -256,11 +335,12 @@ export function SnippetEditDialog({
 
   return (
     <Dialog open={open} onOpenChange={(val) => {
-      onOpenChange(val);
-      if (!val) {
-        resetSnippetForm();
-        setSnippetEditTarget(null);
+      if (val) {
+        onOpenChange(true);
+        return;
       }
+
+      requestCloseSnippetDialog();
     }}>
       <DialogContent
         className="grid h-[calc(100vh-3rem)] max-h-[calc(100vh-3rem)] w-[50vw] min-w-[min(36rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden"
@@ -749,7 +829,7 @@ export function SnippetEditDialog({
             </Button>
           )}
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
+            <Button variant="outline" onClick={requestCloseSnippetDialog}>
               {t("actions.cancel")}
             </Button>
             <Button

@@ -78,14 +78,19 @@ function createFormProps(overrides: Partial<SnippetEditDialogFormProps> = {}): S
   };
 }
 
-function createActionProps(saveSnippetToYaml = vi.fn()): SnippetEditDialogActionProps {
+function createActionProps(
+  saveSnippetToYaml = vi.fn(),
+  overrides: Partial<SnippetEditDialogActionProps> = {},
+): SnippetEditDialogActionProps {
   return {
     deleteSnippetFromYaml: vi.fn(),
     saveSnippetToYaml,
     isSavingSnippet: false,
     showAlert: vi.fn(),
+    showConfirm: vi.fn(),
     resetSnippetForm: vi.fn(),
     setSnippetEditTarget: vi.fn(),
+    ...overrides,
   };
 }
 
@@ -267,5 +272,63 @@ describe("SnippetEditDialog", () => {
 
     await user.tab();
     expect(updateButton).toHaveFocus();
+  });
+
+  it("asks for confirmation before closing a dirty add snippet dialog with Escape", async () => {
+    const user = userEvent.setup();
+    const showConfirm = vi.fn();
+    const resetSnippetForm = vi.fn();
+    const setSnippetEditTarget = vi.fn();
+    const { onOpenChange } = renderDialog(
+      createActionProps(vi.fn(), { showConfirm, resetSnippetForm, setSnippetEditTarget }),
+      { editTriggersText: ":draft" },
+    );
+
+    await user.keyboard("{Escape}");
+
+    expect(showConfirm).toHaveBeenCalledTimes(1);
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(resetSnippetForm).not.toHaveBeenCalled();
+    expect(setSnippetEditTarget).not.toHaveBeenCalled();
+
+    const onConfirm = showConfirm.mock.calls[0][1] as () => void;
+    onConfirm();
+
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(resetSnippetForm).toHaveBeenCalledTimes(1);
+    expect(setSnippetEditTarget).toHaveBeenCalledWith(null);
+  });
+
+  it("asks for confirmation before closing a dirty edit snippet dialog with Escape", async () => {
+    const user = userEvent.setup();
+    const showConfirm = vi.fn();
+    const { onOpenChange } = renderDialog(
+      createActionProps(vi.fn(), { showConfirm }),
+      { editTriggersText: ":changed", editReplace: "hello" },
+      editTarget,
+    );
+
+    await user.keyboard("{Escape}");
+
+    expect(showConfirm).toHaveBeenCalledTimes(1);
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(showConfirm.mock.calls[0][2]).toBe("Discard Unsaved Changes?");
+    expect(showConfirm.mock.calls[0][3]).toBe("Discard Changes");
+    expect(showConfirm.mock.calls[0][4]).toBe("Keep Editing");
+  });
+
+  it("closes a clean add snippet dialog without confirmation", async () => {
+    const user = userEvent.setup();
+    const showConfirm = vi.fn();
+    const resetSnippetForm = vi.fn();
+    const { onOpenChange } = renderDialog(
+      createActionProps(vi.fn(), { showConfirm, resetSnippetForm }),
+    );
+
+    await user.keyboard("{Escape}");
+
+    expect(showConfirm).not.toHaveBeenCalled();
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(resetSnippetForm).toHaveBeenCalledTimes(1);
   });
 });
