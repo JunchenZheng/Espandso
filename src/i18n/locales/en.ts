@@ -319,6 +319,12 @@ export const en = {
       message: "Are you sure you want to delete {{count}} selected snippets from {{file}}?",
       confirmBtn: "Delete Selected",
     },
+    discardSnippetChanges: {
+      title: "Discard Unsaved Changes?",
+      message: "Unsaved changes in this snippet will be lost. Do you want to discard them?",
+      confirmBtn: "Discard Changes",
+      cancelBtn: "Keep Editing",
+    },
   },
   errors: {
     genericError: "Error",

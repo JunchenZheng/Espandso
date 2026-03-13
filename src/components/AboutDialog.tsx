@@ -5,6 +5,7 @@ import { ScrollArea } from "./ui/scroll-area";
 import { Button } from "./ui/button";
 import { OPEN_SOURCE_LIBRARIES, OpenSourceLibrary } from "../logic/openSourceLibraries";
 import { useI18n } from "../i18n/useI18n";
+import { APP_VERSION } from "../version";
 
 interface AboutDialogProps {
   open: boolean;
@@ -45,7 +46,7 @@ export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
             <div className="flex items-center justify-between border-b pb-2">
               <span className="font-semibold text-base">Expandso</span>
               <span className="rounded-full bg-secondary px-2.5 py-0.5 text-sm font-medium">
-                v0.1.0
+                v{APP_VERSION}
               </span>
             </div>
             <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
