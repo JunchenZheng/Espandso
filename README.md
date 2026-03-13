@@ -41,6 +41,24 @@ Run the Tauri app in development mode:
 npm run tauri dev
 ```
 
+## Command Line Mode
+
+Expandso can add snippets without opening the desktop UI, which makes it suitable for third-party launchers such as Alfred and Raycast.
+
+```bash
+expandso add --mode text --trigger ":hello" --content "Hello world" --description "Greeting"
+expandso add --mode file --trigger ":notes" --content "$HOME/notes/snippet.txt"
+expandso add --mode image --trigger ":logo" --content "$HOME/Pictures/logo.png"
+```
+
+Modes interpret `--content` differently:
+
+- `text`: replacement text written to `replace`.
+- `file`: file path read by Espanso through a shell `cat` variable.
+- `image`: image path written to `image_path`.
+
+By default, snippets are written to `base.yml` inside the Espanso match directory resolved from `espanso path`, with a platform default fallback. Use `--config` to select another YAML file, `--match-dir` to provide a match directory, or `--no-restart` to skip the automatic `espanso restart`.
+
 Run focused test layers:
 
 ```bash
