@@ -449,6 +449,7 @@ function App() {
     saveSnippetToYaml,
     isSavingSnippet: snippetEditor.isSaving,
     showAlert,
+    showConfirm,
     resetSnippetForm: snippetEditor.resetForm,
     setSnippetEditTarget: snippetEditor.setEditTarget,
   };

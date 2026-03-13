@@ -1,4 +1,4 @@
-import type { RefObject } from "react";
+import { useRef, type KeyboardEvent, type RefObject } from "react";
 import type { DateFormatOption } from "../../../logic/dateFormats";
 import {
   AlertTriangle,
@@ -31,9 +31,9 @@ import { Textarea } from "../../../components/ui/textarea";
 import { OptionalMark, RequiredMark } from "../../../components/shared/FormMarks";
 import { useI18n } from "../../../i18n/useI18n";
 import { cn } from "../../../lib/utils";
-import { isImageFilePath } from "../../../logic/snippetUtils";
+import { buildTriggerInput, isImageFilePath } from "../../../logic/snippetUtils";
 import { isBinaryDomFile } from "../../../logic/fileCheck";
-import type { SnippetVar, ValidationError } from "../../../logic/types";
+import type { Snippet, SnippetVar, ValidationError } from "../../../logic/types";
 import { DateInsertMenu } from "./DateInsertMenu";
 import { DateVariableList } from "./DateVariableList";
 import type { EspansoConfigPreview } from "../../espanso-configs/types";
@@ -47,6 +47,7 @@ import type {
 import {
   getFormFieldCategory,
   getTextFieldMode,
+  formFieldsToConfigs,
   snippetKindLabel,
 } from "../formSnippet";
 
@@ -91,6 +92,13 @@ export interface SnippetEditDialogActionProps {
   saveSnippetToYaml: () => void;
   isSavingSnippet: boolean;
   showAlert: (description: string, title?: string) => void;
+  showConfirm: (
+    description: string,
+    onConfirm: () => void | Promise<void>,
+    title?: string,
+    confirmText?: string,
+    cancelText?: string,
+  ) => void;
   resetSnippetForm: () => void;
   setSnippetEditTarget: (target: SnippetEditTarget | null) => void;
 }
@@ -155,6 +163,7 @@ export function SnippetEditDialog({
     saveSnippetToYaml,
     isSavingSnippet,
     showAlert,
+    showConfirm,
     resetSnippetForm,
     setSnippetEditTarget,
   } = actions;
@@ -162,17 +171,186 @@ export function SnippetEditDialog({
   const snippetDialogTitle = snippetEditTarget
     ? t("snippets.editKindSnippetTitle", { kind: snippetKindLabel(activeSnippetKind, t) })
     : t("snippets.addKindSnippetTitle", { kind: snippetKindLabel(activeSnippetKind, t) });
+  const shouldUseSnippetTabFlow = activeSnippetKind === "text" || activeSnippetKind === "form";
+  const descriptionInputRef = useRef<HTMLInputElement | null>(null);
+  const saveButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  const getSnippetKind = (snippet: Snippet): AddSnippetKind => {
+    if (snippet.include_file) return "file";
+    if (snippet.image_path !== undefined) return "image";
+    if (snippet.form !== undefined) return "form";
+    return "text";
+  };
+
+  const areJsonEqual = (left: unknown, right: unknown) => JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
+
+  const hasUnsavedChanges = () => {
+    if (!snippetEditTarget) {
+      return (
+        editTriggersText.length > 0 ||
+        editReplace.length > 0 ||
+        editIncludeFile.length > 0 ||
+        editImagePath.length > 0 ||
+        editForm.length > 0 ||
+        editDescription.length > 0 ||
+        editVars.length > 0 ||
+        editFormFieldConfigs.length > 0
+      );
+    }
+
+    const originalSnippet = snippetEditTarget.match.originalSnippet || snippetEditTarget.match.snippet;
+    const originalKind = getSnippetKind(originalSnippet);
+
+    if (activeSnippetKind !== originalKind) return true;
+    if (editTriggersText !== buildTriggerInput(originalSnippet).multiline) return true;
+    if (editDescription !== (originalSnippet.description || "")) return true;
+
+    if (activeSnippetKind === "file") {
+      return editIncludeFile !== (snippetEditTarget.match.resourcePath || originalSnippet.include_file || "");
+    }
+
+    if (activeSnippetKind === "image") {
+      return editImagePath !== (originalSnippet.image_path || "");
+    }
+
+    if (activeSnippetKind === "form") {
+      return (
+        editForm !== (originalSnippet.form || "") ||
+        !areJsonEqual(editVars, originalSnippet.vars || []) ||
+        !areJsonEqual(editFormFieldConfigs, formFieldsToConfigs(originalSnippet.form_fields))
+      );
+    }
+
+    return editReplace !== (originalSnippet.replace || "") || !areJsonEqual(editVars, originalSnippet.vars || []);
+  };
+
+  const closeSnippetDialog = () => {
+    onOpenChange(false);
+    resetSnippetForm();
+    setSnippetEditTarget(null);
+  };
+
+  const requestCloseSnippetDialog = () => {
+    if (!hasUnsavedChanges()) {
+      closeSnippetDialog();
+      return;
+    }
+
+    showConfirm(
+      t("dialogs.discardSnippetChanges.message"),
+      closeSnippetDialog,
+      t("dialogs.discardSnippetChanges.title"),
+      t("dialogs.discardSnippetChanges.confirmBtn"),
+      t("dialogs.discardSnippetChanges.cancelBtn"),
+    );
+  };
+
+  const focusActiveSnippetTextarea = () => {
+    const textarea = activeSnippetKind === "form" ? formTextareaRef.current : replaceTextareaRef.current;
+    textarea?.focus();
+  };
+
+  const isActiveSnippetTextarea = (target: EventTarget | null) => {
+    const textarea = activeSnippetKind === "form" ? formTextareaRef.current : replaceTextareaRef.current;
+    return shouldUseSnippetTabFlow && target instanceof HTMLTextAreaElement && target === textarea;
+  };
+
+  const insertTabIndent = (
+    textarea: HTMLTextAreaElement,
+    value: string,
+    setValue: (val: string) => void,
+  ) => {
+    const start = textarea.selectionStart ?? value.length;
+    const end = textarea.selectionEnd ?? value.length;
+    const nextValue = `${value.slice(0, start)}\t${value.slice(end)}`;
+    const nextCursor = start + 1;
+
+    setValue(nextValue);
+    requestAnimationFrame(() => {
+      textarea.focus();
+      textarea.setSelectionRange(nextCursor, nextCursor);
+    });
+  };
+
+  const handleSnippetTextareaKeyDown = (
+    event: KeyboardEvent<HTMLTextAreaElement>,
+    value: string,
+    setValue: (val: string) => void,
+  ) => {
+    if ((event.metaKey || event.ctrlKey) && event.key === "Enter" && !event.nativeEvent.isComposing) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (!isSavingSnippet) {
+        saveSnippetToYaml();
+      }
+      return true;
+    }
+
+    if (event.key === "Tab" && !event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey) {
+      event.preventDefault();
+      event.stopPropagation();
+      insertTabIndent(event.currentTarget, value, setValue);
+      return true;
+    }
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      descriptionInputRef.current?.focus();
+      return true;
+    }
+
+    return false;
+  };
+
+  const handleDialogKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (
+      event.key !== "Enter" ||
+      event.nativeEvent.isComposing ||
+      isSavingSnippet ||
+      (!event.metaKey && !event.ctrlKey)
+    ) {
+      return;
+    }
+
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+
+    if (!(target instanceof HTMLInputElement) && !(target instanceof HTMLTextAreaElement)) {
+      return;
+    }
+
+    if (
+      target instanceof HTMLInputElement &&
+      ["button", "checkbox", "file", "radio", "reset", "submit"].includes(target.type)
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    saveSnippetToYaml();
+  };
 
   return (
     <Dialog open={open} onOpenChange={(val) => {
-      onOpenChange(val);
-      if (!val) {
-        resetSnippetForm();
-        setSnippetEditTarget(null);
+      if (val) {
+        onOpenChange(true);
+        return;
       }
+
+      requestCloseSnippetDialog();
     }}>
       <DialogContent
         className="grid h-[calc(100vh-3rem)] max-h-[calc(100vh-3rem)] w-[50vw] min-w-[min(36rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden"
+        onKeyDown={handleDialogKeyDown}
+        onEscapeKeyDown={(event) => {
+          if (isActiveSnippetTextarea(event.target)) {
+            event.preventDefault();
+            descriptionInputRef.current?.focus();
+          }
+        }}
       >
         <DialogHeader className="shrink-0">
           <DialogTitle>{snippetDialogTitle}</DialogTitle>
@@ -225,6 +403,20 @@ export function SnippetEditDialog({
                       newLines[idx] = e.target.value;
                       setEditTriggersText(newLines.join("\n"));
                     }}
+                    onKeyDown={(event) => {
+                      if (
+                        shouldUseSnippetTabFlow &&
+                        idx === 0 &&
+                        event.key === "Tab" &&
+                        !event.shiftKey &&
+                        !event.metaKey &&
+                        !event.ctrlKey &&
+                        !event.altKey
+                      ) {
+                        event.preventDefault();
+                        focusActiveSnippetTextarea();
+                      }
+                    }}
                   />
                   {lines.length > 1 && (
                     <Button
@@ -256,7 +448,7 @@ export function SnippetEditDialog({
           <div className="grid grid-cols-4 rounded-md border bg-secondary/60 p-1 shrink-0">
             <Button
               type="button"
-              variant={activeSnippetKind === "text" ? "secondary" : "ghost"}
+              variant={activeSnippetKind === "text" ? "default" : "ghost"}
               className="h-8"
               onClick={() => {
                 setAddSnippetKind("text");
@@ -268,7 +460,7 @@ export function SnippetEditDialog({
             </Button>
             <Button
               type="button"
-              variant={activeSnippetKind === "file" ? "secondary" : "ghost"}
+              variant={activeSnippetKind === "file" ? "default" : "ghost"}
               className="h-8"
               onClick={() => {
                 setAddSnippetKind("file");
@@ -280,7 +472,7 @@ export function SnippetEditDialog({
             </Button>
             <Button
               type="button"
-              variant={activeSnippetKind === "image" ? "secondary" : "ghost"}
+              variant={activeSnippetKind === "image" ? "default" : "ghost"}
               className="h-8"
               onClick={() => {
                 setAddSnippetKind("image");
@@ -292,7 +484,7 @@ export function SnippetEditDialog({
             </Button>
             <Button
               type="button"
-              variant={activeSnippetKind === "form" ? "secondary" : "ghost"}
+              variant={activeSnippetKind === "form" ? "default" : "ghost"}
               className="h-8"
               onClick={() => {
                 setAddSnippetKind("form");
@@ -406,6 +598,10 @@ export function SnippetEditDialog({
                     setFormSelection(null);
                   }}
                   onKeyDown={(event) => {
+                    if (handleSnippetTextareaKeyDown(event, editForm, setEditForm)) {
+                      setFormSelection(null);
+                      return;
+                    }
                     if (event.key !== "Shift" && event.key !== "ArrowLeft" && event.key !== "ArrowRight" && event.key !== "ArrowUp" && event.key !== "ArrowDown") {
                       setFormSelection(null);
                     }
@@ -589,6 +785,7 @@ export function SnippetEditDialog({
                 placeholder={t("snippets.replaceContentPlaceholder")}
                 value={editReplace}
                 onChange={(e) => setEditReplace(e.target.value)}
+                onKeyDown={(event) => handleSnippetTextareaKeyDown(event, editReplace, setEditReplace)}
               />
               <DateVariableList vars={editVars} onRemove={handleRemoveDateVar} />
             </div>
@@ -600,9 +797,23 @@ export function SnippetEditDialog({
             </Label>
             <Input
               id="description"
+              ref={descriptionInputRef}
               placeholder={t("snippets.descriptionPlaceholder")}
               value={editDescription}
               onChange={(e) => setEditDescription(e.target.value)}
+              onKeyDown={(event) => {
+                if (
+                  shouldUseSnippetTabFlow &&
+                  event.key === "Tab" &&
+                  !event.shiftKey &&
+                  !event.metaKey &&
+                  !event.ctrlKey &&
+                  !event.altKey
+                ) {
+                  event.preventDefault();
+                  saveButtonRef.current?.focus();
+                }
+              }}
             />
           </div>
         </div>
@@ -618,10 +829,14 @@ export function SnippetEditDialog({
             </Button>
           )}
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
+            <Button variant="outline" onClick={requestCloseSnippetDialog}>
               {t("actions.cancel")}
             </Button>
-            <Button onClick={saveSnippetToYaml} disabled={isSavingSnippet}>
+            <Button
+              ref={saveButtonRef}
+              onClick={saveSnippetToYaml}
+              disabled={isSavingSnippet}
+            >
               {isSavingSnippet ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               {snippetEditTarget ? t("actions.updateYaml") : t("actions.saveToYaml")}
             </Button>
