@@ -59,6 +59,8 @@ Modes interpret `--content` differently:
 
 By default, snippets are written to `base.yml` inside the Espanso match directory resolved from `espanso path`, with a platform default fallback. Use `--config` to select another YAML file, `--match-dir` to provide a match directory, or `--no-restart` to skip the automatic `espanso restart`.
 
+On macOS, `./install_tauri_app.sh` installs the command as `~/.local/bin/expandso` by linking it to the executable inside `Expandso.app`. Make sure `~/.local/bin` is in your shell `PATH`.
+
 Run focused test layers:
 
 ```bash
