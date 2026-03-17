@@ -1,4 +1,4 @@
-use serde_yaml::{Mapping, Value};
+use serde_yaml::Value;
 use std::env;
 use std::fs;
 use std::path::PathBuf;
@@ -303,72 +303,76 @@ fn match_has_trigger(item: &Value, trigger: &str) -> bool {
 }
 
 fn snippet_to_yaml_item(options: &AddSnippetOptions) -> Result<String, String> {
-    let mut match_map = Mapping::new();
-    match_map.insert(
-        Value::String("trigger".to_string()),
-        Value::String(options.trigger.clone()),
-    );
+    let mut lines = Vec::new();
+    push_yaml_field(&mut lines, "- trigger", &options.trigger, 0)?;
 
     match options.mode {
         SnippetMode::Text => {
-            match_map.insert(
-                Value::String("replace".to_string()),
-                Value::String(options.content.clone()),
-            );
+            push_yaml_field(&mut lines, "replace", &options.content, 2)?;
         }
         SnippetMode::File => {
-            match_map.insert(
-                Value::String("replace".to_string()),
-                Value::String("{{output}}".to_string()),
-            );
-            match_map.insert(
-                Value::String("vars".to_string()),
-                Value::Sequence(vec![cat_var_for_file(&options.content)]),
-            );
+            push_yaml_field(&mut lines, "replace", "{{output}}", 2)?;
+            lines.push("  vars:".to_string());
+            lines.push("    - name: output".to_string());
+            lines.push("      type: shell".to_string());
+            lines.push("      params:".to_string());
+            push_yaml_field(
+                &mut lines,
+                "cmd",
+                &cat_command_for_file(&options.content),
+                8,
+            )?;
         }
         SnippetMode::Image => {
-            match_map.insert(
-                Value::String("image_path".to_string()),
-                Value::String(options.content.clone()),
-            );
+            push_yaml_field(&mut lines, "image_path", &options.content, 2)?;
         }
     }
 
     if let Some(description) = options.description.as_ref() {
-        match_map.insert(
-            Value::String("description".to_string()),
-            Value::String(description.clone()),
-        );
+        push_yaml_field(&mut lines, "description", description, 2)?;
     }
 
-    let item = serde_yaml::to_string(&vec![Value::Mapping(match_map)])
-        .map_err(|e| format!("Failed to serialize snippet: {}", e))?;
-    Ok(item
+    Ok(lines.join("\n"))
+}
+
+fn push_yaml_field(
+    lines: &mut Vec<String>,
+    key: &str,
+    value: &str,
+    indent: usize,
+) -> Result<(), String> {
+    let prefix = " ".repeat(indent);
+    if value.contains('\n') {
+        let chomp = if value.ends_with('\n') { "|" } else { "|-" };
+        lines.push(format!("{}{}: {}", prefix, key, chomp));
+        let child_prefix = " ".repeat(indent + 2);
+        let content = if value.ends_with('\n') {
+            value.strip_suffix('\n').unwrap_or(value)
+        } else {
+            value
+        };
+        for line in content.split('\n') {
+            lines.push(format!("{}{}", child_prefix, line));
+        }
+        return Ok(());
+    }
+
+    lines.push(format!("{}{}: {}", prefix, key, yaml_scalar(value)?));
+    Ok(())
+}
+
+fn yaml_scalar(value: &str) -> Result<String, String> {
+    let serialized = serde_yaml::to_string(&Value::String(value.to_string()))
+        .map_err(|e| format!("Failed to serialize YAML scalar: {}", e))?;
+    Ok(serialized
         .trim_end()
         .strip_prefix("---\n")
-        .unwrap_or(item.trim_end())
+        .unwrap_or(serialized.trim_end())
         .to_string())
 }
 
-fn cat_var_for_file(path: &str) -> Value {
-    let mut params = Mapping::new();
-    params.insert(
-        Value::String("cmd".to_string()),
-        Value::String(format!("cat \"{}\"", path.replace('"', "\\\""))),
-    );
-
-    let mut var = Mapping::new();
-    var.insert(
-        Value::String("name".to_string()),
-        Value::String("output".to_string()),
-    );
-    var.insert(
-        Value::String("type".to_string()),
-        Value::String("shell".to_string()),
-    );
-    var.insert(Value::String("params".to_string()), Value::Mapping(params));
-
-    Value::Mapping(var)
+fn cat_command_for_file(path: &str) -> String {
+    format!("cat \"{}\"", path.replace('"', "\\\""))
 }
 
 fn append_match_to_yaml_content(content: &str, item_yaml: &str) -> Result<String, String> {
@@ -546,6 +550,24 @@ mod tests {
 
         assert!(item.contains("replace: '{{output}}'") || item.contains("replace: \"{{output}}\""));
         assert!(item.contains("cmd: cat \"/tmp/demo.txt\""));
+    }
+
+    #[test]
+    fn writes_multiline_text_with_valid_match_indentation() {
+        let item = snippet_to_yaml_item(&text_options(
+            ":multi",
+            "first line\nsecond line",
+            PathBuf::from("base.yml"),
+        ))
+        .unwrap();
+        let yaml = format!("matches:\n{}\n", indent_yaml_item(&item));
+        let parsed: Value = serde_yaml::from_str(&yaml).unwrap();
+
+        assert!(yaml.contains("  - trigger: :multi\n    replace: |-\n      first line\n      second line\n    description: Greeting\n"));
+        assert_eq!(
+            parsed["matches"][0]["replace"].as_str(),
+            Some("first line\nsecond line")
+        );
     }
 
     #[test]
