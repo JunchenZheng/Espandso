@@ -472,6 +472,11 @@ fn restart_espanso() -> Result<(), String> {
         Ok(output) if output.status.success() => Ok(()),
         Ok(output) => {
             let stderr = String::from_utf8_lossy(&output.stderr);
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            if is_benign_restart_output(&stdout, &stderr) {
+                return Ok(());
+            }
+
             if stderr.trim().is_empty() {
                 Err(format!("espanso restart exited with {}", output.status))
             } else {
@@ -483,6 +488,11 @@ fn restart_espanso() -> Result<(), String> {
             e
         )),
     }
+}
+
+fn is_benign_restart_output(stdout: &str, stderr: &str) -> bool {
+    let output = format!("{}\n{}", stdout, stderr).to_ascii_lowercase();
+    output.contains("unable to stop espanso") && output.contains("espanso is already running")
 }
 
 #[cfg(test)]
@@ -581,5 +591,14 @@ mod tests {
 
         assert_eq!(result.target_path, target);
         assert!(written.contains("matches:\n  - trigger: :new\n    replace: New text"));
+    }
+
+    #[test]
+    fn treats_espanso_already_running_restart_output_as_benign() {
+        assert!(is_benign_restart_output(
+            "",
+            "unable to stop espanso: ipc error: `Connection refused (os error 61)`\nespanso is already running!"
+        ));
+        assert!(!is_benign_restart_output("", "espanso restart failed"));
     }
 }
