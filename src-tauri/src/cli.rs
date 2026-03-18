@@ -258,7 +258,7 @@ fn default_espanso_match_dir() -> Result<PathBuf, String> {
     }
 }
 
-fn validate_yaml_for_append(content: &str, trigger: &str) -> Result<(), String> {
+fn validate_yaml_for_append(content: &str, _trigger: &str) -> Result<(), String> {
     if content.trim().is_empty() {
         return Ok(());
     }
@@ -268,38 +268,11 @@ fn validate_yaml_for_append(content: &str, trigger: &str) -> Result<(), String> 
     let Some(matches) = doc.get("matches") else {
         return Ok(());
     };
-    let Some(sequence) = matches.as_sequence() else {
+    let Some(_sequence) = matches.as_sequence() else {
         return Err("YAML root 'matches' must be a list before snippets can be added.".to_string());
     };
 
-    for item in sequence {
-        if match_has_trigger(item, trigger) {
-            return Err(format!("Duplicate trigger '{}'", trigger));
-        }
-    }
-
     Ok(())
-}
-
-fn match_has_trigger(item: &Value, trigger: &str) -> bool {
-    if item
-        .get("trigger")
-        .and_then(Value::as_str)
-        .is_some_and(|value| value == trigger)
-    {
-        return true;
-    }
-
-    item.get("triggers")
-        .and_then(Value::as_sequence)
-        .map(|triggers| {
-            triggers.iter().any(|value| {
-                value
-                    .as_str()
-                    .is_some_and(|item_trigger| item_trigger == trigger)
-            })
-        })
-        .unwrap_or(false)
 }
 
 fn snippet_to_yaml_item(options: &AddSnippetOptions) -> Result<String, String> {
@@ -536,12 +509,10 @@ mod tests {
     }
 
     #[test]
-    fn rejects_duplicate_trigger() {
+    fn allows_duplicate_trigger() {
         let content = "matches:\n  - triggers:\n      - :hello\n    replace: Hello\n";
 
-        let error = validate_yaml_for_append(content, ":hello").unwrap_err();
-
-        assert_eq!(error, "Duplicate trigger ':hello'");
+        assert!(validate_yaml_for_append(content, ":hello").is_ok());
     }
 
     #[test]

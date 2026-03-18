@@ -16,7 +16,7 @@ A Tauri desktop app for scanning, previewing, and editing Espanso YAML match fil
 - **Static Text Snippet Editor**: Adds single-line or multi-line text replacement snippets directly to the selected YAML config.
 - **Multiple Triggers (Aliases)**: Supports Espanso `triggers: [...]` for a single snippet alias group.
 - **Block Literal YAML Writing**: Multi-line replacement texts are written with YAML block literal style.
-- **Validation & Restart**: Validates trigger shape and duplicate triggers before saving, then restarts Espanso.
+- **Validation & Restart**: Validates snippet shape and prefix trigger conflicts before saving, then restarts Espanso.
 - **Resource Preview**: Previews existing external resource snippets by resolving their configured shell/echo paths.
 
 ## Setup

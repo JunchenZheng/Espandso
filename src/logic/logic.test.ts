@@ -116,12 +116,12 @@ describe("validate", () => {
       snippets: [
         { trigger: "", replace: "world" }, // empty trigger
         { trigger: ":dup", replace: "1" },
-        { trigger: ":dup", replace: "2" }, // duplicate trigger
+        { trigger: ":dup", replace: "2" }, // duplicate triggers are allowed by Espanso
         { trigger: ":both", replace: "yes", include_file: "test.txt" }, // multiple content kinds
         { trigger: ":none" }, // neither replace nor include
         { trigger: "no-colon", replace: "valid custom trigger style" },
         { trigger: ":conflict", triggers: [":conflict2"], replace: "both" }, // both trigger and triggers
-        { triggers: [":t1", ":t1"], replace: "dup in triggers" }, // duplicate inside triggers
+        { triggers: [":t1", ":t1"], replace: "dup in triggers" }, // duplicate aliases are allowed
         { trigger: ":empty-form", form: "" }, // empty form
         { trigger: ":fields", replace: "x", form_fields: { value: { multiline: true } } }, // fields without form
         { trigger: ":bad-img", image_path: "" }, // empty image_path
@@ -135,16 +135,31 @@ describe("validate", () => {
     const messages = errors.map((e) => e.message);
     expect(messages).toContain("root 'version' must be an integer");
     expect(messages).toContain("snippet #0: 'trigger' must be a non-empty string");
-    expect(messages).toContain("snippet #2: duplicate trigger ':dup' (first at #1)");
     expect(messages).toContain("snippet #3: cannot combine 'replace', 'include_file', and 'form'");
     expect(messages).toContain(
       "snippet #4: must have either 'replace', 'include_file', 'image_path', or 'form'",
     );
     expect(messages).toContain("snippet #6: cannot have both 'trigger' and 'triggers'");
-    expect(messages).toContain("snippet #7: duplicate trigger ':t1' (first at #7)");
     expect(messages).toContain("snippet #8: 'form' must be a non-empty string");
     expect(messages).toContain("snippet #9: 'form_fields' can only be used with 'form'");
     expect(messages).toContain("snippet #10: 'image_path' must be a non-empty string");
+  });
+
+  it("should allow exact duplicate triggers", async () => {
+    const data = {
+      version: 1,
+      snippets: [
+        { trigger: ":from", replace: "asdasdasd", description: "asdasd" },
+        { trigger: ":from", replace: "asdasdasd", description: "asdasd" },
+        { trigger: ":from", replace: "asdasdasd2", description: "asdasd   2" },
+        { triggers: [":alias", ":alias"], replace: "same trigger in one alias list" },
+      ],
+    };
+
+    const { errors, warnings } = await validate(data);
+
+    expect(errors).toHaveLength(0);
+    expect(warnings).toHaveLength(0);
   });
 
   it("should check include_file existence", async () => {
