@@ -101,7 +101,7 @@ export const zhCN: TranslationTree = {
     experimentalTitle: "实验性功能",
     experimentalDescription: "尚在测试中的试验性功能。",
     enableYamlWarnings: "YAML 文件检测与警告",
-    enableYamlWarningsDescription: "自动扫描 YAML 文件中的重复触发词与潜在语法警告。",
+    enableYamlWarningsDescription: "自动扫描 YAML 文件中的前缀触发词冲突与潜在语法警告。",
     enablePreSaveConflictCheck: "保存时阻止触发词冲突",
     enablePreSaveConflictCheckDescription:
       "例如：:hello 可能会挡住 :helloworld，导致较长触发词无法触发。",
@@ -112,7 +112,7 @@ export const zhCN: TranslationTree = {
     activeFiles: "活跃匹配文件",
     activeFilesDesc: "成功解析的 YAML 文件",
     warnings: "警告提示",
-    warningsDesc: "检测到的问题或重复项",
+    warningsDesc: "检测到的问题或冲突",
   },
   snippets: {
     searchPlaceholder: "按触发词、替换内容或文件名搜索片段...",
@@ -282,7 +282,7 @@ export const zhCN: TranslationTree = {
     },
     warnings: {
       title: "片段与配置警告",
-      description: "可能存在的重复触发词、语法问题或无法解析的路径提示。",
+      description: "可能存在的前缀触发词冲突、语法问题或无法解析的路径提示。",
       noWarnings: "未检测到任何警告或问题，所有匹配文件格式良好！",
       file: "文件",
       line: "行号",
@@ -333,7 +333,6 @@ export const zhCN: TranslationTree = {
     failedToReadFile: "[{{file}}] 读取文件失败：{{message}}",
     triggerRequired: "触发词为必填项且不能为空。",
     replaceRequired: "替换文本为必填项。",
-    duplicateTrigger: '触发词 "{{trigger}}" 已在 {{file}} 中定义。',
     scanFailed: "扫描 Espanso 目录失败。",
     failedToScanEspansoConfigs: "扫描 Espanso 配置失败：{{message}}",
     espansoPathBlocked:

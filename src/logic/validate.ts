@@ -1,5 +1,5 @@
 import { ValidationError } from "./types";
-import { getSnippetTriggers, isImageFilePath } from "./snippetUtils";
+import { isImageFilePath } from "./snippetUtils";
 
 export interface ValidateOptions {
   snippetsDir?: string;
@@ -27,8 +27,6 @@ export async function validate(
     errors.push({ message: "root 'snippets' must be a list" });
     return { errors, warnings };
   }
-
-  const seenTriggers: Record<string, number> = {};
 
   for (let i = 0; i < snippets.length; i++) {
     const snippet = snippets[i];
@@ -70,17 +68,6 @@ export async function validate(
             break;
           }
         }
-      }
-    }
-
-    const effectiveTriggers = getSnippetTriggers(snippet);
-    for (const tr of effectiveTriggers) {
-      if (tr in seenTriggers) {
-        errors.push({
-          message: `snippet #${i}: duplicate trigger '${tr}' (first at #${seenTriggers[tr]})`,
-        });
-      } else {
-        seenTriggers[tr] = i;
       }
     }
 

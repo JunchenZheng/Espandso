@@ -100,7 +100,7 @@ export const en = {
     experimentalDescription: "Features under active testing.",
     enableYamlWarnings: "YAML Detection & Warnings",
     enableYamlWarningsDescription:
-      "Scan YAML files for duplicate triggers and potential syntax warnings.",
+      "Scan YAML files for prefix trigger conflicts and potential syntax warnings.",
     enablePreSaveConflictCheck: "Block Trigger Conflicts on Save",
     enablePreSaveConflictCheckDescription:
       "Example: :hello can block :helloworld, so the longer trigger may never run.",
@@ -111,7 +111,7 @@ export const en = {
     activeFiles: "Active Match Files",
     activeFilesDesc: "YAML files parsed",
     warnings: "Warnings",
-    warningsDesc: "Issues or duplicates detected",
+    warningsDesc: "Issues or conflicts detected",
   },
   snippets: {
     searchPlaceholder: "Search snippets by trigger, replacement, or file...",
@@ -284,7 +284,7 @@ export const en = {
     },
     warnings: {
       title: "Snippet & Configuration Warnings",
-      description: "Potential duplicates, syntax issues, or unresolvable path warnings.",
+      description: "Potential prefix conflicts, syntax issues, or unresolvable path warnings.",
       noWarnings: "No warnings or issues detected. All match files look good!",
       file: "File",
       line: "Line",
@@ -337,7 +337,6 @@ export const en = {
     failedToReadFile: "[{{file}}] Failed to read file: {{message}}",
     triggerRequired: "Trigger is required and cannot be empty.",
     replaceRequired: "Replacement text is required.",
-    duplicateTrigger: 'Trigger "{{trigger}}" is already defined in {{file}}.',
     scanFailed: "Failed to scan Espanso directory.",
     failedToScanEspansoConfigs: "Failed to scan Espanso configs: {{message}}",
     espansoPathBlocked:

@@ -1,3 +1,4 @@
+pub mod cli;
 mod search_index;
 
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};

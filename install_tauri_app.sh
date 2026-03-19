@@ -15,6 +15,7 @@ DEST_DIR="/Applications"
 SKIP_NPM_SETUP="${SKIP_NPM_SETUP:-0}"
 NO_SIGN="${NO_SIGN:-0}"
 ENABLE_EXPERIMENTAL="${ENABLE_EXPERIMENTAL:-0}"
+CLI_BIN_PATH="${CLI_BIN_PATH:-${HOME:-$ROOT_DIR}/.local/bin/expandso}"
 
 # Parse optional arguments
 for arg in "$@"; do
@@ -64,6 +65,7 @@ Environment:
   NO_SIGN=1              Pass --no-sign to tauri build.
   SKIP_NPM_SETUP=1       Skip scripts/setup_npm_env.sh.
   ENABLE_EXPERIMENTAL=1  Include experimental features in build (default: 0).
+  CLI_BIN_PATH            Command line symlink path (default: ~/.local/bin/expandso).
 EOF
 }
 
@@ -73,6 +75,19 @@ command_exists() {
 
 run_with_privilege() {
   if [ -w "$DEST_DIR" ] || { [ ! -e "$DEST_DIR" ] && [ -w "$(dirname "$DEST_DIR")" ]; }; then
+    "$@"
+  else
+    sudo "$@"
+  fi
+}
+
+run_with_privilege_for_path() {
+  local target_path="$1"
+  shift
+  local parent_dir
+  parent_dir="$(dirname "$target_path")"
+
+  if { [ -e "$parent_dir" ] && [ -w "$parent_dir" ]; } || { [ ! -e "$parent_dir" ] && [ -w "$(dirname "$parent_dir")" ]; }; then
     "$@"
   else
     sudo "$@"
@@ -206,9 +221,33 @@ install_app() {
   echo "Installed:"
   echo "  $DEST_APP_PATH"
 
+  install_cli_command
+
   # Automatically launch the newly installed app
   echo "Launching $DEST_APP_PATH..."
   open "$DEST_APP_PATH"
+}
+
+install_cli_command() {
+  local executable_name
+  executable_name="$(app_process_name)"
+  local executable_path="$DEST_APP_PATH/Contents/MacOS/$executable_name"
+  local cli_dir
+  cli_dir="$(dirname "$CLI_BIN_PATH")"
+
+  if [ ! -x "$executable_path" ]; then
+    echo "CLI executable not found at $executable_path; skipping command installation." >&2
+    return
+  fi
+
+  if [ -e "$CLI_BIN_PATH" ] && [ ! -L "$CLI_BIN_PATH" ]; then
+    echo "CLI command path exists and is not a symlink; skipping: $CLI_BIN_PATH" >&2
+    return
+  fi
+
+  echo "Installing CLI command to $CLI_BIN_PATH..."
+  run_with_privilege_for_path "$cli_dir" mkdir -p "$cli_dir"
+  run_with_privilege_for_path "$CLI_BIN_PATH" ln -sfn "$executable_path" "$CLI_BIN_PATH"
 }
 
 check_and_generate_icons() {
