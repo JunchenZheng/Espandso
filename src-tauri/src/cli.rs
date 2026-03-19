@@ -5,6 +5,9 @@ use std::path::PathBuf;
 use std::process::Command;
 
 const DEFAULT_CONFIG_FILE: &str = "base.yml";
+const COMMON_IMAGE_EXTENSIONS: &[&str] = &[
+    "png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "ico", "tiff", "tif", "avif", "heic",
+];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum SnippetMode {
@@ -297,6 +300,12 @@ fn snippet_to_yaml_item(options: &AddSnippetOptions) -> Result<String, String> {
             )?;
         }
         SnippetMode::Image => {
+            if !is_supported_image_path(&options.content) {
+                return Err(format!(
+                    "--content must be an image file path for --mode image. Supported extensions: {}",
+                    COMMON_IMAGE_EXTENSIONS.join(", ")
+                ));
+            }
             push_yaml_field(&mut lines, "image_path", &options.content, 2)?;
         }
     }
@@ -346,6 +355,16 @@ fn yaml_scalar(value: &str) -> Result<String, String> {
 
 fn cat_command_for_file(path: &str) -> String {
     format!("cat \"{}\"", path.replace('"', "\\\""))
+}
+
+fn is_supported_image_path(path: &str) -> bool {
+    let clean_path = path.trim().split(['?', '#']).next().unwrap_or_default();
+    let Some((_, extension)) = clean_path.rsplit_once('.') else {
+        return false;
+    };
+
+    let extension = extension.to_ascii_lowercase();
+    COMMON_IMAGE_EXTENSIONS.contains(&extension.as_str())
 }
 
 fn append_match_to_yaml_content(content: &str, item_yaml: &str) -> Result<String, String> {
@@ -531,6 +550,41 @@ mod tests {
 
         assert!(item.contains("replace: '{{output}}'") || item.contains("replace: \"{{output}}\""));
         assert!(item.contains("cmd: cat \"/tmp/demo.txt\""));
+    }
+
+    #[test]
+    fn writes_image_mode_for_supported_image_extension() {
+        let options = AddSnippetOptions {
+            mode: SnippetMode::Image,
+            trigger: ":logo".to_string(),
+            content: "/tmp/Logo.PNG".to_string(),
+            description: None,
+            config: "base.yml".to_string(),
+            match_dir: None,
+            restart: false,
+        };
+
+        let item = snippet_to_yaml_item(&options).unwrap();
+
+        assert!(item.contains("image_path: /tmp/Logo.PNG"));
+    }
+
+    #[test]
+    fn rejects_image_mode_for_non_image_extension() {
+        let options = AddSnippetOptions {
+            mode: SnippetMode::Image,
+            trigger: ":logo".to_string(),
+            content: "/Users/zjc/Downloads/git备份/documents/压缩密码111.pdf".to_string(),
+            description: Some("描述".to_string()),
+            config: "base.yml".to_string(),
+            match_dir: None,
+            restart: false,
+        };
+
+        let err = snippet_to_yaml_item(&options).unwrap_err();
+
+        assert!(err.contains("--content must be an image file path for --mode image"));
+        assert!(err.contains("png"));
     }
 
     #[test]
