@@ -43,6 +43,7 @@ import type {
   FormFieldControl,
   FormSelectionState,
   SnippetEditTarget,
+  TextReplacementFormat,
 } from "../types";
 import {
   getFormFieldCategory,
@@ -59,6 +60,8 @@ export interface SnippetEditDialogFormProps {
   setEditTriggersText: (val: string) => void;
   activeSnippetKind: AddSnippetKind;
   setAddSnippetKind: (kind: AddSnippetKind) => void;
+  textReplacementFormat: TextReplacementFormat;
+  setTextReplacementFormat: (format: TextReplacementFormat) => void;
   setAddErrors: (errors: any[]) => void;
   setAddWarnings: (warnings: string[]) => void;
   editIncludeFile: string;
@@ -130,6 +133,8 @@ export function SnippetEditDialog({
     setEditTriggersText,
     activeSnippetKind,
     setAddSnippetKind,
+    textReplacementFormat,
+    setTextReplacementFormat,
     setAddErrors,
     setAddWarnings,
     editIncludeFile,
@@ -182,6 +187,18 @@ export function SnippetEditDialog({
     return "text";
   };
 
+  const getTextReplacementFormat = (snippet: Snippet): TextReplacementFormat => {
+    if (snippet.markdown !== undefined) return "markdown";
+    if (snippet.html !== undefined) return "html";
+    return "plain";
+  };
+
+  const getTextReplacementContent = (snippet: Snippet): string => {
+    if (snippet.markdown !== undefined) return snippet.markdown;
+    if (snippet.html !== undefined) return snippet.html;
+    return snippet.replace || "";
+  };
+
   const areJsonEqual = (left: unknown, right: unknown) => JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
 
   const hasUnsavedChanges = () => {
@@ -221,7 +238,11 @@ export function SnippetEditDialog({
       );
     }
 
-    return editReplace !== (originalSnippet.replace || "") || !areJsonEqual(editVars, originalSnippet.vars || []);
+    return (
+      textReplacementFormat !== getTextReplacementFormat(originalSnippet) ||
+      editReplace !== getTextReplacementContent(originalSnippet) ||
+      !areJsonEqual(editVars, originalSnippet.vars || [])
+    );
   };
 
   const closeSnippetDialog = () => {
@@ -771,7 +792,31 @@ export function SnippetEditDialog({
               )}
             </div>
           ) : (
-            <div className="flex-1 flex flex-col space-y-2 min-h-[120px]">
+            <div className="flex-1 flex flex-col space-y-3 min-h-[120px]">
+              <div className="grid gap-2 sm:grid-cols-3">
+                {([
+                  ["plain", t("snippets.textFormatPlain")],
+                  ["markdown", t("snippets.textFormatMarkdown")],
+                  ["html", t("snippets.textFormatHtml")],
+                ] as const).map(([format, label]) => (
+                  <label
+                    key={format}
+                    className={cn(
+                      "flex min-h-9 items-center gap-2 rounded-md border bg-background px-3 text-sm",
+                      textReplacementFormat === format && "border-primary bg-primary/10",
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="text-replacement-format"
+                      className="h-4 w-4 accent-primary"
+                      checked={textReplacementFormat === format}
+                      onChange={() => setTextReplacementFormat(format)}
+                    />
+                    <span>{label}</span>
+                  </label>
+                ))}
+              </div>
               <div className="flex items-center justify-between">
                 <Label htmlFor="replace" className="inline-flex items-center shrink-0">
                   {t("snippets.replaceContent")} <RequiredMark />

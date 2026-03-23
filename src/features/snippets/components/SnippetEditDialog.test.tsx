@@ -48,6 +48,8 @@ function createFormProps(overrides: Partial<SnippetEditDialogFormProps> = {}): S
     setEditTriggersText: vi.fn(),
     activeSnippetKind: "text",
     setAddSnippetKind: vi.fn(),
+    textReplacementFormat: "plain",
+    setTextReplacementFormat: vi.fn(),
     setAddErrors: vi.fn(),
     setAddWarnings: vi.fn(),
     editIncludeFile: "",
@@ -116,6 +118,25 @@ function renderDialog(
 }
 
 describe("SnippetEditDialog", () => {
+  it("shows text replacement format radio options with plain text selected by default", () => {
+    renderDialog();
+
+    expect(screen.getByLabelText("Plain Text")).toBeChecked();
+    expect(screen.getByLabelText("Markdown")).not.toBeChecked();
+    expect(screen.getByLabelText("HTML")).not.toBeChecked();
+  });
+
+  it("updates the selected text replacement format from the radio group", async () => {
+    const user = userEvent.setup();
+    const setTextReplacementFormat = vi.fn();
+
+    renderDialog(createActionProps(), { setTextReplacementFormat });
+
+    await user.click(screen.getByLabelText("Markdown"));
+
+    expect(setTextReplacementFormat).toHaveBeenCalledWith("markdown");
+  });
+
   it("does not save the snippet when plain Enter is pressed in a single-line field", async () => {
     const user = userEvent.setup();
     const saveSnippetToYaml = vi.fn();

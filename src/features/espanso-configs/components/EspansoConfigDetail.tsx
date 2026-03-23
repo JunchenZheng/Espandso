@@ -16,7 +16,7 @@ import { Button } from "../../../components/ui/button";
 import { useI18n } from "../../../i18n/useI18n";
 import { cn } from "../../../lib/utils";
 import type { ImportedMatch } from "../../../logic/importYaml";
-import { getSnippetTriggers } from "../../../logic/snippetUtils";
+import { getSnippetTextContent, getSnippetTriggers } from "../../../logic/snippetUtils";
 import type { EspansoConfigPreview } from "../types";
 
 export interface EspansoConfigDetailProps {
@@ -297,7 +297,7 @@ export function EspansoConfigDetail({
                     ? `image: ${snippet.image_path}`
                     : snippet.form !== undefined
                       ? snippet.form || t("snippets.emptyForm")
-                      : snippet.replace || t("snippets.emptyReplacement");
+                      : getSnippetTextContent(snippet) || t("snippets.emptyReplacement");
 
                 const isSelected = selectedIndices.has(index);
                 const isHighlighted = highlightedIndex === index;

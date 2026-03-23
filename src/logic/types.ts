@@ -8,6 +8,8 @@ export interface Snippet {
   trigger?: string;
   triggers?: string[];
   replace?: string;
+  markdown?: string;
+  html?: string;
   include_file?: string;
   image_path?: string;
   form?: string;

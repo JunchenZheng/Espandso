@@ -36,7 +36,7 @@ import { DateVariableList } from "./DateVariableList";
 import { DateFormatOption } from "../../../logic/dateFormats";
 import { SnippetVar, ValidationError } from "../../../logic/types";
 import { DeleteTriggerSelection } from "../../../logic/yamlEditor";
-import { getSnippetTriggers, isImageFilePath } from "../../../logic/snippetUtils";
+import { getSnippetPreviewContent, getSnippetTriggers, isImageFilePath } from "../../../logic/snippetUtils";
 import { isBinaryDomFile } from "../../../logic/fileCheck";
 import { ImportedMatch } from "../../../logic/importYaml";
 import { EspansoConfigPreview } from "../../espanso-configs/types";
@@ -47,6 +47,7 @@ import {
   FormFieldControl,
   FormFieldConfig,
   FormSelectionState,
+  TextReplacementFormat,
 } from "../types";
 import { getFormFieldCategory, getTextFieldMode } from "../formSnippet";
 
@@ -77,6 +78,8 @@ export interface VisualYamlEditorFormProps {
   setEditTriggersText: (text: string) => void;
   activeSnippetKind: AddSnippetKind;
   setAddSnippetKind: (kind: AddSnippetKind) => void;
+  textReplacementFormat: TextReplacementFormat;
+  setTextReplacementFormat: (format: TextReplacementFormat) => void;
   setAddErrors: (errors: ValidationError[]) => void;
   setAddWarnings: (warnings: string[]) => void;
   editIncludeFile: string;
@@ -162,6 +165,8 @@ export function VisualYamlEditorDialog({
     setEditTriggersText,
     activeSnippetKind,
     setAddSnippetKind,
+    textReplacementFormat,
+    setTextReplacementFormat,
     setAddErrors,
     setAddWarnings,
     editIncludeFile,
@@ -348,7 +353,7 @@ export function VisualYamlEditorDialog({
                         const q = deleteSearchQuery.toLowerCase();
                         const triggers = getSnippetTriggers(item.snippet).join(" ").toLowerCase();
                         const desc = (item.snippet.description || "").toLowerCase();
-                        const rep = (item.snippet.replace || item.snippet.include_file || item.snippet.image_path || item.snippet.form || "").toLowerCase();
+                        const rep = (getSnippetPreviewContent(item.snippet)).toLowerCase();
                         return triggers.includes(q) || desc.includes(q) || rep.includes(q);
                       })
                       .map((item) => {
@@ -360,7 +365,7 @@ export function VisualYamlEditorDialog({
                         );
                         const triggers = getSnippetTriggers(item.snippet);
                         const triggerText = triggers.length > 0 ? triggers.join(", ") : `Snippet #${matchIdx + 1}`;
-                        const summaryContent = item.snippet.replace || item.snippet.include_file || item.snippet.image_path || (item.snippet.form ? t("snippets.typeForm") : "");
+                        const summaryContent = getSnippetPreviewContent(item.snippet) || (item.snippet.form ? t("snippets.typeForm") : "");
 
                         return (
                           <div
@@ -816,7 +821,31 @@ export function VisualYamlEditorDialog({
                     )}
                   </div>
                 ) : (
-                  <div className="flex-1 flex flex-col space-y-2 min-h-[120px]">
+                  <div className="flex-1 flex flex-col space-y-3 min-h-[120px]">
+                    <div className="grid gap-2 sm:grid-cols-3">
+                      {([
+                        ["plain", t("snippets.textFormatPlain")],
+                        ["markdown", t("snippets.textFormatMarkdown")],
+                        ["html", t("snippets.textFormatHtml")],
+                      ] as const).map(([format, label]) => (
+                        <label
+                          key={format}
+                          className={cn(
+                            "flex min-h-9 items-center gap-2 rounded-md border bg-background px-3 text-sm",
+                            textReplacementFormat === format && "border-primary bg-primary/10",
+                          )}
+                        >
+                          <input
+                            type="radio"
+                            name="visual-text-replacement-format"
+                            className="h-4 w-4 accent-primary"
+                            checked={textReplacementFormat === format}
+                            onChange={() => setTextReplacementFormat(format)}
+                          />
+                          <span>{label}</span>
+                        </label>
+                      ))}
+                    </div>
                     <div className="flex items-center justify-between">
                       <Label htmlFor="ve-replace" className="inline-flex items-center shrink-0">
                         {t("snippets.replaceContent")} <RequiredMark />

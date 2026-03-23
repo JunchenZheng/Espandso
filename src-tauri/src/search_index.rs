@@ -426,6 +426,52 @@ fn get_supported_form_companion_vars<'a>(
         .collect()
 }
 
+fn yaml_value_to_text(value: &serde_yaml::Value) -> String {
+    match value {
+        serde_yaml::Value::String(s) => s.clone(),
+        serde_yaml::Value::Number(n) => n.to_string(),
+        serde_yaml::Value::Bool(b) => b.to_string(),
+        _ => "".to_string(),
+    }
+}
+
+fn get_text_replacement_field<'a>(
+    match_val: &'a serde_yaml::Value,
+) -> Option<(&'static str, &'a serde_yaml::Value)> {
+    for field in ["replace", "markdown", "html"] {
+        if let Some(value) = match_val.get(field) {
+            return Some((field, value));
+        }
+    }
+    None
+}
+
+fn text_replacement_snippet_json(
+    trigger: Option<&String>,
+    triggers: Option<&Vec<String>>,
+    replacement_field: &str,
+    replacement_text: &str,
+    vars_json: &Option<serde_json::Value>,
+    description: &Option<String>,
+) -> serde_json::Value {
+    let mut snippet = serde_json::Map::new();
+
+    if let Some(triggers) = triggers {
+        snippet.insert("triggers".to_string(), serde_json::json!(triggers));
+    }
+    if let Some(trigger) = trigger {
+        snippet.insert("trigger".to_string(), serde_json::json!(trigger));
+    }
+    snippet.insert(
+        replacement_field.to_string(),
+        serde_json::json!(replacement_text),
+    );
+    snippet.insert("vars".to_string(), serde_json::json!(vars_json));
+    snippet.insert("description".to_string(), serde_json::json!(description));
+
+    serde_json::Value::Object(snippet)
+}
+
 pub fn parse_yaml_match(
     match_val: &serde_yaml::Value,
     file_name: &str,
@@ -672,13 +718,8 @@ pub fn parse_yaml_match(
         return ParsedYamlFile { matches, warnings };
     }
 
-    if let Some(replace_val) = match_val.get("replace") {
-        let replace_str = match replace_val {
-            serde_yaml::Value::String(s) => s.clone(),
-            serde_yaml::Value::Number(n) => n.to_string(),
-            serde_yaml::Value::Bool(b) => b.to_string(),
-            _ => "".to_string(),
-        };
+    if let Some((replacement_field, replacement_val)) = get_text_replacement_field(match_val) {
+        let replacement_str = yaml_value_to_text(replacement_val);
 
         let vars_json = if !vars_block.is_empty() {
             Some(serde_json::to_value(vars_block).unwrap_or(serde_json::Value::Null))
@@ -686,25 +727,28 @@ pub fn parse_yaml_match(
             None
         };
 
-        let orig_snippet_obj = serde_json::json!({
-            "triggers": if triggers.len() > 1 { Some(&triggers) } else { None },
-            "trigger": if triggers.len() == 1 { Some(&triggers[0]) } else { None },
-            "replace": replace_str,
-            "vars": vars_json,
-            "description": description
-        });
+        let orig_snippet_obj = text_replacement_snippet_json(
+            if triggers.len() == 1 { Some(&triggers[0]) } else { None },
+            if triggers.len() > 1 { Some(&triggers) } else { None },
+            replacement_field,
+            &replacement_str,
+            &vars_json,
+            &description,
+        );
         let orig_snippet_json = serde_json::to_string(&orig_snippet_obj).ok();
 
         for (trigger_index, trig) in triggers.iter().enumerate() {
             let display_index = *current_display_index;
             *current_display_index += 1;
 
-            let snippet_obj = serde_json::json!({
-                "trigger": trig,
-                "replace": replace_str,
-                "vars": vars_json,
-                "description": description
-            });
+            let snippet_obj = text_replacement_snippet_json(
+                Some(trig),
+                None,
+                replacement_field,
+                &replacement_str,
+                &vars_json,
+                &description,
+            );
 
             matches.push(ParsedMatchRow {
                 display_index,
@@ -712,8 +756,8 @@ pub fn parse_yaml_match(
                 trigger_index,
                 trigger: trig.clone(),
                 description: description.clone(),
-                content: Some(replace_str.clone()),
-                kind: "replace".to_string(),
+                content: Some(replacement_str.clone()),
+                kind: replacement_field.to_string(),
                 snippet_json: serde_json::to_string(&snippet_obj).unwrap(),
                 original_snippet_json: orig_snippet_json.clone(),
                 resource_path: None,
@@ -725,7 +769,7 @@ pub fn parse_yaml_match(
     }
 
     warnings.push(format!(
-        "[{}] Snippet for {} has no replace/form/image/include block, skipping",
+        "[{}] Snippet for {} has no replacement/form/image/include block, skipping",
         file_name,
         triggers.join(", ")
     ));
@@ -1721,7 +1765,7 @@ matches:
     fn test_yaml_parser_supported_shapes() {
         let yaml = include_str!("../../test_data/yaml/search-index-shapes.yml");
         let parsed = parse_yaml_content(yaml, "shapes.yml");
-        assert_eq!(parsed.matches.len(), 7);
+        assert_eq!(parsed.matches.len(), 9);
 
         let include_snippet: serde_json::Value =
             serde_json::from_str(&parsed.matches[3].snippet_json).unwrap();
@@ -1731,10 +1775,14 @@ matches:
             Some("customer_data.json")
         );
         assert_eq!(parsed.matches[4].kind, "image_path");
-        assert_eq!(parsed.matches[5].trigger, ":form");
-        assert_eq!(parsed.matches[6].kind, "form");
-        assert!(parsed.matches[6].snippet_json.contains("form_fields"));
-        assert!(parsed.matches[6].snippet_json.contains("vars"));
+        assert_eq!(parsed.matches[5].kind, "markdown");
+        assert!(parsed.matches[5].snippet_json.contains("markdown"));
+        assert_eq!(parsed.matches[6].kind, "html");
+        assert!(parsed.matches[6].snippet_json.contains("html"));
+        assert_eq!(parsed.matches[7].trigger, ":form");
+        assert_eq!(parsed.matches[8].kind, "form");
+        assert!(parsed.matches[8].snippet_json.contains("form_fields"));
+        assert!(parsed.matches[8].snippet_json.contains("vars"));
     }
 
     #[test]

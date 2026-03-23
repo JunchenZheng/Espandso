@@ -415,6 +415,8 @@ function App() {
     setEditTriggersText: snippetEditor.setTriggersText,
     activeSnippetKind: snippetEditor.kind,
     setAddSnippetKind: snippetEditor.setKind,
+    textReplacementFormat: snippetEditor.textFormat,
+    setTextReplacementFormat: snippetEditor.setTextFormat,
     setAddErrors: snippetEditor.setErrors,
     setAddWarnings: snippetEditor.setWarnings,
     editIncludeFile: snippetEditor.includeFile,

@@ -25,6 +25,14 @@ matches:
     image_path: "/tmp/logo.png"
     description: "Company logo"
 
+  - trigger: ":rich"
+    markdown: "This **is** rich"
+    description: "Rich markdown"
+
+  - trigger: ":html"
+    html: "<strong>Rich HTML</strong>"
+    description: "Rich HTML"
+
   - trigger: ":form"
     form: "Name: [[name]]"
     form_fields:

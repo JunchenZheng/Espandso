@@ -102,6 +102,8 @@ describe("validate", () => {
         { trigger: ":file", include_file: "test.txt" },
         { trigger: ":cat", image_path: "/path/to/cat.png" },
         { trigger: ":form", form: "Hello [[name]]", form_fields: { name: { default: "Ada" } } },
+        { trigger: ":md", markdown: "This **is** rich" },
+        { trigger: ":html", html: "<strong>Rich</strong>" },
       ],
     };
 
@@ -135,9 +137,9 @@ describe("validate", () => {
     const messages = errors.map((e) => e.message);
     expect(messages).toContain("root 'version' must be an integer");
     expect(messages).toContain("snippet #0: 'trigger' must be a non-empty string");
-    expect(messages).toContain("snippet #3: cannot combine 'replace', 'include_file', and 'form'");
+    expect(messages).toContain("snippet #3: cannot combine replacement fields");
     expect(messages).toContain(
-      "snippet #4: must have either 'replace', 'include_file', 'image_path', or 'form'",
+      "snippet #4: must have either 'replace', 'markdown', 'html', 'include_file', 'image_path', or 'form'",
     );
     expect(messages).toContain("snippet #6: cannot have both 'trigger' and 'triggers'");
     expect(messages).toContain("snippet #8: 'form' must be a non-empty string");
@@ -223,6 +225,23 @@ matches:
       triggers: [":hi", ":hey"],
       replace: "greeting",
     });
+  });
+
+  it("should import rich text matches", () => {
+    const yaml = `
+matches:
+  - trigger: :rich
+    markdown: This *text* is **very rich**!
+  - trigger: :html
+    html: |
+      <p>Rich <strong>HTML</strong></p>
+`;
+    const res = importYamlContent(yaml, "base.yml");
+    expect(res.warnings).toHaveLength(0);
+    expect(res.snippets).toEqual([
+      { trigger: ":rich", markdown: "This *text* is **very rich**!" },
+      { trigger: ":html", html: "<p>Rich <strong>HTML</strong></p>\n" },
+    ]);
   });
 
   it("should import include_file snippets and snippets with custom vars (like date) with replace block", () => {
@@ -458,6 +477,20 @@ matches:
     });
 
     expect(updated).toContain("replace: |-\n      line one\n      line two");
+  });
+
+  it("should append rich text snippets with markdown and html fields", () => {
+    const markdown = appendSnippetToYamlContent("matches: []", {
+      trigger: ":rich",
+      markdown: "This *text* is **very rich**!",
+    });
+    expect(markdown).toContain("markdown: This *text* is **very rich**!");
+
+    const html = appendSnippetToYamlContent("matches: []", {
+      trigger: ":html",
+      html: "<p>Rich</p>\n<strong>HTML</strong>",
+    });
+    expect(html).toContain("html: |-\n      <p>Rich</p>\n      <strong>HTML</strong>");
   });
 
   it("should ensure blank line between match items when appending", () => {

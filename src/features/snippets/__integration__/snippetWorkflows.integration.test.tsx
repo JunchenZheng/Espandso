@@ -54,6 +54,29 @@ describe("Snippet integration workflows", () => {
     });
   });
 
+  it("adds a markdown rich text snippet from the text mode", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<App />);
+
+    await screen.findByText(":hello");
+    await user.click(screen.getByRole("button", { name: "Add Snippet" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Add Text Snippet" });
+    await user.click(within(dialog).getByLabelText("Markdown"));
+    await user.type(within(dialog).getByLabelText(/Trigger/u), ":rich");
+    await user.type(within(dialog).getByLabelText(/Replace Content/u), "This **is** rich");
+    await user.click(within(dialog).getByRole("button", { name: "Save to YAML" }));
+
+    const path = `${tauriHarness.getMatchDir()}/base.yml`;
+    await waitFor(() => {
+      expect(tauriHarness.getFile(path)).toContain("trigger: :rich");
+    });
+
+    expect(tauriHarness.getFile(path)).toContain("markdown: This **is** rich");
+    expect(await screen.findByText(":rich")).toBeInTheDocument();
+    expect(screen.getByText("This **is** rich")).toBeInTheDocument();
+  });
+
   it("blocks saving a snippet that would create a trigger prefix conflict when enabled", async () => {
     const user = userEvent.setup();
     renderWithProviders(<App />);

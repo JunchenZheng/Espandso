@@ -61,6 +61,8 @@ function createFormProps(): VisualYamlEditorFormProps {
     setEditTriggersText: vi.fn(),
     activeSnippetKind: "text",
     setAddSnippetKind: vi.fn(),
+    textReplacementFormat: "plain",
+    setTextReplacementFormat: vi.fn(),
     setAddErrors: vi.fn(),
     setAddWarnings: vi.fn(),
     editIncludeFile: "",
