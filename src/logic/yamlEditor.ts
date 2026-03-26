@@ -1,5 +1,6 @@
 import YAML, { Document, isScalar, isSeq, visit } from "yaml";
 import { Snippet, SnippetVar } from "./types";
+import { encodeRichTextUnicodeEntities } from "./richTextEncoding";
 
 const FORM_VAR_NAME = "form1";
 
@@ -61,9 +62,9 @@ export function snippetToYamlMatch(snippet: Snippet): Record<string, any> {
     }
   } else {
     if (snippet.markdown !== undefined) {
-      match.markdown = snippet.markdown;
+      match.markdown = encodeRichTextUnicodeEntities(snippet.markdown);
     } else if (snippet.html !== undefined) {
-      match.html = snippet.html;
+      match.html = encodeRichTextUnicodeEntities(snippet.html);
     } else {
       match.replace = snippet.replace || "";
     }

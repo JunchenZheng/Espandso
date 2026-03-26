@@ -244,6 +244,21 @@ matches:
     ]);
   });
 
+  it("should decode rich text unicode entities when importing", () => {
+    const yaml = `
+matches:
+  - trigger: :rich
+    markdown: "**&#x4E2D;&#x6587;**"
+  - trigger: :html
+    html: <p>&#20013;&#25991;</p>
+`;
+    const res = importYamlContent(yaml, "base.yml");
+    expect(res.snippets).toEqual([
+      { trigger: ":rich", markdown: "**中文**" },
+      { trigger: ":html", html: "<p>中文</p>" },
+    ]);
+  });
+
   it("should import include_file snippets and snippets with custom vars (like date) with replace block", () => {
     const yaml = `
 matches:
@@ -491,6 +506,28 @@ matches:
       html: "<p>Rich</p>\n<strong>HTML</strong>",
     });
     expect(html).toContain("html: |-\n      <p>Rich</p>\n      <strong>HTML</strong>");
+  });
+
+  it("should preserve rich text unicode characters when writing YAML", () => {
+    const markdown = appendSnippetToYamlContent("matches: []", {
+      trigger: ":rich-cn",
+      markdown: "**中文** and English",
+    });
+    expect(markdown).toContain("markdown: \"**&#x4E2D;&#x6587;** and English\"");
+
+    const html = appendSnippetToYamlContent("matches: []", {
+      trigger: ":html-cn",
+      html: "<p>中文</p>",
+    });
+    expect(html).toContain("html: <p>&#x4E2D;&#x6587;</p>");
+  });
+
+  it("should avoid double-encoding existing rich text unicode entities when writing YAML", () => {
+    const markdown = appendSnippetToYamlContent("matches: []", {
+      trigger: ":rich-entity",
+      markdown: "**&#x4E2D;&#x6587;**",
+    });
+    expect(markdown).toContain("markdown: \"**&#x4E2D;&#x6587;**\"");
   });
 
   it("should ensure blank line between match items when appending", () => {

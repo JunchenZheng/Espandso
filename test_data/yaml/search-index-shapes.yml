@@ -26,11 +26,11 @@ matches:
     description: "Company logo"
 
   - trigger: ":rich"
-    markdown: "This **is** rich"
+    markdown: "This **&#x4E2D;&#x6587;** is rich"
     description: "Rich markdown"
 
   - trigger: ":html"
-    html: "<strong>Rich HTML</strong>"
+    html: "<strong>&#x4E2D;&#x6587; HTML</strong>"
     description: "Rich HTML"
 
   - trigger: ":form"

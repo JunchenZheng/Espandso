@@ -446,6 +446,55 @@ fn get_text_replacement_field<'a>(
     None
 }
 
+fn decode_rich_text_unicode_entities(value: &str) -> String {
+    let mut decoded = String::new();
+    let mut chars = value.chars().peekable();
+
+    while let Some(ch) = chars.next() {
+        if ch != '&' || chars.peek() != Some(&'#') {
+            decoded.push(ch);
+            continue;
+        }
+
+        let mut entity = String::from("&#");
+        chars.next();
+
+        let mut is_hex = false;
+        if matches!(chars.peek(), Some('x') | Some('X')) {
+            is_hex = true;
+            entity.push(chars.next().unwrap());
+        }
+
+        let mut digits = String::new();
+        while let Some(next) = chars.peek() {
+            if (is_hex && next.is_ascii_hexdigit()) || (!is_hex && next.is_ascii_digit()) {
+                digits.push(chars.next().unwrap());
+            } else {
+                break;
+            }
+        }
+
+        if chars.peek() != Some(&';') || digits.is_empty() {
+            decoded.push_str(&entity);
+            decoded.push_str(&digits);
+            continue;
+        }
+
+        chars.next();
+        let radix = if is_hex { 16 } else { 10 };
+        match u32::from_str_radix(&digits, radix).ok().and_then(char::from_u32) {
+            Some(character) => decoded.push(character),
+            None => {
+                decoded.push_str(&entity);
+                decoded.push_str(&digits);
+                decoded.push(';');
+            }
+        }
+    }
+
+    decoded
+}
+
 fn text_replacement_snippet_json(
     trigger: Option<&String>,
     triggers: Option<&Vec<String>>,
@@ -719,7 +768,12 @@ pub fn parse_yaml_match(
     }
 
     if let Some((replacement_field, replacement_val)) = get_text_replacement_field(match_val) {
-        let replacement_str = yaml_value_to_text(replacement_val);
+        let raw_replacement_str = yaml_value_to_text(replacement_val);
+        let replacement_str = if replacement_field == "replace" {
+            raw_replacement_str
+        } else {
+            decode_rich_text_unicode_entities(&raw_replacement_str)
+        };
 
         let vars_json = if !vars_block.is_empty() {
             Some(serde_json::to_value(vars_block).unwrap_or(serde_json::Value::Null))
@@ -1777,8 +1831,18 @@ matches:
         assert_eq!(parsed.matches[4].kind, "image_path");
         assert_eq!(parsed.matches[5].kind, "markdown");
         assert!(parsed.matches[5].snippet_json.contains("markdown"));
+        assert_eq!(
+            parsed.matches[5].content.as_deref(),
+            Some("This **中文** is rich")
+        );
+        assert!(parsed.matches[5].snippet_json.contains("中文"));
         assert_eq!(parsed.matches[6].kind, "html");
         assert!(parsed.matches[6].snippet_json.contains("html"));
+        assert_eq!(
+            parsed.matches[6].content.as_deref(),
+            Some("<strong>中文 HTML</strong>")
+        );
+        assert!(parsed.matches[6].snippet_json.contains("中文"));
         assert_eq!(parsed.matches[7].trigger, ":form");
         assert_eq!(parsed.matches[8].kind, "form");
         assert!(parsed.matches[8].snippet_json.contains("form_fields"));

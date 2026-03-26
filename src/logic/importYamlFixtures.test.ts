@@ -13,13 +13,15 @@ describe("importYaml shared fixtures", () => {
     const result = importYamlContent(yaml, "search-index-shapes.yml");
 
     expect(result.warnings).toEqual([]);
-    expect(result.snippets).toHaveLength(7);
+    expect(result.snippets).toHaveLength(9);
     expect(result.snippets.map((snippet) => snippet.trigger)).toEqual([
       ":hello",
       ":date",
       ":today",
       ":file",
       ":image",
+      ":rich",
+      ":html",
       ":form",
       ":verbose",
     ]);
@@ -33,6 +35,14 @@ describe("importYaml shared fixtures", () => {
       image_path: "/tmp/logo.png",
     });
     expect(result.snippets[5]).toMatchObject({
+      trigger: ":rich",
+      markdown: "This **中文** is rich",
+    });
+    expect(result.snippets[6]).toMatchObject({
+      trigger: ":html",
+      html: "<strong>中文 HTML</strong>",
+    });
+    expect(result.snippets[7]).toMatchObject({
       trigger: ":form",
       form: "Name: [[name]]",
       form_fields: {
@@ -41,7 +51,7 @@ describe("importYaml shared fixtures", () => {
         },
       },
     });
-    expect(result.snippets[6]).toMatchObject({
+    expect(result.snippets[8]).toMatchObject({
       trigger: ":verbose",
       form: "Date: [[date]]",
       vars: [

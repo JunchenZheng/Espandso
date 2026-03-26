@@ -1,5 +1,6 @@
 import YAML from "yaml";
 import { Snippet } from "./types";
+import { decodeRichTextUnicodeEntities } from "./richTextEncoding";
 
 export interface ImportedMatch {
   snippet: Snippet;
@@ -239,7 +240,12 @@ export function parseYamlMatch(
       warnings: [`[${fileName}] Snippet for ${triggers.join(", ")} has no replacement block, skipping`],
     };
   }
-  const replacementSnippet = { [textReplacement.field]: String(textReplacement.value) };
+  const replacementValue = String(textReplacement.value);
+  const replacementSnippet = {
+    [textReplacement.field]: textReplacement.field === "replace"
+      ? replacementValue
+      : decodeRichTextUnicodeEntities(replacementValue),
+  };
 
   const originalSnippet: Snippet =
     triggers.length > 1
