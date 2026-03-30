@@ -1,6 +1,7 @@
 import YAML, { Document, isScalar, isSeq, visit } from "yaml";
 import { Snippet, SnippetVar } from "./types";
-import { encodeRichTextUnicodeEntities } from "./richTextEncoding";
+import { containsNonAscii, encodeNonAsciiToHtmlEntities } from "./richTextEncoding";
+import { renderMarkdownToSafeHtml } from "./markdownToHtml";
 
 const FORM_VAR_NAME = "form1";
 
@@ -62,9 +63,18 @@ export function snippetToYamlMatch(snippet: Snippet): Record<string, any> {
     }
   } else {
     if (snippet.markdown !== undefined) {
-      match.markdown = encodeRichTextUnicodeEntities(snippet.markdown);
+      if (containsNonAscii(snippet.markdown)) {
+        // Espanso's markdown renderer produces UTF-8 HTML on the clipboard
+        // without a charset declaration, causing CJK mojibake.  Pre-render
+        // to HTML with entity-encoded non-ASCII characters to work around it.
+        match.html = renderMarkdownToSafeHtml(snippet.markdown);
+      } else {
+        match.markdown = snippet.markdown;
+      }
     } else if (snippet.html !== undefined) {
-      match.html = encodeRichTextUnicodeEntities(snippet.html);
+      match.html = containsNonAscii(snippet.html)
+        ? encodeNonAsciiToHtmlEntities(snippet.html)
+        : snippet.html;
     } else {
       match.replace = snippet.replace || "";
     }

@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import YAML from "yaml";
 import { validate } from "./validate";
 import { importYamlContent } from "./importYaml";
 import {
@@ -508,26 +509,62 @@ matches:
     expect(html).toContain("html: |-\n      <p>Rich</p>\n      <strong>HTML</strong>");
   });
 
-  it("should preserve rich text unicode characters when writing YAML", () => {
-    const markdown = appendSnippetToYamlContent("matches: []", {
+  it("should auto-convert non-ASCII markdown to html with entity encoding", () => {
+    const result = appendSnippetToYamlContent("matches: []", {
       trigger: ":rich-cn",
       markdown: "**中文** and English",
     });
-    expect(markdown).toContain("markdown: \"**&#x4E2D;&#x6587;** and English\"");
+    // Non-ASCII markdown should become html: with entity-encoded CJK
+    expect(result).toContain("html:");
+    expect(result).not.toContain("markdown:");
+    expect(result).toContain("&#x4E2D;");
+    expect(result).toContain("&#x6587;");
+    expect(result).toContain("<strong>");
+    expect(result).toContain("and English");
 
-    const html = appendSnippetToYamlContent("matches: []", {
+    const parsed = YAML.parse(result);
+    expect(parsed.matches[0]).toMatchObject({
+      trigger: ":rich-cn",
+      html: "<strong>&#x4E2D;&#x6587;</strong> and English",
+    });
+    expect(parsed.matches[0].markdown).toBeUndefined();
+    expect(parsed.matches[0].html).not.toMatch(/[^\x00-\x7F]/);
+  });
+
+  it("should entity-encode non-ASCII html content", () => {
+    const result = appendSnippetToYamlContent("matches: []", {
       trigger: ":html-cn",
       html: "<p>中文</p>",
     });
-    expect(html).toContain("html: <p>&#x4E2D;&#x6587;</p>");
+    expect(result).toContain("html:");
+    expect(result).toContain("&#x4E2D;");
+    expect(result).toContain("&#x6587;");
+    expect(result).not.toContain("中文");
   });
 
-  it("should avoid double-encoding existing rich text unicode entities when writing YAML", () => {
-    const markdown = appendSnippetToYamlContent("matches: []", {
-      trigger: ":rich-entity",
-      markdown: "**&#x4E2D;&#x6587;**",
+  it("should preserve existing HTML entities while encoding raw non-ASCII html", () => {
+    const result = appendSnippetToYamlContent("matches: []", {
+      trigger: ":html-mixed",
+      html: "<p>&#x4E2D;文 😀</p>",
     });
-    expect(markdown).toContain("markdown: \"**&#x4E2D;&#x6587;**\"");
+    const parsed = YAML.parse(result);
+
+    expect(parsed.matches[0].html).toBe("<p>&#x4E2D;&#x6587; &#x1F600;</p>");
+  });
+
+  it("should pass through ASCII-only markdown and html as-is", () => {
+    const markdown = appendSnippetToYamlContent("matches: []", {
+      trigger: ":rich-ascii",
+      markdown: "This **is** rich",
+    });
+    expect(markdown).toContain("markdown: This **is** rich");
+    expect(markdown).not.toContain("html:");
+
+    const html = appendSnippetToYamlContent("matches: []", {
+      trigger: ":html-ascii",
+      html: "<p>Hello</p>",
+    });
+    expect(html).toContain("html: <p>Hello</p>");
   });
 
   it("should ensure blank line between match items when appending", () => {
