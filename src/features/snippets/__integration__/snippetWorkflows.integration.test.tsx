@@ -77,6 +77,30 @@ describe("Snippet integration workflows", () => {
     expect(screen.getByText("This **is** rich")).toBeInTheDocument();
   });
 
+  it("uses an HTML fallback for non-ASCII markdown snippets", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<App />);
+
+    await screen.findByText(":hello");
+    await user.click(screen.getByRole("button", { name: "Add Snippet" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Add Text Snippet" });
+    await user.click(within(dialog).getByLabelText("Markdown"));
+    await user.type(within(dialog).getByLabelText(/Trigger/u), ":rich-cn");
+    await user.type(within(dialog).getByLabelText(/Replace Content/u), "**中文** and English");
+    await user.click(within(dialog).getByRole("button", { name: "Save to YAML" }));
+
+    const path = `${tauriHarness.getMatchDir()}/base.yml`;
+    await waitFor(() => {
+      expect(tauriHarness.getFile(path)).toContain("trigger: :rich-cn");
+    });
+
+    expect(tauriHarness.getFile(path)).toContain("html: <strong>&#x4E2D;&#x6587;</strong> and English");
+    expect(tauriHarness.getFile(path)).not.toContain("markdown:");
+    expect(await screen.findByText(":rich-cn")).toBeInTheDocument();
+    expect(screen.getByText("<strong>中文</strong> and English")).toBeInTheDocument();
+  });
+
   it("blocks saving a snippet that would create a trigger prefix conflict when enabled", async () => {
     const user = userEvent.setup();
     renderWithProviders(<App />);

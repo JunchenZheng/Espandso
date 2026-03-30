@@ -509,12 +509,11 @@ matches:
     expect(html).toContain("html: |-\n      <p>Rich</p>\n      <strong>HTML</strong>");
   });
 
-  it("should auto-convert non-ASCII markdown to html with entity encoding", () => {
+  it("should use an HTML fallback for non-ASCII markdown to avoid Espanso mojibake", () => {
     const result = appendSnippetToYamlContent("matches: []", {
       trigger: ":rich-cn",
       markdown: "**中文** and English",
     });
-    // Non-ASCII markdown should become html: with entity-encoded CJK
     expect(result).toContain("html:");
     expect(result).not.toContain("markdown:");
     expect(result).toContain("&#x4E2D;");

@@ -64,9 +64,8 @@ export function snippetToYamlMatch(snippet: Snippet): Record<string, any> {
   } else {
     if (snippet.markdown !== undefined) {
       if (containsNonAscii(snippet.markdown)) {
-        // Espanso's markdown renderer produces UTF-8 HTML on the clipboard
-        // without a charset declaration, causing CJK mojibake.  Pre-render
-        // to HTML with entity-encoded non-ASCII characters to work around it.
+        // Espanso's markdown clipboard output can mojibake CJK text.
+        // Render the authored Markdown to ASCII-only HTML so expansion stays readable.
         match.html = renderMarkdownToSafeHtml(snippet.markdown);
       } else {
         match.markdown = snippet.markdown;
