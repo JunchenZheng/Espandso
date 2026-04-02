@@ -1,8 +1,11 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import {
   EXPANSO_EXPERIMENTAL_YAML_WARNINGS_KEY,
+  EXPANSO_EXPERIMENTAL_RICH_TEXT_KEY,
   getExperimentalYamlWarningsEnabled,
+  getExperimentalRichTextEnabled,
   setExperimentalYamlWarningsEnabled,
+  setExperimentalRichTextEnabled,
   isYamlWarningsActive,
 } from "./features";
 
@@ -49,6 +52,18 @@ describe("features logic", () => {
     setExperimentalYamlWarningsEnabled(false);
     expect(storageMock.getItem(EXPANSO_EXPERIMENTAL_YAML_WARNINGS_KEY)).toBe("false");
     expect(getExperimentalYamlWarningsEnabled()).toBe(false);
+  });
+
+  it("should store and retrieve experimental rich text setting", () => {
+    expect(getExperimentalRichTextEnabled()).toBe(false);
+
+    setExperimentalRichTextEnabled(true);
+    expect(storageMock.getItem(EXPANSO_EXPERIMENTAL_RICH_TEXT_KEY)).toBe("true");
+    expect(getExperimentalRichTextEnabled()).toBe(true);
+
+    setExperimentalRichTextEnabled(false);
+    expect(storageMock.getItem(EXPANSO_EXPERIMENTAL_RICH_TEXT_KEY)).toBe("false");
+    expect(getExperimentalRichTextEnabled()).toBe(false);
   });
 
   it("should determine if yaml warnings active correctly", () => {

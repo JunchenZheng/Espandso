@@ -11,6 +11,7 @@ import {
 import { Label } from "../../../components/ui/label";
 import { Switch } from "../../../components/ui/switch";
 import { useI18n } from "../../../i18n/useI18n";
+import { cn } from "../../../lib/utils";
 import { IS_EXPERIMENTAL_BUILD } from "../../../logic/features";
 import type { EspansoPathSource } from "../../../logic/espansoPaths";
 
@@ -23,6 +24,8 @@ interface SettingsDialogProps {
   onRefreshScan: () => void;
   enableExperimentalYamlWarnings: boolean;
   onToggleExperimentalYamlWarnings: (checked: boolean) => void;
+  enableExperimentalRichText: boolean;
+  onToggleExperimentalRichText: (checked: boolean) => void;
   enablePreSaveConflictCheck: boolean;
   onTogglePreSaveConflictCheck: (checked: boolean) => void;
   onOpenAbout: () => void;
@@ -37,6 +40,8 @@ export function SettingsDialog({
   onRefreshScan,
   enableExperimentalYamlWarnings,
   onToggleExperimentalYamlWarnings,
+  enableExperimentalRichText,
+  onToggleExperimentalRichText,
   enablePreSaveConflictCheck,
   onTogglePreSaveConflictCheck,
   onOpenAbout,
@@ -157,8 +162,8 @@ export function SettingsDialog({
           </div>
 
           {/* Experimental Features Block */}
-          {IS_EXPERIMENTAL_BUILD && (
-            <div className="rounded-lg border bg-secondary/40 p-4">
+          <div className="rounded-lg border bg-secondary/40 p-4 space-y-4">
+            {IS_EXPERIMENTAL_BUILD && (
               <div className="flex items-start gap-3">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-background text-primary">
                   <FlaskConical className="h-5 w-5" />
@@ -182,8 +187,31 @@ export function SettingsDialog({
                   </p>
                 </div>
               </div>
+            )}
+            <div className={cn("flex items-start gap-3", IS_EXPERIMENTAL_BUILD && "border-t pt-4")}>
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-background text-primary">
+                <FlaskConical className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-3">
+                  <Label
+                    htmlFor="experimental-rich-text"
+                    className="text-sm font-semibold cursor-pointer"
+                  >
+                    {t("settings.enableRichText")}
+                  </Label>
+                  <Switch
+                    id="experimental-rich-text"
+                    checked={enableExperimentalRichText}
+                    onCheckedChange={onToggleExperimentalRichText}
+                  />
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {t("settings.enableRichTextDescription")}
+                </p>
+              </div>
             </div>
-          )}
+          </div>
         </div>
         <DialogFooter className="sm:justify-between">
           <Button

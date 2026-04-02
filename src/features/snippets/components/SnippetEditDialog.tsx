@@ -54,6 +54,7 @@ import {
 
 export interface SnippetEditDialogFormProps {
   isYamlWarningsEnabled: boolean;
+  isRichTextEnabled: boolean;
   addErrors: ValidationError[];
   addWarnings: string[];
   editTriggersText: string;
@@ -127,6 +128,7 @@ export function SnippetEditDialog({
 
   const {
     isYamlWarningsEnabled,
+    isRichTextEnabled,
     addErrors,
     addWarnings,
     editTriggersText,
@@ -172,6 +174,14 @@ export function SnippetEditDialog({
     resetSnippetForm,
     setSnippetEditTarget,
   } = actions;
+
+  const textFormatOptions: Array<readonly [TextReplacementFormat, string]> = isRichTextEnabled
+    ? [
+        ["plain", t("snippets.textFormatPlain")],
+        ["markdown", t("snippets.textFormatMarkdown")],
+        ["html", t("snippets.textFormatHtml")],
+      ]
+    : [["plain", t("snippets.textFormatPlain")]];
 
   const snippetDialogTitle = snippetEditTarget
     ? t("snippets.editKindSnippetTitle", { kind: snippetKindLabel(activeSnippetKind, t) })
@@ -794,11 +804,7 @@ export function SnippetEditDialog({
           ) : (
             <div className="flex-1 flex flex-col space-y-3 min-h-[120px]">
               <div className="grid gap-2 sm:grid-cols-3">
-                {([
-                  ["plain", t("snippets.textFormatPlain")],
-                  ["markdown", t("snippets.textFormatMarkdown")],
-                  ["html", t("snippets.textFormatHtml")],
-                ] as const).map(([format, label]) => (
+                {textFormatOptions.map(([format, label]) => (
                   <label
                     key={format}
                     className={cn(

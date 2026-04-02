@@ -54,8 +54,36 @@ describe("Snippet integration workflows", () => {
     });
   });
 
+  it("shows rich text formats only after enabling the experimental setting", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<App />);
+
+    await screen.findByText(":hello");
+    await user.click(screen.getByRole("button", { name: "Add Snippet" }));
+
+    let dialog = await screen.findByRole("dialog", { name: "Add Text Snippet" });
+    expect(within(dialog).getByLabelText("Plain Text")).toBeChecked();
+    expect(within(dialog).queryByLabelText("Markdown")).not.toBeInTheDocument();
+    expect(within(dialog).queryByLabelText("HTML")).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    const settingsDialog = await screen.findByRole("dialog", { name: "Settings" });
+    await user.click(
+      within(settingsDialog).getByRole("switch", { name: "Rich Text Snippets" }),
+    );
+    await user.click(within(settingsDialog).getByRole("button", { name: "Done" }));
+
+    await user.click(screen.getByRole("button", { name: "Add Snippet" }));
+    dialog = await screen.findByRole("dialog", { name: "Add Text Snippet" });
+    expect(within(dialog).getByLabelText("Plain Text")).toBeChecked();
+    expect(within(dialog).getByLabelText("Markdown")).not.toBeChecked();
+    expect(within(dialog).getByLabelText("HTML")).not.toBeChecked();
+  });
+
   it("adds a markdown rich text snippet from the text mode", async () => {
     const user = userEvent.setup();
+    window.localStorage.setItem("expandso_enable_experimental_rich_text", "true");
     renderWithProviders(<App />);
 
     await screen.findByText(":hello");
@@ -79,6 +107,7 @@ describe("Snippet integration workflows", () => {
 
   it("uses an HTML fallback for non-ASCII markdown snippets", async () => {
     const user = userEvent.setup();
+    window.localStorage.setItem("expandso_enable_experimental_rich_text", "true");
     renderWithProviders(<App />);
 
     await screen.findByText(":hello");

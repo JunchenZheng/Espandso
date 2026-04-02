@@ -42,6 +42,7 @@ const editTarget: SnippetEditTarget = {
 function createFormProps(overrides: Partial<SnippetEditDialogFormProps> = {}): SnippetEditDialogFormProps {
   return {
     isYamlWarningsEnabled: true,
+    isRichTextEnabled: false,
     addErrors: [],
     addWarnings: [],
     editTriggersText: "",
@@ -118,8 +119,16 @@ function renderDialog(
 }
 
 describe("SnippetEditDialog", () => {
-  it("shows text replacement format radio options with plain text selected by default", () => {
+  it("hides rich text format options by default", () => {
     renderDialog();
+
+    expect(screen.getByLabelText("Plain Text")).toBeChecked();
+    expect(screen.queryByLabelText("Markdown")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("HTML")).not.toBeInTheDocument();
+  });
+
+  it("shows rich text format options when enabled", () => {
+    renderDialog(createActionProps(), { isRichTextEnabled: true });
 
     expect(screen.getByLabelText("Plain Text")).toBeChecked();
     expect(screen.getByLabelText("Markdown")).not.toBeChecked();
@@ -130,7 +139,7 @@ describe("SnippetEditDialog", () => {
     const user = userEvent.setup();
     const setTextReplacementFormat = vi.fn();
 
-    renderDialog(createActionProps(), { setTextReplacementFormat });
+    renderDialog(createActionProps(), { isRichTextEnabled: true, setTextReplacementFormat });
 
     await user.click(screen.getByLabelText("Markdown"));
 

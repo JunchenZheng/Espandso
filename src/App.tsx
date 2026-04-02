@@ -32,7 +32,9 @@ import {
 } from "./logic/triggerConflicts";
 import { detectTriggerPrefixConflictsFromIndex } from "./tauri/searchIndex";
 import {
+  getExperimentalRichTextEnabled,
   getPreSaveConflictCheckEnabled,
+  setExperimentalRichTextEnabled,
   setPreSaveConflictCheckEnabled,
 } from "./logic/features";
 export type { EspansoConfigPreview } from "./features/espanso-configs/types";
@@ -117,6 +119,9 @@ function App() {
   const [isImportAlfredOpen, setIsImportAlfredOpen] = useState<boolean>(false);
   const [enablePreSaveConflictCheck, setEnablePreSaveConflictCheck] = useState<boolean>(() =>
     getPreSaveConflictCheckEnabled(),
+  );
+  const [enableExperimentalRichText, setEnableExperimentalRichText] = useState<boolean>(() =>
+    getExperimentalRichTextEnabled(),
   );
   const [isTriggerConflictsOpen, setIsTriggerConflictsOpen] = useState<boolean>(false);
   const [selectedTriggerPrefixConflicts, setSelectedTriggerPrefixConflicts] = useState<
@@ -411,6 +416,7 @@ function App() {
     addErrors: snippetEditor.errors,
     addWarnings: snippetEditor.warnings,
     isYamlWarningsEnabled,
+    isRichTextEnabled: enableExperimentalRichText,
     editTriggersText: snippetEditor.triggersText,
     setEditTriggersText: snippetEditor.setTriggersText,
     activeSnippetKind: snippetEditor.kind,
@@ -557,6 +563,11 @@ function App() {
         onRefreshScan={scanDefaultEspansoConfigDir}
         enableExperimentalYamlWarnings={enableExperimentalYamlWarnings}
         onToggleExperimentalYamlWarnings={handleToggleExperimentalYamlWarnings}
+        enableExperimentalRichText={enableExperimentalRichText}
+        onToggleExperimentalRichText={(checked) => {
+          setEnableExperimentalRichText(checked);
+          setExperimentalRichTextEnabled(checked);
+        }}
         enablePreSaveConflictCheck={enablePreSaveConflictCheck}
         onTogglePreSaveConflictCheck={(checked) => {
           setEnablePreSaveConflictCheck(checked);

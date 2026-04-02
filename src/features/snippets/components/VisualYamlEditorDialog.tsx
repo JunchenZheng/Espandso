@@ -74,6 +74,7 @@ export interface VisualYamlEditorFormProps {
   addErrors: ValidationError[];
   addWarnings: string[];
   isYamlWarningsEnabled: boolean;
+  isRichTextEnabled: boolean;
   editTriggersText: string;
   setEditTriggersText: (text: string) => void;
   activeSnippetKind: AddSnippetKind;
@@ -161,6 +162,7 @@ export function VisualYamlEditorDialog({
     addErrors,
     addWarnings,
     isYamlWarningsEnabled,
+    isRichTextEnabled,
     editTriggersText,
     setEditTriggersText,
     activeSnippetKind,
@@ -203,6 +205,14 @@ export function VisualYamlEditorDialog({
     resetSnippetForm,
     setSnippetEditTarget,
   } = actions;
+
+  const textFormatOptions: Array<readonly [TextReplacementFormat, string]> = isRichTextEnabled
+    ? [
+        ["plain", t("snippets.textFormatPlain")],
+        ["markdown", t("snippets.textFormatMarkdown")],
+        ["html", t("snippets.textFormatHtml")],
+      ]
+    : [["plain", t("snippets.textFormatPlain")]];
 
   const handleDialogKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.key !== "Enter" || event.nativeEvent.isComposing || isSavingSnippet) {
@@ -823,11 +833,7 @@ export function VisualYamlEditorDialog({
                 ) : (
                   <div className="flex-1 flex flex-col space-y-3 min-h-[120px]">
                     <div className="grid gap-2 sm:grid-cols-3">
-                      {([
-                        ["plain", t("snippets.textFormatPlain")],
-                        ["markdown", t("snippets.textFormatMarkdown")],
-                        ["html", t("snippets.textFormatHtml")],
-                      ] as const).map(([format, label]) => (
+                      {textFormatOptions.map(([format, label]) => (
                         <label
                           key={format}
                           className={cn(

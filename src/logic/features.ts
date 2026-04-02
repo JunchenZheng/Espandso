@@ -4,6 +4,7 @@ export const IS_EXPERIMENTAL_BUILD =
 
 export const EXPANSO_EXPERIMENTAL_YAML_WARNINGS_KEY = "expandso_enable_experimental_yaml_warnings";
 export const EXPANSO_PRE_SAVE_CONFLICT_CHECK_KEY = "expandso_enable_pre_save_conflict_check";
+export const EXPANSO_EXPERIMENTAL_RICH_TEXT_KEY = "expandso_enable_experimental_rich_text";
 
 export function getExperimentalYamlWarningsEnabled(): boolean {
   if (typeof window === "undefined" || !window.localStorage) {
@@ -49,6 +50,28 @@ export function setPreSaveConflictCheckEnabled(enabled: boolean): void {
   }
   try {
     window.localStorage.setItem(EXPANSO_PRE_SAVE_CONFLICT_CHECK_KEY, enabled ? "true" : "false");
+  } catch {
+    // Ignore storage write errors
+  }
+}
+
+export function getExperimentalRichTextEnabled(): boolean {
+  if (typeof window === "undefined" || !window.localStorage) {
+    return false;
+  }
+  try {
+    return window.localStorage.getItem(EXPANSO_EXPERIMENTAL_RICH_TEXT_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+export function setExperimentalRichTextEnabled(enabled: boolean): void {
+  if (typeof window === "undefined" || !window.localStorage) {
+    return;
+  }
+  try {
+    window.localStorage.setItem(EXPANSO_EXPERIMENTAL_RICH_TEXT_KEY, enabled ? "true" : "false");
   } catch {
     // Ignore storage write errors
   }

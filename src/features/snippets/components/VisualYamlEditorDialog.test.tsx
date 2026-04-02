@@ -57,6 +57,7 @@ function createFormProps(): VisualYamlEditorFormProps {
     addErrors: [],
     addWarnings: [],
     isYamlWarningsEnabled: true,
+    isRichTextEnabled: false,
     editTriggersText: "",
     setEditTriggersText: vi.fn(),
     activeSnippetKind: "text",
