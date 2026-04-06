@@ -119,10 +119,10 @@ function renderDialog(
 }
 
 describe("SnippetEditDialog", () => {
-  it("hides rich text format options by default", () => {
+  it("hides the text format selector by default", () => {
     renderDialog();
 
-    expect(screen.getByLabelText("Plain Text")).toBeChecked();
+    expect(screen.queryByLabelText("Plain Text")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Markdown")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("HTML")).not.toBeInTheDocument();
   });

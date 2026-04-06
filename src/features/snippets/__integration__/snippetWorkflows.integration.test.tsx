@@ -62,7 +62,7 @@ describe("Snippet integration workflows", () => {
     await user.click(screen.getByRole("button", { name: "Add Snippet" }));
 
     let dialog = await screen.findByRole("dialog", { name: "Add Text Snippet" });
-    expect(within(dialog).getByLabelText("Plain Text")).toBeChecked();
+    expect(within(dialog).queryByLabelText("Plain Text")).not.toBeInTheDocument();
     expect(within(dialog).queryByLabelText("Markdown")).not.toBeInTheDocument();
     expect(within(dialog).queryByLabelText("HTML")).not.toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Cancel" }));

@@ -832,26 +832,28 @@ export function VisualYamlEditorDialog({
                   </div>
                 ) : (
                   <div className="flex-1 flex flex-col space-y-3 min-h-[120px]">
-                    <div className="grid gap-2 sm:grid-cols-3">
-                      {textFormatOptions.map(([format, label]) => (
-                        <label
-                          key={format}
-                          className={cn(
-                            "flex min-h-9 items-center gap-2 rounded-md border bg-background px-3 text-sm",
-                            textReplacementFormat === format && "border-primary bg-primary/10",
-                          )}
-                        >
-                          <input
-                            type="radio"
-                            name="visual-text-replacement-format"
-                            className="h-4 w-4 accent-primary"
-                            checked={textReplacementFormat === format}
-                            onChange={() => setTextReplacementFormat(format)}
-                          />
-                          <span>{label}</span>
-                        </label>
-                      ))}
-                    </div>
+                    {isRichTextEnabled && (
+                      <div className="grid gap-2 sm:grid-cols-3">
+                        {textFormatOptions.map(([format, label]) => (
+                          <label
+                            key={format}
+                            className={cn(
+                              "flex min-h-9 items-center gap-2 rounded-md border bg-background px-3 text-sm",
+                              textReplacementFormat === format && "border-primary bg-primary/10",
+                            )}
+                          >
+                            <input
+                              type="radio"
+                              name="visual-text-replacement-format"
+                              className="h-4 w-4 accent-primary"
+                              checked={textReplacementFormat === format}
+                              onChange={() => setTextReplacementFormat(format)}
+                            />
+                            <span>{label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
                     <div className="flex items-center justify-between">
                       <Label htmlFor="ve-replace" className="inline-flex items-center shrink-0">
                         {t("snippets.replaceContent")} <RequiredMark />
