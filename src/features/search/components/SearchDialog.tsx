@@ -10,7 +10,7 @@ import {
   SearchResult,
   SearchableConfigPreview,
 } from "../../../logic/snippetSearch";
-import { getSnippetTriggers } from "../../../logic/snippetUtils";
+import { getSnippetPreviewContent, getSnippetTriggers } from "../../../logic/snippetUtils";
 import { cn } from "../../../lib/utils";
 import {
   searchSnippetIndex,
@@ -294,12 +294,7 @@ export function SearchDialog<T extends SearchableConfigPreview>({
                 const triggers = getSnippetTriggers(res.snippet);
                 const displayTrigger =
                   triggers.length > 0 ? triggers.join(", ") : `#${res.snippetIndex + 1}`;
-                const previewText =
-                  res.snippet.replace ||
-                  res.snippet.form ||
-                  res.snippet.image_path ||
-                  res.snippet.include_file ||
-                  "";
+                const previewText = getSnippetPreviewContent(res.snippet);
 
                 return (
                   <button

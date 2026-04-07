@@ -1,5 +1,7 @@
 import YAML, { Document, isScalar, isSeq, visit } from "yaml";
 import { Snippet, SnippetVar } from "./types";
+import { containsNonAscii, encodeNonAsciiToHtmlEntities } from "./richTextEncoding";
+import { renderMarkdownToSafeHtml } from "./markdownToHtml";
 
 const FORM_VAR_NAME = "form1";
 
@@ -60,7 +62,21 @@ export function snippetToYamlMatch(snippet: Snippet): Record<string, any> {
       }
     }
   } else {
-    match.replace = snippet.replace || "";
+    if (snippet.markdown !== undefined) {
+      if (containsNonAscii(snippet.markdown)) {
+        // Espanso's markdown clipboard output can mojibake CJK text.
+        // Render the authored Markdown to ASCII-only HTML so expansion stays readable.
+        match.html = renderMarkdownToSafeHtml(snippet.markdown);
+      } else {
+        match.markdown = snippet.markdown;
+      }
+    } else if (snippet.html !== undefined) {
+      match.html = containsNonAscii(snippet.html)
+        ? encodeNonAsciiToHtmlEntities(snippet.html)
+        : snippet.html;
+    } else {
+      match.replace = snippet.replace || "";
+    }
     if (snippet.vars && snippet.vars.length > 0) {
       match.vars = snippet.vars;
     }

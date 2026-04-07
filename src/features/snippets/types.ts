@@ -2,6 +2,7 @@ import type { ImportedMatch } from "../../logic/importYaml";
 import type { EspansoConfigPreview } from "../espanso-configs/types";
 
 export type AddSnippetKind = "text" | "file" | "image" | "form";
+export type TextReplacementFormat = "plain" | "markdown" | "html";
 export type FormFieldControl = "text" | "multiline" | "choice" | "list";
 export type FormFieldCategory = "text" | "choice" | "list";
 export type TextFieldMode = "single" | "multiline";

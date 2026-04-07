@@ -1,5 +1,5 @@
 import { Snippet } from "./types";
-import { getSnippetTriggers } from "./snippetUtils";
+import { getSnippetPreviewContent, getSnippetTriggers } from "./snippetUtils";
 
 export interface SearchScope {
   trigger: boolean;
@@ -71,16 +71,7 @@ export function searchSnippets<T extends SearchableConfigPreview>(
 
       // Check content scope
       if (scope.content) {
-        let contentText = "";
-        if (snippet.replace) {
-          contentText = snippet.replace;
-        } else if (snippet.form) {
-          contentText = snippet.form;
-        } else if (snippet.image_path) {
-          contentText = snippet.image_path;
-        } else if (snippet.include_file) {
-          contentText = snippet.include_file;
-        }
+        const contentText = getSnippetPreviewContent(snippet);
 
         if (contentText && contentText.toLowerCase().includes(trimmedQuery)) {
           matchedFields.push("content");

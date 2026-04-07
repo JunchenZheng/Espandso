@@ -38,6 +38,8 @@ export async function validate(
     const trigger = snippet.trigger;
     const triggers = snippet.triggers;
     const replace = snippet.replace;
+    const markdown = snippet.markdown;
+    const html = snippet.html;
     const includeFile = snippet.include_file;
     const imagePath = snippet.image_path;
     const form = snippet.form;
@@ -73,24 +75,34 @@ export async function validate(
 
     // Replacement kind validation
     const hasReplace = replace !== undefined && replace !== null;
+    const hasMarkdown = markdown !== undefined && markdown !== null;
+    const hasHtml = html !== undefined && html !== null;
     const hasInclude = includeFile !== undefined && includeFile !== null;
     const hasImagePath = imagePath !== undefined && imagePath !== null;
     const hasForm = form !== undefined && form !== null;
-    const replacementKindCount = [hasReplace, hasInclude, hasImagePath, hasForm].filter(
+    const replacementKindCount = [hasReplace, hasMarkdown, hasHtml, hasInclude, hasImagePath, hasForm].filter(
       Boolean,
     ).length;
 
     if (replacementKindCount === 0) {
       errors.push({
-        message: `snippet #${i}: must have either 'replace', 'include_file', 'image_path', or 'form'`,
+        message: `snippet #${i}: must have either 'replace', 'markdown', 'html', 'include_file', 'image_path', or 'form'`,
       });
     } else if (replacementKindCount > 1) {
       errors.push({
-        message: `snippet #${i}: cannot combine 'replace', 'include_file', and 'form'`,
+        message: `snippet #${i}: cannot combine replacement fields`,
       });
     } else if (hasReplace) {
       if (typeof replace !== "string" || !replace) {
         errors.push({ message: `snippet #${i}: 'replace' must be a non-empty string` });
+      }
+    } else if (hasMarkdown) {
+      if (typeof markdown !== "string" || !markdown) {
+        errors.push({ message: `snippet #${i}: 'markdown' must be a non-empty string` });
+      }
+    } else if (hasHtml) {
+      if (typeof html !== "string" || !html) {
+        errors.push({ message: `snippet #${i}: 'html' must be a non-empty string` });
       }
     } else if (hasInclude) {
       if (typeof includeFile !== "string" || !includeFile) {

@@ -54,6 +54,82 @@ describe("Snippet integration workflows", () => {
     });
   });
 
+  it("shows rich text formats only after enabling the experimental setting", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<App />);
+
+    await screen.findByText(":hello");
+    await user.click(screen.getByRole("button", { name: "Add Snippet" }));
+
+    let dialog = await screen.findByRole("dialog", { name: "Add Text Snippet" });
+    expect(within(dialog).queryByLabelText("Plain Text")).not.toBeInTheDocument();
+    expect(within(dialog).queryByLabelText("Markdown")).not.toBeInTheDocument();
+    expect(within(dialog).queryByLabelText("HTML")).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    const settingsDialog = await screen.findByRole("dialog", { name: "Settings" });
+    await user.click(
+      within(settingsDialog).getByRole("switch", { name: "Rich Text Snippets" }),
+    );
+    await user.click(within(settingsDialog).getByRole("button", { name: "Done" }));
+
+    await user.click(screen.getByRole("button", { name: "Add Snippet" }));
+    dialog = await screen.findByRole("dialog", { name: "Add Text Snippet" });
+    expect(within(dialog).getByLabelText("Plain Text")).toBeChecked();
+    expect(within(dialog).getByLabelText("Markdown")).not.toBeChecked();
+    expect(within(dialog).getByLabelText("HTML")).not.toBeChecked();
+  });
+
+  it("adds a markdown rich text snippet from the text mode", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem("expandso_enable_experimental_rich_text", "true");
+    renderWithProviders(<App />);
+
+    await screen.findByText(":hello");
+    await user.click(screen.getByRole("button", { name: "Add Snippet" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Add Text Snippet" });
+    await user.click(within(dialog).getByLabelText("Markdown"));
+    await user.type(within(dialog).getByLabelText(/Trigger/u), ":rich");
+    await user.type(within(dialog).getByLabelText(/Replace Content/u), "This **is** rich");
+    await user.click(within(dialog).getByRole("button", { name: "Save to YAML" }));
+
+    const path = `${tauriHarness.getMatchDir()}/base.yml`;
+    await waitFor(() => {
+      expect(tauriHarness.getFile(path)).toContain("trigger: :rich");
+    });
+
+    expect(tauriHarness.getFile(path)).toContain("markdown: This **is** rich");
+    expect(await screen.findByText(":rich")).toBeInTheDocument();
+    expect(screen.getByText("This **is** rich")).toBeInTheDocument();
+  });
+
+  it("uses an HTML fallback for non-ASCII markdown snippets", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem("expandso_enable_experimental_rich_text", "true");
+    renderWithProviders(<App />);
+
+    await screen.findByText(":hello");
+    await user.click(screen.getByRole("button", { name: "Add Snippet" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Add Text Snippet" });
+    await user.click(within(dialog).getByLabelText("Markdown"));
+    await user.type(within(dialog).getByLabelText(/Trigger/u), ":rich-cn");
+    await user.type(within(dialog).getByLabelText(/Replace Content/u), "**中文** and English");
+    await user.click(within(dialog).getByRole("button", { name: "Save to YAML" }));
+
+    const path = `${tauriHarness.getMatchDir()}/base.yml`;
+    await waitFor(() => {
+      expect(tauriHarness.getFile(path)).toContain("trigger: :rich-cn");
+    });
+
+    expect(tauriHarness.getFile(path)).toContain("html: <strong>&#x4E2D;&#x6587;</strong> and English");
+    expect(tauriHarness.getFile(path)).not.toContain("markdown:");
+    expect(await screen.findByText(":rich-cn")).toBeInTheDocument();
+    expect(screen.getByText("<strong>中文</strong> and English")).toBeInTheDocument();
+  });
+
   it("blocks saving a snippet that would create a trigger prefix conflict when enabled", async () => {
     const user = userEvent.setup();
     renderWithProviders(<App />);

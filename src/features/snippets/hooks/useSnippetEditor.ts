@@ -19,12 +19,14 @@ import type {
   FormFieldControl,
   FormSelectionState,
   SnippetEditTarget,
+  TextReplacementFormat,
 } from "../types";
 
 export function useSnippetEditor() {
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [editTarget, setEditTarget] = useState<SnippetEditTarget | null>(null);
   const [kind, setKind] = useState<AddSnippetKind>("text");
+  const [textFormat, setTextFormat] = useState<TextReplacementFormat>("plain");
   const [triggersText, setTriggersText] = useState<string>("");
   const [replace, setReplace] = useState<string>("");
   const [vars, setVars] = useState<SnippetVar[]>([]);
@@ -54,6 +56,7 @@ export function useSnippetEditor() {
 
   const resetForm = useCallback(() => {
     setKind("text");
+    setTextFormat("plain");
     setTriggersText("");
     setReplace("");
     setVars([]);
@@ -88,7 +91,16 @@ export function useSnippetEditor() {
             : "text",
     );
     setTriggersText(triggerInput.multiline);
-    setReplace(editableSnippet.replace || "");
+    if (editableSnippet.markdown !== undefined) {
+      setTextFormat("markdown");
+      setReplace(editableSnippet.markdown);
+    } else if (editableSnippet.html !== undefined) {
+      setTextFormat("html");
+      setReplace(editableSnippet.html);
+    } else {
+      setTextFormat("plain");
+      setReplace(editableSnippet.replace || "");
+    }
     setVars(editableSnippet.vars ? [...editableSnippet.vars] : []);
     setIncludeFile(target.match.resourcePath || editableSnippet.include_file || "");
     setImagePath(editableSnippet.image_path || "");
@@ -262,7 +274,13 @@ export function useSnippetEditor() {
         snippet.vars = referencedVars;
       }
     } else {
-      snippet.replace = replace;
+      if (textFormat === "markdown") {
+        snippet.markdown = replace;
+      } else if (textFormat === "html") {
+        snippet.html = replace;
+      } else {
+        snippet.replace = replace;
+      }
       const referencedVars = getReferencedVars(replace, vars);
       if (referencedVars.length > 0) {
         snippet.vars = referencedVars;
@@ -274,7 +292,7 @@ export function useSnippetEditor() {
     }
 
     return snippet;
-  }, [description, form, formFieldConfigs, imagePath, includeFile, kind, replace, triggersText, vars]);
+  }, [description, form, formFieldConfigs, imagePath, includeFile, kind, replace, textFormat, triggersText, vars]);
 
   return {
     isOpen,
@@ -283,6 +301,8 @@ export function useSnippetEditor() {
     setEditTarget,
     kind,
     setKind,
+    textFormat,
+    setTextFormat,
     triggersText,
     setTriggersText,
     replace,

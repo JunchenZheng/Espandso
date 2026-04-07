@@ -14,7 +14,9 @@ export function buildEspansoConfigPreviewFromContent(
   return {
     config,
     snippetCount: result.snippets.length,
-    inlineCount: result.snippets.filter((snippet) => snippet.replace !== undefined).length,
+    inlineCount: result.snippets.filter(
+      (snippet) => snippet.replace !== undefined || snippet.markdown !== undefined || snippet.html !== undefined,
+    ).length,
     resourceCount: result.snippets.filter((snippet) => snippet.include_file).length,
     imageCount: result.snippets.filter((snippet) => snippet.image_path !== undefined).length,
     formCount: result.snippets.filter((snippet) => snippet.form !== undefined).length,

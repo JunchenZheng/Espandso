@@ -52,6 +52,14 @@ export function buildTriggerInput(snippet: Snippet): TriggerInputState {
   };
 }
 
+export function getSnippetTextContent(snippet: Snippet): string {
+  return snippet.replace ?? snippet.markdown ?? snippet.html ?? "";
+}
+
+export function getSnippetPreviewContent(snippet: Snippet): string {
+  return getSnippetTextContent(snippet) || snippet.form || snippet.image_path || snippet.include_file || "";
+}
+
 const COMMON_IMAGE_EXTENSIONS = new Set([
   "png",
   "jpg",

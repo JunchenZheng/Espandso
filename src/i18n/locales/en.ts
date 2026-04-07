@@ -101,6 +101,9 @@ export const en = {
     enableYamlWarnings: "YAML Detection & Warnings",
     enableYamlWarningsDescription:
       "Scan YAML files for prefix trigger conflicts and potential syntax warnings.",
+    enableRichText: "Rich Text Snippets",
+    enableRichTextDescription:
+      "Show experimental Markdown and HTML replacement formats in snippet editors.",
     enablePreSaveConflictCheck: "Block Trigger Conflicts on Save",
     enablePreSaveConflictCheckDescription:
       "Example: :hello can block :helloworld, so the longer trigger may never run.",
@@ -137,6 +140,9 @@ export const en = {
     typeImageShort: "Image",
     typeFileShort: "File",
     typeFormShort: "Form",
+    textFormatPlain: "Plain Text",
+    textFormatMarkdown: "Markdown",
+    textFormatHtml: "HTML",
     triggerPlaceholder: ":e.g. :hello",
     replacePlaceholder: "Text that replaces the trigger...",
     descriptionPlaceholder: "Optional brief note for this snippet",

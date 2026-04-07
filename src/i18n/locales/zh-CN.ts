@@ -102,6 +102,8 @@ export const zhCN: TranslationTree = {
     experimentalDescription: "尚在测试中的试验性功能。",
     enableYamlWarnings: "YAML 文件检测与警告",
     enableYamlWarningsDescription: "自动扫描 YAML 文件中的前缀触发词冲突与潜在语法警告。",
+    enableRichText: "富文本片段",
+    enableRichTextDescription: "在片段编辑器中显示实验性的 Markdown 和 HTML 替换格式。",
     enablePreSaveConflictCheck: "保存时阻止触发词冲突",
     enablePreSaveConflictCheckDescription:
       "例如：:hello 可能会挡住 :helloworld，导致较长触发词无法触发。",
@@ -138,6 +140,9 @@ export const zhCN: TranslationTree = {
     typeImageShort: "图片",
     typeFileShort: "文件",
     typeFormShort: "表单",
+    textFormatPlain: "纯文本",
+    textFormatMarkdown: "Markdown",
+    textFormatHtml: "HTML",
     triggerPlaceholder: "例如：:hello",
     replacePlaceholder: "将被替换的文本内容...",
     descriptionPlaceholder: "为此片段添加可选说明",

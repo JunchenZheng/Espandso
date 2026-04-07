@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import YAML from "yaml";
 import { validate } from "./validate";
 import { importYamlContent } from "./importYaml";
 import {
@@ -102,6 +103,8 @@ describe("validate", () => {
         { trigger: ":file", include_file: "test.txt" },
         { trigger: ":cat", image_path: "/path/to/cat.png" },
         { trigger: ":form", form: "Hello [[name]]", form_fields: { name: { default: "Ada" } } },
+        { trigger: ":md", markdown: "This **is** rich" },
+        { trigger: ":html", html: "<strong>Rich</strong>" },
       ],
     };
 
@@ -135,9 +138,9 @@ describe("validate", () => {
     const messages = errors.map((e) => e.message);
     expect(messages).toContain("root 'version' must be an integer");
     expect(messages).toContain("snippet #0: 'trigger' must be a non-empty string");
-    expect(messages).toContain("snippet #3: cannot combine 'replace', 'include_file', and 'form'");
+    expect(messages).toContain("snippet #3: cannot combine replacement fields");
     expect(messages).toContain(
-      "snippet #4: must have either 'replace', 'include_file', 'image_path', or 'form'",
+      "snippet #4: must have either 'replace', 'markdown', 'html', 'include_file', 'image_path', or 'form'",
     );
     expect(messages).toContain("snippet #6: cannot have both 'trigger' and 'triggers'");
     expect(messages).toContain("snippet #8: 'form' must be a non-empty string");
@@ -223,6 +226,38 @@ matches:
       triggers: [":hi", ":hey"],
       replace: "greeting",
     });
+  });
+
+  it("should import rich text matches", () => {
+    const yaml = `
+matches:
+  - trigger: :rich
+    markdown: This *text* is **very rich**!
+  - trigger: :html
+    html: |
+      <p>Rich <strong>HTML</strong></p>
+`;
+    const res = importYamlContent(yaml, "base.yml");
+    expect(res.warnings).toHaveLength(0);
+    expect(res.snippets).toEqual([
+      { trigger: ":rich", markdown: "This *text* is **very rich**!" },
+      { trigger: ":html", html: "<p>Rich <strong>HTML</strong></p>\n" },
+    ]);
+  });
+
+  it("should decode rich text unicode entities when importing", () => {
+    const yaml = `
+matches:
+  - trigger: :rich
+    markdown: "**&#x4E2D;&#x6587;**"
+  - trigger: :html
+    html: <p>&#20013;&#25991;</p>
+`;
+    const res = importYamlContent(yaml, "base.yml");
+    expect(res.snippets).toEqual([
+      { trigger: ":rich", markdown: "**中文**" },
+      { trigger: ":html", html: "<p>中文</p>" },
+    ]);
   });
 
   it("should import include_file snippets and snippets with custom vars (like date) with replace block", () => {
@@ -458,6 +493,77 @@ matches:
     });
 
     expect(updated).toContain("replace: |-\n      line one\n      line two");
+  });
+
+  it("should append rich text snippets with markdown and html fields", () => {
+    const markdown = appendSnippetToYamlContent("matches: []", {
+      trigger: ":rich",
+      markdown: "This *text* is **very rich**!",
+    });
+    expect(markdown).toContain("markdown: This *text* is **very rich**!");
+
+    const html = appendSnippetToYamlContent("matches: []", {
+      trigger: ":html",
+      html: "<p>Rich</p>\n<strong>HTML</strong>",
+    });
+    expect(html).toContain("html: |-\n      <p>Rich</p>\n      <strong>HTML</strong>");
+  });
+
+  it("should use an HTML fallback for non-ASCII markdown to avoid Espanso mojibake", () => {
+    const result = appendSnippetToYamlContent("matches: []", {
+      trigger: ":rich-cn",
+      markdown: "**中文** and English",
+    });
+    expect(result).toContain("html:");
+    expect(result).not.toContain("markdown:");
+    expect(result).toContain("&#x4E2D;");
+    expect(result).toContain("&#x6587;");
+    expect(result).toContain("<strong>");
+    expect(result).toContain("and English");
+
+    const parsed = YAML.parse(result);
+    expect(parsed.matches[0]).toMatchObject({
+      trigger: ":rich-cn",
+      html: "<strong>&#x4E2D;&#x6587;</strong> and English",
+    });
+    expect(parsed.matches[0].markdown).toBeUndefined();
+    expect(parsed.matches[0].html).not.toMatch(/[^\x00-\x7F]/);
+  });
+
+  it("should entity-encode non-ASCII html content", () => {
+    const result = appendSnippetToYamlContent("matches: []", {
+      trigger: ":html-cn",
+      html: "<p>中文</p>",
+    });
+    expect(result).toContain("html:");
+    expect(result).toContain("&#x4E2D;");
+    expect(result).toContain("&#x6587;");
+    expect(result).not.toContain("中文");
+  });
+
+  it("should preserve existing HTML entities while encoding raw non-ASCII html", () => {
+    const result = appendSnippetToYamlContent("matches: []", {
+      trigger: ":html-mixed",
+      html: "<p>&#x4E2D;文 😀</p>",
+    });
+    const parsed = YAML.parse(result);
+
+    expect(parsed.matches[0].html).toBe("<p>&#x4E2D;&#x6587; &#x1F600;</p>");
+  });
+
+  it("should pass through ASCII-only markdown and html as-is", () => {
+    const markdown = appendSnippetToYamlContent("matches: []", {
+      trigger: ":rich-ascii",
+      markdown: "This **is** rich",
+    });
+    expect(markdown).toContain("markdown: This **is** rich");
+    expect(markdown).not.toContain("html:");
+
+    const html = appendSnippetToYamlContent("matches: []", {
+      trigger: ":html-ascii",
+      html: "<p>Hello</p>",
+    });
+    expect(html).toContain("html: <p>Hello</p>");
   });
 
   it("should ensure blank line between match items when appending", () => {

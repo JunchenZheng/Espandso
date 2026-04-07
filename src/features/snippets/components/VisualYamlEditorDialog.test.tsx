@@ -52,15 +52,18 @@ function createVisualEditorProps(): VisualYamlEditorStateProps {
   };
 }
 
-function createFormProps(): VisualYamlEditorFormProps {
+function createFormProps(overrides: Partial<VisualYamlEditorFormProps> = {}): VisualYamlEditorFormProps {
   return {
     addErrors: [],
     addWarnings: [],
     isYamlWarningsEnabled: true,
+    isRichTextEnabled: false,
     editTriggersText: "",
     setEditTriggersText: vi.fn(),
     activeSnippetKind: "text",
     setAddSnippetKind: vi.fn(),
+    textReplacementFormat: "plain",
+    setTextReplacementFormat: vi.fn(),
     setAddErrors: vi.fn(),
     setAddWarnings: vi.fn(),
     editIncludeFile: "",
@@ -87,6 +90,7 @@ function createFormProps(): VisualYamlEditorFormProps {
     visualEditorReplaceTextareaRef: createRef<HTMLTextAreaElement>(),
     editDescription: "",
     setEditDescription: vi.fn(),
+    ...overrides,
   };
 }
 
@@ -101,7 +105,10 @@ function createActionProps(saveSnippetToYaml = vi.fn()): VisualYamlEditorActionP
   };
 }
 
-function renderDialog(actions = createActionProps()) {
+function renderDialog(
+  actions = createActionProps(),
+  formOverrides: Partial<VisualYamlEditorFormProps> = {},
+) {
   const props: VisualYamlEditorDialogProps = {
     isOpen: true,
     onOpenChange: vi.fn(),
@@ -109,7 +116,7 @@ function renderDialog(actions = createActionProps()) {
     selectedEspansoPreview: preview,
     t: (key, options) => translate("en", key, options),
     visualEditor: createVisualEditorProps(),
-    form: createFormProps(),
+    form: createFormProps(formOverrides),
     actions,
   };
 
@@ -117,6 +124,22 @@ function renderDialog(actions = createActionProps()) {
 }
 
 describe("VisualYamlEditorDialog", () => {
+  it("hides the text format selector by default", () => {
+    renderDialog();
+
+    expect(screen.queryByLabelText("Plain Text")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Markdown")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("HTML")).not.toBeInTheDocument();
+  });
+
+  it("shows rich text format options when enabled", () => {
+    renderDialog(createActionProps(), { isRichTextEnabled: true });
+
+    expect(screen.getByLabelText("Plain Text")).toBeChecked();
+    expect(screen.getByLabelText("Markdown")).not.toBeChecked();
+    expect(screen.getByLabelText("HTML")).not.toBeChecked();
+  });
+
   it("saves the snippet when Enter is pressed in a single-line field", async () => {
     const user = userEvent.setup();
     const saveSnippetToYaml = vi.fn();

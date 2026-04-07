@@ -1,5 +1,6 @@
 import YAML from "yaml";
 import { Snippet } from "./types";
+import { decodeRichTextUnicodeEntities } from "./richTextEncoding";
 
 export interface ImportedMatch {
   snippet: Snippet;
@@ -74,6 +75,17 @@ function getVerboseFormVar(varsBlock: any[]): any | null {
 
 function getSupportedFormCompanionVars(varsBlock: any[], formVar: any): any[] {
   return varsBlock.filter((v) => v !== formVar && v?.type === "date");
+}
+
+type TextReplacementField = "replace" | "markdown" | "html";
+
+function getTextReplacementField(match: any): { field: TextReplacementField; value: any } | null {
+  for (const field of ["replace", "markdown", "html"] as const) {
+    if (match[field] !== undefined && match[field] !== null) {
+      return { field, value: match[field] };
+    }
+  }
+  return null;
 }
 
 export function parseYamlMatch(
@@ -221,18 +233,24 @@ export function parseYamlMatch(
     return { matches, warnings };
   }
 
-  const replace = match.replace;
-  if (replace === undefined || replace === null) {
+  const textReplacement = getTextReplacementField(match);
+  if (!textReplacement) {
     return {
       matches: [],
-      warnings: [`[${fileName}] Snippet for ${triggers.join(", ")} has no replace block, skipping`],
+      warnings: [`[${fileName}] Snippet for ${triggers.join(", ")} has no replacement block, skipping`],
     };
   }
+  const replacementValue = String(textReplacement.value);
+  const replacementSnippet = {
+    [textReplacement.field]: textReplacement.field === "replace"
+      ? replacementValue
+      : decodeRichTextUnicodeEntities(replacementValue),
+  };
 
   const originalSnippet: Snippet =
     triggers.length > 1
-      ? { triggers, replace: String(replace) }
-      : { trigger: triggers[0], replace: String(replace) };
+      ? { triggers, ...replacementSnippet }
+      : { trigger: triggers[0], ...replacementSnippet };
   if (match.description) {
     originalSnippet.description = match.description;
   }
@@ -243,7 +261,7 @@ export function parseYamlMatch(
   const matches: ImportedMatch[] = triggers.map((trigger, triggerIndex) => {
     const snippet: Snippet = {
       trigger,
-      replace: String(replace),
+      ...replacementSnippet,
     };
     if (match.description) {
       snippet.description = match.description;
