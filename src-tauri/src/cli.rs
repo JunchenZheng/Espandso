@@ -626,4 +626,242 @@ mod tests {
         ));
         assert!(!is_benign_restart_output("", "espanso restart failed"));
     }
+
+    #[test]
+    fn test_try_run_cli_empty_and_unknown() {
+        assert_eq!(try_run_cli(vec![]), Ok(false));
+        assert_eq!(try_run_cli(vec!["unknown_cmd".to_string()]), Ok(false));
+    }
+
+    #[test]
+    fn test_try_run_cli_help_options() {
+        assert_eq!(try_run_cli(vec!["--help".to_string()]), Ok(true));
+        assert_eq!(try_run_cli(vec!["-h".to_string()]), Ok(true));
+        assert_eq!(try_run_cli(vec!["help".to_string()]), Ok(true));
+    }
+
+    #[test]
+    fn test_try_run_cli_add_command_execution() {
+        let temp = tempfile::tempdir().unwrap();
+        let target = temp.path().join("cli_test.yml");
+        let args = vec![
+            "add".to_string(),
+            "--mode".to_string(),
+            "text".to_string(),
+            "--trigger".to_string(),
+            ":clitest".to_string(),
+            "--content".to_string(),
+            "CLI Content".to_string(),
+            "--config".to_string(),
+            target.to_string_lossy().to_string(),
+            "--no-restart".to_string(),
+        ];
+
+        let result = try_run_cli(args);
+        assert_eq!(result, Ok(true));
+
+        let content = fs::read_to_string(&target).unwrap();
+        assert!(content.contains(":clitest"));
+        assert!(content.contains("CLI Content"));
+    }
+
+    #[test]
+    fn test_try_run_cli_add_command_error() {
+        let args = vec!["add".to_string(), "--mode".to_string(), "text".to_string()];
+        let result = try_run_cli(args);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("--trigger is required"));
+    }
+
+    #[test]
+    fn test_parse_add_options_missing_and_empty_required_flags() {
+        let base_args = vec!["--mode".to_string(), "text".to_string()];
+
+        // Missing --mode when trigger and content are provided
+        let args_no_mode = vec![
+            "--trigger".to_string(),
+            ":trig".to_string(),
+            "--content".to_string(),
+            "val".to_string(),
+        ];
+        let err = parse_add_options(&args_no_mode).unwrap_err();
+        assert!(err.contains("--mode is required"));
+
+        // Missing --trigger
+        let err = parse_add_options(&base_args).unwrap_err();
+        assert!(err.contains("--trigger is required"));
+
+        // Missing --content
+        let mut args_no_content = base_args.clone();
+        args_no_content.extend_from_slice(&["--trigger".to_string(), ":trig".to_string()]);
+        let err = parse_add_options(&args_no_content).unwrap_err();
+        assert!(err.contains("--content is required"));
+
+        // Empty --trigger
+        let mut args_empty_trig = base_args.clone();
+        args_empty_trig.extend_from_slice(&[
+            "--trigger".to_string(),
+            "   ".to_string(),
+            "--content".to_string(),
+            "val".to_string(),
+        ]);
+        let err = parse_add_options(&args_empty_trig).unwrap_err();
+        assert!(err.contains("--trigger must not be empty"));
+
+        // Empty --content
+        let mut args_empty_content = base_args.clone();
+        args_empty_content.extend_from_slice(&[
+            "--trigger".to_string(),
+            ":trig".to_string(),
+            "--content".to_string(),
+            "".to_string(),
+        ]);
+        let err = parse_add_options(&args_empty_content).unwrap_err();
+        assert!(err.contains("--content must not be empty"));
+    }
+
+    #[test]
+    fn test_parse_add_options_flag_value_missing() {
+        let err = parse_add_options(&["--mode".to_string()]).unwrap_err();
+        assert!(err.contains("--mode requires a value"));
+
+        let err = parse_add_options(&["--trigger".to_string()]).unwrap_err();
+        assert!(err.contains("--trigger requires a value"));
+
+        let err = parse_add_options(&["--content".to_string()]).unwrap_err();
+        assert!(err.contains("--content requires a value"));
+    }
+
+    #[test]
+    fn test_parse_add_options_short_flags_and_custom_match_dir() {
+        let args = vec![
+            "-m".to_string(),
+            "text".to_string(),
+            "-t".to_string(),
+            ":short".to_string(),
+            "-c".to_string(),
+            "short content".to_string(),
+            "-d".to_string(),
+            "short desc".to_string(),
+            "--match-dir".to_string(),
+            "/custom/match/dir".to_string(),
+            "--no-restart".to_string(),
+        ];
+
+        let opts = parse_add_options(&args).unwrap();
+        assert_eq!(opts.mode, SnippetMode::Text);
+        assert_eq!(opts.trigger, ":short");
+        assert_eq!(opts.content, "short content");
+        assert_eq!(opts.description, Some("short desc".to_string()));
+        assert_eq!(opts.match_dir, Some(PathBuf::from("/custom/match/dir")));
+        assert!(!opts.restart);
+    }
+
+    #[test]
+    fn test_parse_add_options_empty_description_normalized_to_none() {
+        let args = vec![
+            "--mode".to_string(),
+            "text".to_string(),
+            "--trigger".to_string(),
+            ":trig".to_string(),
+            "--content".to_string(),
+            "cont".to_string(),
+            "--description".to_string(),
+            "   ".to_string(),
+        ];
+
+        let opts = parse_add_options(&args).unwrap();
+        assert_eq!(opts.description, None);
+    }
+
+    #[test]
+    fn test_parse_add_options_invalid_mode_and_unknown_flag() {
+        let invalid_mode_args = vec![
+            "--mode".to_string(),
+            "invalid_mode".to_string(),
+            "--trigger".to_string(),
+            ":t".to_string(),
+            "--content".to_string(),
+            "c".to_string(),
+        ];
+        let err = parse_add_options(&invalid_mode_args).unwrap_err();
+        assert!(err.contains("--mode must be one of: text, file, image"));
+
+        let unknown_flag_args = vec!["--unknown-flag".to_string()];
+        let err = parse_add_options(&unknown_flag_args).unwrap_err();
+        assert!(err.contains("Unknown option: --unknown-flag"));
+    }
+
+    #[test]
+    fn test_parse_add_options_help_flag_in_add_command() {
+        let args = vec!["--help".to_string()];
+        let err = parse_add_options(&args).unwrap_err();
+        assert_eq!(err, "help requested");
+    }
+
+    #[test]
+    fn test_resolve_target_path_handling() {
+        let abs_opts = AddSnippetOptions {
+            mode: SnippetMode::Text,
+            trigger: ":t".to_string(),
+            content: "c".to_string(),
+            description: None,
+            config: "/abs/path/custom.yml".to_string(),
+            match_dir: Some(PathBuf::from("/match/dir")),
+            restart: false,
+        };
+        assert_eq!(
+            resolve_target_path(&abs_opts).unwrap(),
+            PathBuf::from("/abs/path/custom.yml")
+        );
+
+        let rel_opts = AddSnippetOptions {
+            mode: SnippetMode::Text,
+            trigger: ":t".to_string(),
+            content: "c".to_string(),
+            description: None,
+            config: "sub/custom.yml".to_string(),
+            match_dir: Some(PathBuf::from("/match/dir")),
+            restart: false,
+        };
+        assert_eq!(
+            resolve_target_path(&rel_opts).unwrap(),
+            PathBuf::from("/match/dir/sub/custom.yml")
+        );
+    }
+
+    #[test]
+    fn test_parse_espanso_config_dir_output() {
+        let sample_output = "Info: status\nConfig: /Users/test/Library/Application Support/espanso\nPackages: /path\n";
+        assert_eq!(
+            parse_espanso_config_dir(sample_output),
+            Some(PathBuf::from("/Users/test/Library/Application Support/espanso"))
+        );
+
+        let lowercase_output = "config: /home/user/.config/espanso\n";
+        assert_eq!(
+            parse_espanso_config_dir(lowercase_output),
+            Some(PathBuf::from("/home/user/.config/espanso"))
+        );
+
+        let invalid_output = "No config key found\n";
+        assert_eq!(parse_espanso_config_dir(invalid_output), None);
+    }
+
+    #[test]
+    fn test_cat_command_for_file_escaping() {
+        assert_eq!(cat_command_for_file("/simple/path.txt"), "cat \"/simple/path.txt\"");
+        assert_eq!(
+            cat_command_for_file("/path/with/\"quote\".txt"),
+            "cat \"/path/with/\\\"quote\\\".txt\""
+        );
+    }
+
+    #[test]
+    fn test_validate_yaml_for_append_invalid_matches_type() {
+        let content = "matches: invalid_not_a_list\n";
+        let err = validate_yaml_for_append(content, ":t").unwrap_err();
+        assert!(err.contains("YAML root 'matches' must be a list"));
+    }
 }
+
