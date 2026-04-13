@@ -1,10 +1,14 @@
 use serde_yaml::Value;
 use std::env;
-use std::fs;
-use std::path::PathBuf;
+use std::fs::{self, File};
+use std::io::Write;
+use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::thread;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 const DEFAULT_CONFIG_FILE: &str = "base.yml";
+const ESPANSO_RESTART_SETTLE_DELAY: Duration = Duration::from_millis(150);
 const COMMON_IMAGE_EXTENSIONS: &[&str] = &[
     "png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "ico", "tiff", "tif", "avif", "heic",
 ];
@@ -70,7 +74,8 @@ Options:
   --description <text>  Optional Espanso description.
   --config <file>       Target YAML file or match-dir relative path. Defaults to base.yml.
   --match-dir <dir>     Espanso match directory. Defaults to `espanso path` or platform default.
-  --no-restart          Write the snippet without running `espanso restart`.
+  --restart             Run `espanso restart` after writing. By default, Espanso reloads from file changes.
+  --no-restart          Deprecated compatibility flag; this is now the default behavior.
   -h, --help            Show this help."
     );
 }
@@ -82,7 +87,7 @@ fn parse_add_options(args: &[String]) -> Result<AddSnippetOptions, String> {
     let mut description: Option<String> = None;
     let mut config = DEFAULT_CONFIG_FILE.to_string();
     let mut match_dir: Option<PathBuf> = env::var_os("EXPANDSO_MATCH_DIR").map(PathBuf::from);
-    let mut restart = true;
+    let mut restart = false;
 
     let mut index = 0;
     while index < args.len() {
@@ -112,6 +117,9 @@ fn parse_add_options(args: &[String]) -> Result<AddSnippetOptions, String> {
             }
             "--no-restart" => {
                 restart = false;
+            }
+            "--restart" => {
+                restart = true;
             }
             "-h" | "--help" => {
                 print_usage();
@@ -181,10 +189,10 @@ fn add_snippet(options: AddSnippetOptions) -> Result<AddSnippetResult, String> {
     validate_yaml_for_append(&existing_content, &options.trigger)?;
     let item_yaml = snippet_to_yaml_item(&options)?;
     let updated_content = append_match_to_yaml_content(&existing_content, &item_yaml)?;
-    fs::write(&target_path, updated_content)
-        .map_err(|e| format!("Failed to write {}: {}", target_path.display(), e))?;
+    write_yaml_file_stably(&target_path, &updated_content)?;
 
     let restart_warning = if options.restart {
+        thread::sleep(ESPANSO_RESTART_SETTLE_DELAY);
         restart_espanso().err()
     } else {
         None
@@ -208,6 +216,55 @@ fn resolve_target_path(options: &AddSnippetOptions) -> Result<PathBuf, String> {
     };
 
     Ok(match_dir.join(config_path))
+}
+
+fn write_yaml_file_stably(path: &Path, content: &str) -> Result<(), String> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| format!("Unable to resolve parent directory for {}", path.display()))?;
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| format!("Unable to resolve file name for {}", path.display()))?;
+    let temp_path = parent.join(format!(
+        ".{}.expandso-{}.tmp",
+        file_name,
+        unique_temp_suffix()
+    ));
+
+    let write_result = (|| -> Result<(), String> {
+        let mut file = File::create(&temp_path)
+            .map_err(|e| format!("Failed to create {}: {}", temp_path.display(), e))?;
+        file.write_all(content.as_bytes())
+            .map_err(|e| format!("Failed to write {}: {}", temp_path.display(), e))?;
+        file.sync_all()
+            .map_err(|e| format!("Failed to sync {}: {}", temp_path.display(), e))?;
+        drop(file);
+
+        fs::rename(&temp_path, path).map_err(|e| {
+            format!(
+                "Failed to replace {} with {}: {}",
+                path.display(),
+                temp_path.display(),
+                e
+            )
+        })?;
+        Ok(())
+    })();
+
+    if write_result.is_err() {
+        let _ = fs::remove_file(&temp_path);
+    }
+
+    write_result
+}
+
+fn unique_temp_suffix() -> String {
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or_default();
+    format!("{}-{}", std::process::id(), timestamp)
 }
 
 fn resolve_espanso_match_dir() -> Result<PathBuf, String> {
@@ -619,6 +676,28 @@ mod tests {
     }
 
     #[test]
+    fn stable_yaml_write_replaces_target_without_temp_file_leftover() {
+        let temp = tempfile::tempdir().unwrap();
+        let target = temp.path().join("base.yml");
+
+        write_yaml_file_stably(
+            &target,
+            "matches:\n  - trigger: :stable\n    replace: Ready\n",
+        )
+        .unwrap();
+
+        let written = fs::read_to_string(&target).unwrap();
+        assert!(written.contains(":stable"));
+
+        let leftovers = fs::read_dir(temp.path())
+            .unwrap()
+            .filter_map(Result::ok)
+            .filter(|entry| entry.file_name().to_string_lossy().contains(".expandso-"))
+            .count();
+        assert_eq!(leftovers, 0);
+    }
+
+    #[test]
     fn treats_espanso_already_running_restart_output_as_benign() {
         assert!(is_benign_restart_output(
             "",
@@ -758,6 +837,31 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_add_options_restart_is_opt_in() {
+        let base_args = vec![
+            "--mode".to_string(),
+            "text".to_string(),
+            "--trigger".to_string(),
+            ":trig".to_string(),
+            "--content".to_string(),
+            "cont".to_string(),
+        ];
+
+        let default_opts = parse_add_options(&base_args).unwrap();
+        assert!(!default_opts.restart);
+
+        let mut restart_args = base_args.clone();
+        restart_args.push("--restart".to_string());
+        let restart_opts = parse_add_options(&restart_args).unwrap();
+        assert!(restart_opts.restart);
+
+        let mut no_restart_args = restart_args.clone();
+        no_restart_args.push("--no-restart".to_string());
+        let no_restart_opts = parse_add_options(&no_restart_args).unwrap();
+        assert!(!no_restart_opts.restart);
+    }
+
+    #[test]
     fn test_parse_add_options_empty_description_normalized_to_none() {
         let args = vec![
             "--mode".to_string(),
@@ -835,7 +939,9 @@ mod tests {
         let sample_output = "Info: status\nConfig: /Users/test/Library/Application Support/espanso\nPackages: /path\n";
         assert_eq!(
             parse_espanso_config_dir(sample_output),
-            Some(PathBuf::from("/Users/test/Library/Application Support/espanso"))
+            Some(PathBuf::from(
+                "/Users/test/Library/Application Support/espanso"
+            ))
         );
 
         let lowercase_output = "config: /home/user/.config/espanso\n";
@@ -850,7 +956,10 @@ mod tests {
 
     #[test]
     fn test_cat_command_for_file_escaping() {
-        assert_eq!(cat_command_for_file("/simple/path.txt"), "cat \"/simple/path.txt\"");
+        assert_eq!(
+            cat_command_for_file("/simple/path.txt"),
+            "cat \"/simple/path.txt\""
+        );
         assert_eq!(
             cat_command_for_file("/path/with/\"quote\".txt"),
             "cat \"/path/with/\\\"quote\\\".txt\""
@@ -864,4 +973,3 @@ mod tests {
         assert!(err.contains("YAML root 'matches' must be a list"));
     }
 }
-
