@@ -108,10 +108,15 @@ function App() {
     handleCreateFolder,
   } = useEspansoConfigs({ isYamlWarningsEnabled });
 
-  const { isSearchOpen, setIsSearchOpen, highlightedSnippetIndex, handleSelectSearchResult } =
-    useSearchIndex({
-      onSelectConfigPath: setSelectedEspansoConfigPath,
-    });
+  const {
+    isSearchOpen,
+    setIsSearchOpen,
+    highlightedSnippetIndex,
+    highlightSnippetIndex,
+    handleSelectSearchResult,
+  } = useSearchIndex({
+    onSelectConfigPath: setSelectedEspansoConfigPath,
+  });
 
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isLogOpen, setIsLogOpen] = useState<boolean>(false);
@@ -247,6 +252,7 @@ function App() {
     loadEspansoConfigPreview,
     setSelectedEspansoConfigPath,
     loadVisualEditorYaml,
+    highlightSnippetIndex,
     showAlert,
     showConfirm,
     t,

@@ -45,6 +45,12 @@ describe("Snippet integration workflows", () => {
     expect(tauriHarness.getFile(path)).toContain("replace: Goodbye from integration");
     expect(await screen.findByText(":bye")).toBeInTheDocument();
     expect(screen.getByText("Goodbye from integration")).toBeInTheDocument();
+    await waitFor(() => {
+      const addedRow = screen
+        .getAllByTestId("snippet-row")
+        .find((row) => row.getAttribute("data-snippet-index") === "1");
+      expect(addedRow).toHaveClass("bg-emerald-500/20");
+    });
     expect(tauriHarness.invoke).toHaveBeenCalledWith("mark_search_index_internal_write", {
       filePath: path,
     });

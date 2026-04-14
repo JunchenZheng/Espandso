@@ -46,6 +46,7 @@ interface UseSnippetCommandsProps {
   loadEspansoConfigPreview: (config: EspansoConfigFile) => Promise<unknown>;
   setSelectedEspansoConfigPath: (path: string) => void;
   loadVisualEditorYaml: (pathOverride?: string, matchIndexToHighlight?: number) => Promise<void>;
+  highlightSnippetIndex?: (snippetIndex: number) => void;
   showAlert: (description: string, title?: string) => void;
   showConfirm: (
     description: string,
@@ -108,6 +109,7 @@ export function useSnippetCommands({
   loadEspansoConfigPreview,
   setSelectedEspansoConfigPath,
   loadVisualEditorYaml,
+  highlightSnippetIndex,
   showAlert,
   showConfirm,
   t,
@@ -267,6 +269,9 @@ export function useSnippetCommands({
       setSnippetEditTarget(null);
       await loadEspansoConfigPreview(targetPreview.config);
       setSelectedEspansoConfigPath(targetPreview.config.path);
+      if (!snippetEditTarget) {
+        highlightSnippetIndex?.(savedMatchIndex);
+      }
       if (isVisualEditorOpen) {
         await loadVisualEditorYaml(targetPreview.config.path, savedMatchIndex);
       } else {
@@ -285,6 +290,7 @@ export function useSnippetCommands({
     espansoMatchDir,
     isSavingSnippet,
     isVisualEditorOpen,
+    highlightSnippetIndex,
     loadEspansoConfigPreview,
     loadVisualEditorYaml,
     resetSnippetForm,
