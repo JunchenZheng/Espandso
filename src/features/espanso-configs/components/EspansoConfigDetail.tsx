@@ -66,15 +66,29 @@ export function EspansoConfigDetail({
   const totalHeight = snippetCount * ROW_HEIGHT;
   const contentScrollTop = Math.max(0, scrollTop - HEADER_HEIGHT);
 
-  useEffect(() => {
-    if (highlightedIndex !== undefined && highlightedIndex !== null && highlightedIndex >= 0) {
-      const targetScrollTop = Math.max(0, HEADER_HEIGHT + highlightedIndex * ROW_HEIGHT - 60);
-      setScrollTop(targetScrollTop);
-      if (scrollRef.current) {
-        scrollRef.current.scrollTop = targetScrollTop;
-      }
+  useLayoutEffect(() => {
+    if (
+      highlightedIndex === undefined ||
+      highlightedIndex === null ||
+      highlightedIndex < 0 ||
+      snippetCount === 0
+    ) {
+      return;
     }
-  }, [highlightedIndex, ROW_HEIGHT, HEADER_HEIGHT]);
+
+    const frameId = window.requestAnimationFrame(() => {
+      if (!scrollRef.current) {
+        return;
+      }
+
+      const targetIndex = Math.min(highlightedIndex, snippetCount - 1);
+      const targetScrollTop = Math.max(0, HEADER_HEIGHT + targetIndex * ROW_HEIGHT - 60);
+      scrollRef.current.scrollTop = targetScrollTop;
+      setScrollTop(scrollRef.current.scrollTop);
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [highlightedIndex, snippetCount, ROW_HEIGHT, HEADER_HEIGHT]);
 
   const startIndex = Math.max(0, Math.floor(contentScrollTop / ROW_HEIGHT) - OVERSCAN_ROWS);
   const visibleRowCount =
@@ -319,9 +333,9 @@ export function EspansoConfigDetail({
                       isSelected &&
                         "bg-emerald-500/15 hover:bg-emerald-500/20 shadow-[inset_2px_0_0_0_rgb(16_185_129)]",
                       isHighlighted &&
-                        "bg-emerald-500/20 hover:bg-emerald-500/30 font-semibold ring-1 ring-emerald-500/50 animate-pulse shadow-[inset_4px_0_0_0_rgb(16_185_129)]",
+                        "bg-emerald-500/20 hover:bg-emerald-500/30 font-semibold ring-1 ring-emerald-500/50 animate-pulse",
                       isDeleting &&
-                        "bg-red-500/20 hover:bg-red-500/30 font-semibold ring-1 ring-red-500/50 animate-pulse shadow-[inset_4px_0_0_0_rgb(239_68_68)]",
+                        "bg-red-500/20 hover:bg-red-500/30 font-semibold ring-1 ring-red-500/50 animate-pulse",
                     )}
                     onClick={() => {
                       if (isDeleting) {
