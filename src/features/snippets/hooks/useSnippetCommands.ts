@@ -47,6 +47,7 @@ interface UseSnippetCommandsProps {
   setSelectedEspansoConfigPath: (path: string) => void;
   loadVisualEditorYaml: (pathOverride?: string, matchIndexToHighlight?: number) => Promise<void>;
   highlightSnippetIndex?: (snippetIndex: number) => void;
+  showDeletingSnippetIndices?: (snippetIndices: number[]) => Promise<void>;
   showAlert: (description: string, title?: string) => void;
   showConfirm: (
     description: string,
@@ -110,6 +111,7 @@ export function useSnippetCommands({
   setSelectedEspansoConfigPath,
   loadVisualEditorYaml,
   highlightSnippetIndex,
+  showDeletingSnippetIndices,
   showAlert,
   showConfirm,
   t,
@@ -329,12 +331,12 @@ export function useSnippetCommands({
           );
           resetSnippetForm();
           setSnippetEditTarget(null);
+          setIsAddSnippetOpen(false);
+          await showDeletingSnippetIndices?.([target.displayIndex]);
           await loadEspansoConfigPreview(target.preview.config);
           setSelectedEspansoConfigPath(target.preview.config.path);
           if (isVisualEditorOpen) {
             await loadVisualEditorYaml(target.preview.config.path);
-          } else {
-            setIsAddSnippetOpen(false);
           }
         } catch (error: unknown) {
           showAlert(t("errors.failedToDeleteSnippet", { message: getErrorMessage(error) }), t("errors.genericError"));
@@ -359,6 +361,7 @@ export function useSnippetCommands({
     setSnippetEditTarget,
     showAlert,
     showConfirm,
+    showDeletingSnippetIndices,
     t,
   ]);
 
@@ -367,6 +370,7 @@ export function useSnippetCommands({
       configPath: string,
       relativePath: string,
       matchIndices: number[],
+      displayIndices: number[],
       onComplete?: () => void,
     ) => {
       if (matchIndices.length === 0) {
@@ -389,6 +393,7 @@ export function useSnippetCommands({
               matchIndices,
               espansoMatchDir || undefined,
             );
+            await showDeletingSnippetIndices?.(displayIndices);
             const targetConfig = espansoConfigs.find((config) => config.path === configPath);
             if (targetConfig) {
               await loadEspansoConfigPreview(targetConfig);
@@ -420,6 +425,7 @@ export function useSnippetCommands({
       setSelectedEspansoConfigPath,
       showAlert,
       showConfirm,
+      showDeletingSnippetIndices,
       t,
     ],
   );

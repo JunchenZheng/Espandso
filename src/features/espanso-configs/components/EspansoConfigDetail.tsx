@@ -22,6 +22,7 @@ import type { EspansoConfigPreview } from "../types";
 export interface EspansoConfigDetailProps {
   preview: EspansoConfigPreview;
   highlightedIndex?: number | null;
+  deletingIndices?: Set<number>;
   onViewSnippet: (match: ImportedMatch, index: number) => void;
   onAddSnippet: () => void;
   onOpenTriggerConflicts?: () => void;
@@ -29,12 +30,13 @@ export interface EspansoConfigDetailProps {
   onOpenVisualEditor?: () => void;
   onOpenImportAlfred?: () => void;
   onOpenWarnings?: (path: string) => void;
-  onBatchDelete?: (matchIndices: number[], onComplete: () => void) => void;
+  onBatchDelete?: (matchIndices: number[], displayIndices: number[], onComplete: () => void) => void;
 }
 
 export function EspansoConfigDetail({
   preview,
   highlightedIndex,
+  deletingIndices,
   onViewSnippet,
   onAddSnippet,
   onOpenTriggerConflicts,
@@ -176,10 +178,11 @@ export function EspansoConfigDetail({
                 disabled={selectedIndices.size === 0}
                 onClick={() => {
                   if (selectedIndices.size === 0) return;
-                  const originalIndices = Array.from(selectedIndices).map((idx) => {
+                  const displayIndices = Array.from(selectedIndices).sort((a, b) => a - b);
+                  const originalIndices = displayIndices.map((idx) => {
                     return preview.importedMatches[idx]?.originalMatchIndex ?? idx;
                   });
-                  onBatchDelete?.(originalIndices, exitBatchMode);
+                  onBatchDelete?.(originalIndices, displayIndices, exitBatchMode);
                 }}
               >
                 <Trash2 className="h-4 w-4" />
@@ -301,6 +304,7 @@ export function EspansoConfigDetail({
 
                 const isSelected = selectedIndices.has(index);
                 const isHighlighted = highlightedIndex === index;
+                const isDeleting = deletingIndices?.has(index) ?? false;
 
                 return (
                   <button
@@ -316,8 +320,13 @@ export function EspansoConfigDetail({
                         "bg-emerald-500/15 hover:bg-emerald-500/20 shadow-[inset_2px_0_0_0_rgb(16_185_129)]",
                       isHighlighted &&
                         "bg-emerald-500/20 hover:bg-emerald-500/30 font-semibold ring-1 ring-emerald-500/50 animate-pulse shadow-[inset_4px_0_0_0_rgb(16_185_129)]",
+                      isDeleting &&
+                        "bg-red-500/20 hover:bg-red-500/30 font-semibold ring-1 ring-red-500/50 animate-pulse shadow-[inset_4px_0_0_0_rgb(239_68_68)]",
                     )}
                     onClick={() => {
+                      if (isDeleting) {
+                        return;
+                      }
                       if (isBatchMode) {
                         toggleSelectIndex(index);
                       } else {
