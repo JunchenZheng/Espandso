@@ -32,6 +32,7 @@ interface AppWorkspaceProps {
   selectedPreviewError: string;
   espansoScanMessage: string;
   highlightedSnippetIndex: number | null;
+  updatedSnippetIndex: number | null;
   deletingSnippetIndices: Set<number>;
   mainSplitRef: RefObject<HTMLDivElement | null>;
   onOpenSearch: () => void;
@@ -72,6 +73,7 @@ export function AppWorkspace({
   selectedPreviewError,
   espansoScanMessage,
   highlightedSnippetIndex,
+  updatedSnippetIndex,
   deletingSnippetIndices,
   mainSplitRef,
   onOpenSearch,
@@ -195,6 +197,7 @@ export function AppWorkspace({
                   <EspansoConfigDetail
                     preview={selectedEspansoPreview}
                     highlightedIndex={highlightedSnippetIndex}
+                    updatedIndex={updatedSnippetIndex}
                     deletingIndices={deletingSnippetIndices}
                     onViewSnippet={(match, index) =>
                       onOpenSnippet({

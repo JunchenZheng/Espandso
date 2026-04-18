@@ -43,6 +43,7 @@ const DEFAULT_COLLECTION_PANE_WIDTH = 20;
 const MIN_COLLECTION_PANE_WIDTH = 14;
 const MAX_COLLECTION_PANE_WIDTH = 40;
 const DELETE_HIGHLIGHT_DURATION_MS = 900;
+const UPDATE_HIGHLIGHT_DURATION_MS = 2500;
 
 function App() {
   const { t } = useI18n();
@@ -134,7 +135,9 @@ function App() {
     TriggerPrefixConflict[]
   >([]);
   const [alfredInitialFilePath, setAlfredInitialFilePath] = useState<string | null>(null);
+  const [updatedSnippetIndex, setUpdatedSnippetIndex] = useState<number | null>(null);
   const [deletingSnippetIndices, setDeletingSnippetIndices] = useState<Set<number>>(new Set());
+  const clearUpdateHighlightTimeoutRef = useRef<number | null>(null);
   const clearDeleteHighlightTimeoutRef = useRef<number | null>(null);
 
   const snippetEditor = useSnippetEditor();
@@ -226,6 +229,9 @@ function App() {
 
   useEffect(() => {
     return () => {
+      if (clearUpdateHighlightTimeoutRef.current !== null) {
+        window.clearTimeout(clearUpdateHighlightTimeoutRef.current);
+      }
       if (clearDeleteHighlightTimeoutRef.current !== null) {
         window.clearTimeout(clearDeleteHighlightTimeoutRef.current);
       }
@@ -250,6 +256,19 @@ function App() {
         resolve();
       }, DELETE_HIGHLIGHT_DURATION_MS);
     });
+  }, []);
+
+  const highlightUpdatedSnippetIndex = useCallback((snippetIndex: number) => {
+    setUpdatedSnippetIndex(snippetIndex);
+
+    if (clearUpdateHighlightTimeoutRef.current !== null) {
+      window.clearTimeout(clearUpdateHighlightTimeoutRef.current);
+    }
+
+    clearUpdateHighlightTimeoutRef.current = window.setTimeout(() => {
+      setUpdatedSnippetIndex((prev) => (prev === snippetIndex ? null : prev));
+      clearUpdateHighlightTimeoutRef.current = null;
+    }, UPDATE_HIGHLIGHT_DURATION_MS);
   }, []);
 
   const {
@@ -284,6 +303,7 @@ function App() {
     setSelectedEspansoConfigPath,
     loadVisualEditorYaml,
     highlightSnippetIndex,
+    highlightUpdatedSnippetIndex,
     showDeletingSnippetIndices,
     showAlert,
     showConfirm,
@@ -525,6 +545,7 @@ function App() {
         selectedPreviewError={selectedPreviewError}
         espansoScanMessage={espansoScanMessage}
         highlightedSnippetIndex={highlightedSnippetIndex}
+        updatedSnippetIndex={updatedSnippetIndex}
         deletingSnippetIndices={deletingSnippetIndices}
         mainSplitRef={mainSplitRef}
         onOpenSearch={() => setIsSearchOpen(true)}

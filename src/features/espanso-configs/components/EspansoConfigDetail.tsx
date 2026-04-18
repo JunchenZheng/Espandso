@@ -22,6 +22,7 @@ import type { EspansoConfigPreview } from "../types";
 export interface EspansoConfigDetailProps {
   preview: EspansoConfigPreview;
   highlightedIndex?: number | null;
+  updatedIndex?: number | null;
   deletingIndices?: Set<number>;
   onViewSnippet: (match: ImportedMatch, index: number) => void;
   onAddSnippet: () => void;
@@ -36,6 +37,7 @@ export interface EspansoConfigDetailProps {
 export function EspansoConfigDetail({
   preview,
   highlightedIndex,
+  updatedIndex,
   deletingIndices,
   onViewSnippet,
   onAddSnippet,
@@ -318,6 +320,7 @@ export function EspansoConfigDetail({
 
                 const isSelected = selectedIndices.has(index);
                 const isHighlighted = highlightedIndex === index;
+                const isUpdated = updatedIndex === index;
                 const isDeleting = deletingIndices?.has(index) ?? false;
 
                 return (
@@ -334,6 +337,8 @@ export function EspansoConfigDetail({
                         "bg-emerald-500/15 hover:bg-emerald-500/20 shadow-[inset_2px_0_0_0_rgb(16_185_129)]",
                       isHighlighted &&
                         "bg-emerald-500/20 hover:bg-emerald-500/30 font-semibold ring-1 ring-emerald-500/50 animate-pulse",
+                      isUpdated &&
+                        "bg-amber-500/20 hover:bg-amber-500/30 font-semibold ring-1 ring-amber-500/50 animate-pulse",
                       isDeleting &&
                         "bg-red-500/20 hover:bg-red-500/30 font-semibold ring-1 ring-red-500/50 animate-pulse",
                     )}

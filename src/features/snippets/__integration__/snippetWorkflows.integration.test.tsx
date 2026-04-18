@@ -71,6 +71,37 @@ describe("Snippet integration workflows", () => {
     });
   });
 
+  it("marks an updated snippet amber after editing and updating YAML", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<App />);
+
+    await screen.findByText(":hello");
+    const rowToEdit = screen
+      .getAllByTestId("snippet-row")
+      .find((row) => row.getAttribute("data-snippet-index") === "0");
+    expect(rowToEdit).toBeInTheDocument();
+    await user.click(rowToEdit!);
+
+    const dialog = await screen.findByRole("dialog", { name: "Edit Text Snippet" });
+    const replaceInput = within(dialog).getByLabelText(/Replace Content/u);
+    await user.clear(replaceInput);
+    await user.type(replaceInput, "Hello after edit");
+    await user.click(within(dialog).getByRole("button", { name: "Update YAML" }));
+
+    const path = `${tauriHarness.getMatchDir()}/base.yml`;
+    await waitFor(() => {
+      expect(tauriHarness.getFile(path)).toContain("replace: Hello after edit");
+    });
+
+    expect(await screen.findByText("Hello after edit")).toBeInTheDocument();
+    await waitFor(() => {
+      const updatedRow = screen
+        .getAllByTestId("snippet-row")
+        .find((row) => row.getAttribute("data-snippet-index") === "0");
+      expect(updatedRow).toHaveClass("bg-amber-500/20");
+    });
+  });
+
   it("shows rich text formats only after enabling the experimental setting", async () => {
     const user = userEvent.setup();
     renderWithProviders(<App />);
