@@ -22,6 +22,8 @@ import type { EspansoConfigPreview } from "../types";
 export interface EspansoConfigDetailProps {
   preview: EspansoConfigPreview;
   highlightedIndex?: number | null;
+  updatedIndex?: number | null;
+  deletingIndices?: Set<number>;
   onViewSnippet: (match: ImportedMatch, index: number) => void;
   onAddSnippet: () => void;
   onOpenTriggerConflicts?: () => void;
@@ -29,12 +31,14 @@ export interface EspansoConfigDetailProps {
   onOpenVisualEditor?: () => void;
   onOpenImportAlfred?: () => void;
   onOpenWarnings?: (path: string) => void;
-  onBatchDelete?: (matchIndices: number[], onComplete: () => void) => void;
+  onBatchDelete?: (matchIndices: number[], displayIndices: number[], onComplete: () => void) => void;
 }
 
 export function EspansoConfigDetail({
   preview,
   highlightedIndex,
+  updatedIndex,
+  deletingIndices,
   onViewSnippet,
   onAddSnippet,
   onOpenTriggerConflicts,
@@ -64,15 +68,29 @@ export function EspansoConfigDetail({
   const totalHeight = snippetCount * ROW_HEIGHT;
   const contentScrollTop = Math.max(0, scrollTop - HEADER_HEIGHT);
 
-  useEffect(() => {
-    if (highlightedIndex !== undefined && highlightedIndex !== null && highlightedIndex >= 0) {
-      const targetScrollTop = Math.max(0, HEADER_HEIGHT + highlightedIndex * ROW_HEIGHT - 60);
-      setScrollTop(targetScrollTop);
-      if (scrollRef.current) {
-        scrollRef.current.scrollTop = targetScrollTop;
-      }
+  useLayoutEffect(() => {
+    if (
+      highlightedIndex === undefined ||
+      highlightedIndex === null ||
+      highlightedIndex < 0 ||
+      snippetCount === 0
+    ) {
+      return;
     }
-  }, [highlightedIndex, ROW_HEIGHT, HEADER_HEIGHT]);
+
+    const frameId = window.requestAnimationFrame(() => {
+      if (!scrollRef.current) {
+        return;
+      }
+
+      const targetIndex = Math.min(highlightedIndex, snippetCount - 1);
+      const targetScrollTop = Math.max(0, HEADER_HEIGHT + targetIndex * ROW_HEIGHT - 60);
+      scrollRef.current.scrollTop = targetScrollTop;
+      setScrollTop(scrollRef.current.scrollTop);
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [highlightedIndex, snippetCount, ROW_HEIGHT, HEADER_HEIGHT]);
 
   const startIndex = Math.max(0, Math.floor(contentScrollTop / ROW_HEIGHT) - OVERSCAN_ROWS);
   const visibleRowCount =
@@ -176,10 +194,11 @@ export function EspansoConfigDetail({
                 disabled={selectedIndices.size === 0}
                 onClick={() => {
                   if (selectedIndices.size === 0) return;
-                  const originalIndices = Array.from(selectedIndices).map((idx) => {
+                  const displayIndices = Array.from(selectedIndices).sort((a, b) => a - b);
+                  const originalIndices = displayIndices.map((idx) => {
                     return preview.importedMatches[idx]?.originalMatchIndex ?? idx;
                   });
-                  onBatchDelete?.(originalIndices, exitBatchMode);
+                  onBatchDelete?.(originalIndices, displayIndices, exitBatchMode);
                 }}
               >
                 <Trash2 className="h-4 w-4" />
@@ -242,7 +261,7 @@ export function EspansoConfigDetail({
         <div
           className={cn(
             previewGridClassName,
-            "sticky top-0 z-10 h-9 border-b bg-secondary/40 text-xs font-semibold text-muted-foreground",
+            "sticky top-0 z-10 h-9 border-b bg-background text-xs font-semibold text-muted-foreground",
             isBatchMode ? batchPreviewGridColumns : previewGridColumns,
           )}
         >
@@ -301,6 +320,8 @@ export function EspansoConfigDetail({
 
                 const isSelected = selectedIndices.has(index);
                 const isHighlighted = highlightedIndex === index;
+                const isUpdated = updatedIndex === index;
+                const isDeleting = deletingIndices?.has(index) ?? false;
 
                 return (
                   <button
@@ -315,9 +336,16 @@ export function EspansoConfigDetail({
                       isSelected &&
                         "bg-emerald-500/15 hover:bg-emerald-500/20 shadow-[inset_2px_0_0_0_rgb(16_185_129)]",
                       isHighlighted &&
-                        "bg-emerald-500/20 hover:bg-emerald-500/30 font-semibold ring-1 ring-emerald-500/50 animate-pulse shadow-[inset_4px_0_0_0_rgb(16_185_129)]",
+                        "bg-emerald-500/20 hover:bg-emerald-500/30 font-semibold ring-1 ring-emerald-500/50 animate-pulse",
+                      isUpdated &&
+                        "bg-amber-500/20 hover:bg-amber-500/30 font-semibold ring-1 ring-amber-500/50 animate-pulse",
+                      isDeleting &&
+                        "bg-red-500/20 hover:bg-red-500/30 font-semibold ring-1 ring-red-500/50 animate-pulse",
                     )}
                     onClick={() => {
+                      if (isDeleting) {
+                        return;
+                      }
                       if (isBatchMode) {
                         toggleSelectIndex(index);
                       } else {

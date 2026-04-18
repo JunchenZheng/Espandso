@@ -30,23 +30,27 @@ export function useSearchIndex(options: UseSearchIndexOptions = {}) {
     };
   }, []);
 
+  const highlightSnippetIndex = useCallback((snippetIndex: number) => {
+    setHighlightedSnippetIndex(snippetIndex);
+
+    if (clearHighlightTimeoutRef.current !== null) {
+      window.clearTimeout(clearHighlightTimeoutRef.current);
+    }
+    clearHighlightTimeoutRef.current = window.setTimeout(() => {
+      setHighlightedSnippetIndex((prev) => (prev === snippetIndex ? null : prev));
+      clearHighlightTimeoutRef.current = null;
+    }, 2500);
+  }, []);
+
   const handleSelectSearchResult = useCallback(
     (result: SearchResult, overrideSelectPath?: (path: string) => void) => {
       const selectPath = overrideSelectPath || onSelectConfigPath;
       if (selectPath) {
         selectPath(result.filePath);
       }
-      setHighlightedSnippetIndex(result.snippetIndex);
-
-      if (clearHighlightTimeoutRef.current !== null) {
-        window.clearTimeout(clearHighlightTimeoutRef.current);
-      }
-      clearHighlightTimeoutRef.current = window.setTimeout(() => {
-        setHighlightedSnippetIndex((prev) => (prev === result.snippetIndex ? null : prev));
-        clearHighlightTimeoutRef.current = null;
-      }, 2500);
+      highlightSnippetIndex(result.snippetIndex);
     },
-    [onSelectConfigPath],
+    [highlightSnippetIndex, onSelectConfigPath],
   );
 
   return {
@@ -54,6 +58,7 @@ export function useSearchIndex(options: UseSearchIndexOptions = {}) {
     setIsSearchOpen,
     highlightedSnippetIndex,
     setHighlightedSnippetIndex,
+    highlightSnippetIndex,
     handleSelectSearchResult,
   };
 }

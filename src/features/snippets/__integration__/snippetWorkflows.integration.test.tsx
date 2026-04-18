@@ -13,6 +13,17 @@ const baseYaml = [
   "",
 ].join("\n");
 
+const batchYaml = [
+  "matches:",
+  "  - trigger: :one",
+  "    replace: One",
+  "  - trigger: :two",
+  "    replace: Two",
+  "  - trigger: :three",
+  "    replace: Three",
+  "",
+].join("\n");
+
 describe("Snippet integration workflows", () => {
   beforeEach(() => {
     window.localStorage.clear();
@@ -45,12 +56,49 @@ describe("Snippet integration workflows", () => {
     expect(tauriHarness.getFile(path)).toContain("replace: Goodbye from integration");
     expect(await screen.findByText(":bye")).toBeInTheDocument();
     expect(screen.getByText("Goodbye from integration")).toBeInTheDocument();
+    await waitFor(() => {
+      const addedRow = screen
+        .getAllByTestId("snippet-row")
+        .find((row) => row.getAttribute("data-snippet-index") === "1");
+      expect(addedRow).toHaveClass("bg-emerald-500/20");
+    });
     expect(tauriHarness.invoke).toHaveBeenCalledWith("mark_search_index_internal_write", {
       filePath: path,
     });
     expect(tauriHarness.invoke).toHaveBeenCalledWith("refresh_search_index_file", {
       filePath: path,
       matchDir: tauriHarness.getMatchDir(),
+    });
+  });
+
+  it("marks an updated snippet amber after editing and updating YAML", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<App />);
+
+    await screen.findByText(":hello");
+    const rowToEdit = screen
+      .getAllByTestId("snippet-row")
+      .find((row) => row.getAttribute("data-snippet-index") === "0");
+    expect(rowToEdit).toBeInTheDocument();
+    await user.click(rowToEdit!);
+
+    const dialog = await screen.findByRole("dialog", { name: "Edit Text Snippet" });
+    const replaceInput = within(dialog).getByLabelText(/Replace Content/u);
+    await user.clear(replaceInput);
+    await user.type(replaceInput, "Hello after edit");
+    await user.click(within(dialog).getByRole("button", { name: "Update YAML" }));
+
+    const path = `${tauriHarness.getMatchDir()}/base.yml`;
+    await waitFor(() => {
+      expect(tauriHarness.getFile(path)).toContain("replace: Hello after edit");
+    });
+
+    expect(await screen.findByText("Hello after edit")).toBeInTheDocument();
+    await waitFor(() => {
+      const updatedRow = screen
+        .getAllByTestId("snippet-row")
+        .find((row) => row.getAttribute("data-snippet-index") === "0");
+      expect(updatedRow).toHaveClass("bg-amber-500/20");
     });
   });
 
@@ -79,6 +127,44 @@ describe("Snippet integration workflows", () => {
     expect(within(dialog).getByLabelText("Plain Text")).toBeChecked();
     expect(within(dialog).getByLabelText("Markdown")).not.toBeChecked();
     expect(within(dialog).getByLabelText("HTML")).not.toBeChecked();
+  });
+
+  it("marks batch-deleted snippets red before refreshing them out of the list", async () => {
+    const user = userEvent.setup();
+    const matchDir = tauriHarness.getMatchDir();
+    tauriHarness.reset({
+      files: {
+        [`${matchDir}/base.yml`]: batchYaml,
+      },
+    });
+    renderWithProviders(<App />);
+
+    await screen.findByText(":two");
+    await user.click(screen.getByRole("button", { name: "Batch Delete" }));
+
+    const rowToDelete = screen
+      .getAllByTestId("snippet-row")
+      .find((row) => row.getAttribute("data-snippet-index") === "1");
+    expect(rowToDelete).toBeInTheDocument();
+    await user.click(rowToDelete!);
+    await user.click(screen.getByRole("button", { name: "Delete Selected (1)" }));
+    await user.click(await screen.findByRole("button", { name: "Delete Selected" }));
+
+    await waitFor(() => {
+      const deletingRow = screen
+        .getAllByTestId("snippet-row")
+        .find((row) => row.getAttribute("data-snippet-index") === "1");
+      expect(deletingRow).toHaveClass("bg-red-500/20");
+      expect(deletingRow).toHaveTextContent(":two");
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText(":two")).not.toBeInTheDocument();
+    }, { timeout: 2500 });
+
+    expect(tauriHarness.getFile(`${matchDir}/base.yml`)).not.toContain("trigger: :two");
+    expect(screen.getByText(":one")).toBeInTheDocument();
+    expect(screen.getByText(":three")).toBeInTheDocument();
   });
 
   it("adds a markdown rich text snippet from the text mode", async () => {

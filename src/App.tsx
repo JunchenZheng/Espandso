@@ -42,6 +42,8 @@ export type { EspansoConfigPreview } from "./features/espanso-configs/types";
 const DEFAULT_COLLECTION_PANE_WIDTH = 20;
 const MIN_COLLECTION_PANE_WIDTH = 14;
 const MAX_COLLECTION_PANE_WIDTH = 40;
+const DELETE_HIGHLIGHT_DURATION_MS = 900;
+const UPDATE_HIGHLIGHT_DURATION_MS = 2500;
 
 function App() {
   const { t } = useI18n();
@@ -108,10 +110,15 @@ function App() {
     handleCreateFolder,
   } = useEspansoConfigs({ isYamlWarningsEnabled });
 
-  const { isSearchOpen, setIsSearchOpen, highlightedSnippetIndex, handleSelectSearchResult } =
-    useSearchIndex({
-      onSelectConfigPath: setSelectedEspansoConfigPath,
-    });
+  const {
+    isSearchOpen,
+    setIsSearchOpen,
+    highlightedSnippetIndex,
+    highlightSnippetIndex,
+    handleSelectSearchResult,
+  } = useSearchIndex({
+    onSelectConfigPath: setSelectedEspansoConfigPath,
+  });
 
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isLogOpen, setIsLogOpen] = useState<boolean>(false);
@@ -128,6 +135,10 @@ function App() {
     TriggerPrefixConflict[]
   >([]);
   const [alfredInitialFilePath, setAlfredInitialFilePath] = useState<string | null>(null);
+  const [updatedSnippetIndex, setUpdatedSnippetIndex] = useState<number | null>(null);
+  const [deletingSnippetIndices, setDeletingSnippetIndices] = useState<Set<number>>(new Set());
+  const clearUpdateHighlightTimeoutRef = useRef<number | null>(null);
+  const clearDeleteHighlightTimeoutRef = useRef<number | null>(null);
 
   const snippetEditor = useSnippetEditor();
 
@@ -216,6 +227,50 @@ function App() {
 
   const { alertDialog, showAlert, showConfirm, closeAlertDialog } = useConfirmAlertDialog();
 
+  useEffect(() => {
+    return () => {
+      if (clearUpdateHighlightTimeoutRef.current !== null) {
+        window.clearTimeout(clearUpdateHighlightTimeoutRef.current);
+      }
+      if (clearDeleteHighlightTimeoutRef.current !== null) {
+        window.clearTimeout(clearDeleteHighlightTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const showDeletingSnippetIndices = useCallback((indices: number[]) => {
+    const next = new Set(indices.filter((index) => index >= 0));
+    if (next.size === 0) {
+      return Promise.resolve();
+    }
+
+    if (clearDeleteHighlightTimeoutRef.current !== null) {
+      window.clearTimeout(clearDeleteHighlightTimeoutRef.current);
+    }
+
+    setDeletingSnippetIndices(next);
+    return new Promise<void>((resolve) => {
+      clearDeleteHighlightTimeoutRef.current = window.setTimeout(() => {
+        setDeletingSnippetIndices(new Set());
+        clearDeleteHighlightTimeoutRef.current = null;
+        resolve();
+      }, DELETE_HIGHLIGHT_DURATION_MS);
+    });
+  }, []);
+
+  const highlightUpdatedSnippetIndex = useCallback((snippetIndex: number) => {
+    setUpdatedSnippetIndex(snippetIndex);
+
+    if (clearUpdateHighlightTimeoutRef.current !== null) {
+      window.clearTimeout(clearUpdateHighlightTimeoutRef.current);
+    }
+
+    clearUpdateHighlightTimeoutRef.current = window.setTimeout(() => {
+      setUpdatedSnippetIndex((prev) => (prev === snippetIndex ? null : prev));
+      clearUpdateHighlightTimeoutRef.current = null;
+    }, UPDATE_HIGHLIGHT_DURATION_MS);
+  }, []);
+
   const {
     chooseSnippetFile,
     chooseSnippetImageFile,
@@ -247,6 +302,9 @@ function App() {
     loadEspansoConfigPreview,
     setSelectedEspansoConfigPath,
     loadVisualEditorYaml,
+    highlightSnippetIndex,
+    highlightUpdatedSnippetIndex,
+    showDeletingSnippetIndices,
     showAlert,
     showConfirm,
     t,
@@ -487,6 +545,8 @@ function App() {
         selectedPreviewError={selectedPreviewError}
         espansoScanMessage={espansoScanMessage}
         highlightedSnippetIndex={highlightedSnippetIndex}
+        updatedSnippetIndex={updatedSnippetIndex}
+        deletingSnippetIndices={deletingSnippetIndices}
         mainSplitRef={mainSplitRef}
         onOpenSearch={() => setIsSearchOpen(true)}
         onRefresh={scanDefaultEspansoConfigDir}
@@ -503,12 +563,13 @@ function App() {
         onOpenVisualEditor={openVisualEditorDialog}
         onOpenImportAlfred={() => setIsImportAlfredOpen(true)}
         onOpenWarnings={openWarningsDialog}
-        onBatchDelete={(matchIndices, onComplete) => {
+        onBatchDelete={(matchIndices, displayIndices, onComplete) => {
           if (!selectedEspansoPreview) return;
           batchDeleteSnippetsFromYaml(
             selectedEspansoPreview.config.path,
             selectedEspansoPreview.config.relativePath,
             matchIndices,
+            displayIndices,
             onComplete,
           );
         }}

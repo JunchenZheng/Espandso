@@ -32,6 +32,8 @@ interface AppWorkspaceProps {
   selectedPreviewError: string;
   espansoScanMessage: string;
   highlightedSnippetIndex: number | null;
+  updatedSnippetIndex: number | null;
+  deletingSnippetIndices: Set<number>;
   mainSplitRef: RefObject<HTMLDivElement | null>;
   onOpenSearch: () => void;
   onRefresh: () => void;
@@ -48,7 +50,7 @@ interface AppWorkspaceProps {
   onOpenVisualEditor: () => void;
   onOpenImportAlfred?: () => void;
   onOpenWarnings: (path: string) => void;
-  onBatchDelete: (matchIndices: number[], onComplete: () => void) => void;
+  onBatchDelete: (matchIndices: number[], displayIndices: number[], onComplete: () => void) => void;
   onCollectionResizeStart: (event: PointerEvent<HTMLButtonElement>) => void;
   onCollectionResizeMove: (event: PointerEvent<HTMLButtonElement>) => void;
   onCollectionResizeStop: (event: PointerEvent<HTMLButtonElement>) => void;
@@ -71,6 +73,8 @@ export function AppWorkspace({
   selectedPreviewError,
   espansoScanMessage,
   highlightedSnippetIndex,
+  updatedSnippetIndex,
+  deletingSnippetIndices,
   mainSplitRef,
   onOpenSearch,
   onRefresh,
@@ -193,6 +197,8 @@ export function AppWorkspace({
                   <EspansoConfigDetail
                     preview={selectedEspansoPreview}
                     highlightedIndex={highlightedSnippetIndex}
+                    updatedIndex={updatedSnippetIndex}
+                    deletingIndices={deletingSnippetIndices}
                     onViewSnippet={(match, index) =>
                       onOpenSnippet({
                         preview: selectedEspansoPreview,
