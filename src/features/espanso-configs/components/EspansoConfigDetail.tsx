@@ -261,7 +261,7 @@ export function EspansoConfigDetail({
         <div
           className={cn(
             previewGridClassName,
-            "sticky top-0 z-10 h-9 border-b bg-secondary/40 text-xs font-semibold text-muted-foreground",
+            "sticky top-0 z-10 h-9 border-b bg-background text-xs font-semibold text-muted-foreground",
             isBatchMode ? batchPreviewGridColumns : previewGridColumns,
           )}
         >
