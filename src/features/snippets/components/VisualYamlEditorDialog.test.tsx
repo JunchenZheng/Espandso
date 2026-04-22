@@ -100,6 +100,7 @@ function createActionProps(saveSnippetToYaml = vi.fn()): VisualYamlEditorActionP
     saveSnippetToYaml,
     isSavingSnippet: false,
     showAlert: vi.fn(),
+    showConfirm: vi.fn(),
     resetSnippetForm: vi.fn(),
     setSnippetEditTarget: vi.fn(),
   };
@@ -108,19 +109,26 @@ function createActionProps(saveSnippetToYaml = vi.fn()): VisualYamlEditorActionP
 function renderDialog(
   actions = createActionProps(),
   formOverrides: Partial<VisualYamlEditorFormProps> = {},
+  visualEditorOverrides: Partial<VisualYamlEditorStateProps> = {},
 ) {
+  const onOpenChange = vi.fn();
   const props: VisualYamlEditorDialogProps = {
     isOpen: true,
-    onOpenChange: vi.fn(),
+    onOpenChange,
     snippetEditTarget: null,
     selectedEspansoPreview: preview,
     t: (key, options) => translate("en", key, options),
-    visualEditor: createVisualEditorProps(),
+    visualEditor: {
+      ...createVisualEditorProps(),
+      ...visualEditorOverrides,
+    },
     form: createFormProps(formOverrides),
     actions,
   };
 
   renderWithProviders(<VisualYamlEditorDialog {...props} />);
+
+  return { onOpenChange };
 }
 
 describe("VisualYamlEditorDialog", () => {
@@ -158,5 +166,57 @@ describe("VisualYamlEditorDialog", () => {
     fireEvent.keyDown(screen.getByLabelText(/Replace Content/u), { key: "Enter" });
 
     expect(saveSnippetToYaml).not.toHaveBeenCalled();
+  });
+
+  it("asks for confirmation before canceling a dirty add workflow", async () => {
+    const user = userEvent.setup();
+    const actions = createActionProps();
+    const { onOpenChange } = renderDialog(actions, { editTriggersText: ":draft" });
+
+    await user.click(screen.getByRole("button", { name: /Cancel/u }));
+
+    expect(actions.showConfirm).toHaveBeenCalledTimes(1);
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(actions.resetSnippetForm).not.toHaveBeenCalled();
+
+    const onConfirm = vi.mocked(actions.showConfirm).mock.calls[0][1] as () => void;
+    onConfirm();
+
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(actions.resetSnippetForm).toHaveBeenCalledTimes(1);
+    expect(actions.setSnippetEditTarget).toHaveBeenCalledWith(null);
+  });
+
+  it("asks for confirmation before closing a dirty delete workflow with Escape", async () => {
+    const user = userEvent.setup();
+    const actions = createActionProps();
+    const { onOpenChange } = renderDialog(
+      actions,
+      {},
+      {
+        visualEditorMode: "delete",
+        pendingDeleteSelections: [{ matchIndex: 0, triggerIndex: 0 }],
+      },
+    );
+
+    await user.keyboard("{Escape}");
+
+    expect(actions.showConfirm).toHaveBeenCalledTimes(1);
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(vi.mocked(actions.showConfirm).mock.calls[0][2]).toBe("Discard Unsaved Changes?");
+    expect(vi.mocked(actions.showConfirm).mock.calls[0][3]).toBe("Discard Changes");
+    expect(vi.mocked(actions.showConfirm).mock.calls[0][4]).toBe("Keep Editing");
+  });
+
+  it("closes a clean visual editor without confirmation", async () => {
+    const user = userEvent.setup();
+    const actions = createActionProps();
+    const { onOpenChange } = renderDialog(actions);
+
+    await user.keyboard("{Escape}");
+
+    expect(actions.showConfirm).not.toHaveBeenCalled();
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(actions.resetSnippetForm).toHaveBeenCalledTimes(1);
   });
 });
