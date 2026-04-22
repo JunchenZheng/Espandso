@@ -147,4 +147,40 @@ describe("Espanso config integration workflows", () => {
       matchDir: tauriHarness.getMatchDir(),
     });
   });
+
+  it("uses the selected collection directory as the default create-file location", async () => {
+    const user = userEvent.setup();
+    const matchDir = tauriHarness.getMatchDir();
+    tauriHarness.reset({
+      directories: [`${matchDir}/work`],
+      files: {
+        [`${matchDir}/base.yml`]: baseYaml,
+        [`${matchDir}/work/team.yml`]: [
+          "matches:",
+          "  - trigger: :team",
+          "    replace: Team hello",
+          "",
+        ].join("\n"),
+      },
+    });
+
+    renderWithProviders(<App />);
+
+    await screen.findByText(":hello");
+    await user.click(screen.getByText("work"));
+    expect(await screen.findByText("/work")).toBeInTheDocument();
+
+    await user.click(screen.getByTitle("Create New YAML File in /work"));
+
+    const dialog = await screen.findByRole("dialog", { name: "Create New YAML File" });
+    expect(within(dialog).getByLabelText("Target Location")).toHaveValue("work");
+
+    await user.type(within(dialog).getByLabelText(/File Name/u), "ideas");
+    await user.click(within(dialog).getByRole("button", { name: "Create File" }));
+
+    const newPath = `${matchDir}/work/ideas.yml`;
+    await waitFor(() => {
+      expect(tauriHarness.getFile(newPath)).toContain("Espanso match file: ideas");
+    });
+  });
 });

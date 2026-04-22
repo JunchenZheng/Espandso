@@ -43,24 +43,50 @@ export const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
   }, [containsActive]);
 
   if (node.isDir) {
+    const isActive = node.relativePath === activePath || node.path === activePath;
+
     return (
       <div className="mb-0.5">
         <div
           className={cn(
             "group flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent/70",
-            containsActive ? "text-foreground font-semibold" : "text-foreground/80 font-medium",
+            isActive
+              ? "bg-primary text-primary-foreground font-semibold"
+              : containsActive
+                ? "text-foreground font-semibold"
+                : "text-foreground/80 font-medium",
           )}
         >
           <button
             className="flex min-w-0 flex-1 items-center gap-2 text-left"
-            onClick={() => setIsOpen(!isOpen)}
+            onClick={() => {
+              onSelect(node.relativePath || node.path);
+              setIsOpen(!isOpen);
+            }}
           >
             {isOpen ? (
-              <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground/70 transition-transform" />
+              <ChevronDown
+                className={cn(
+                  "h-4 w-4 shrink-0 transition-transform",
+                  isActive ? "text-primary-foreground/80" : "text-muted-foreground/70",
+                )}
+              />
             ) : (
-              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/70 transition-transform" />
+              <ChevronRight
+                className={cn(
+                  "h-4 w-4 shrink-0 transition-transform",
+                  isActive ? "text-primary-foreground/80" : "text-muted-foreground/70",
+                )}
+              />
             )}
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-400">
+            <div
+              className={cn(
+                "flex h-7 w-7 shrink-0 items-center justify-center rounded-md",
+                isActive
+                  ? "bg-primary-foreground/20 text-primary-foreground"
+                  : "bg-amber-500/15 text-amber-600 dark:text-amber-400",
+              )}
+            >
               {isOpen ? <FolderOpen className="h-4 w-4" /> : <Folder className="h-4 w-4" />}
             </div>
             <div className="min-w-0 flex-1">
@@ -69,7 +95,12 @@ export const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
           </button>
           <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
             <button
-              className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent-foreground/10 hover:text-foreground"
+              className={cn(
+                "flex h-6 w-6 items-center justify-center rounded hover:bg-accent-foreground/10",
+                isActive
+                  ? "text-primary-foreground/80 hover:text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
               title={t("filesystem.createFolderIn", { path: node.name })}
               onClick={(e) => {
                 e.stopPropagation();
@@ -79,7 +110,12 @@ export const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
               <FolderPlus className="h-3.5 w-3.5" />
             </button>
             <button
-              className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent-foreground/10 hover:text-foreground"
+              className={cn(
+                "flex h-6 w-6 items-center justify-center rounded hover:bg-accent-foreground/10",
+                isActive
+                  ? "text-primary-foreground/80 hover:text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
               title={t("filesystem.createFileIn", { path: node.name })}
               onClick={(e) => {
                 e.stopPropagation();
