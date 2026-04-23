@@ -49,12 +49,12 @@ export const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
       <div className="mb-0.5">
         <div
           className={cn(
-            "group flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent/70",
+            "group flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm transition-colors",
             isActive
               ? "bg-primary text-primary-foreground font-semibold"
               : containsActive
-                ? "text-foreground font-semibold"
-                : "text-foreground/80 font-medium",
+                ? "text-foreground font-semibold hover:bg-accent/70"
+                : "text-foreground/80 font-medium hover:bg-accent/70",
           )}
         >
           <button
