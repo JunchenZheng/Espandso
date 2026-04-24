@@ -2,11 +2,9 @@ import { memo, useEffect, useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
-  FilePlus,
   FileText,
   Folder,
   FolderOpen,
-  FolderPlus,
   SquareArrowOutUpRight,
 } from "lucide-react";
 import { useI18n } from "../../../i18n/useI18n";
@@ -93,38 +91,7 @@ export const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
               <div className="truncate text-sm font-semibold tracking-tight">{node.name}</div>
             </div>
           </button>
-          <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-            <button
-              className={cn(
-                "flex h-6 w-6 items-center justify-center rounded hover:bg-accent-foreground/10",
-                isActive
-                  ? "text-primary-foreground/80 hover:text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-              title={t("filesystem.createFolderIn", { path: node.name })}
-              onClick={(e) => {
-                e.stopPropagation();
-                onCreateFolder?.(node.relativePath);
-              }}
-            >
-              <FolderPlus className="h-3.5 w-3.5" />
-            </button>
-            <button
-              className={cn(
-                "flex h-6 w-6 items-center justify-center rounded hover:bg-accent-foreground/10",
-                isActive
-                  ? "text-primary-foreground/80 hover:text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-              title={t("filesystem.createFileIn", { path: node.name })}
-              onClick={(e) => {
-                e.stopPropagation();
-                onCreateFile?.(node.relativePath);
-              }}
-            >
-              <FilePlus className="h-3.5 w-3.5" />
-            </button>
-          </div>
+          {/* Directory quick-create actions are intentionally not rendered; use the Collection header actions with the selected directory context. */}
         </div>
         {isOpen && node.children && (
           <div className="ml-3.5 mt-0.5 space-y-0.5 border-l border-border/50 pl-2">
