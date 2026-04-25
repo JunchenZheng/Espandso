@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { buildEspansoConfigPreviewTree, findTreeNode, getEspansoConfigAncestorPaths } from "./tree";
+import {
+  buildEspansoConfigPreviewTree,
+  findTreeNode,
+  getEspansoConfigAncestorPaths,
+  getEspansoMatchRootName,
+  wrapEspansoConfigPreviewTreeWithMatchRoot,
+} from "./tree";
 import type { EspansoConfigPreview } from "./types";
 
 describe("Espanso config tree helpers", () => {
@@ -62,5 +68,50 @@ describe("Espanso config tree helpers", () => {
     const subNode = findTreeNode(tree, "sub");
     expect(subNode?.isDir).toBe(true);
     expect(subNode?.snippetCount).toBe(3);
+  });
+
+  it("derives the collection root name from the configured match directory", () => {
+    expect(getEspansoMatchRootName("/Users/me/Library/Application Support/espanso/match")).toBe(
+      "match",
+    );
+    expect(getEspansoMatchRootName("C:\\Users\\me\\AppData\\Roaming\\espanso\\match\\")).toBe(
+      "match",
+    );
+  });
+
+  it("wraps preview nodes in the configured match directory root", () => {
+    const tree = buildEspansoConfigPreviewTree([
+      {
+        config: {
+          name: "base.yml",
+          path: "/path/match/base.yml",
+          relativePath: "base.yml",
+        },
+        snippetCount: 2,
+        inlineCount: 2,
+        resourceCount: 0,
+        imageCount: 0,
+        formCount: 0,
+        warningCount: 0,
+        warnings: [],
+        snippets: [],
+        importedMatches: [],
+      },
+    ]);
+
+    const wrapped = wrapEspansoConfigPreviewTreeWithMatchRoot(tree, "/path/espanso/match");
+
+    expect(wrapped).toHaveLength(1);
+    expect(wrapped[0]).toMatchObject({
+      name: "match",
+      path: "/path/espanso/match",
+      relativePath: "",
+      isDir: true,
+      isCollectionRoot: true,
+      snippetCount: 2,
+      fileCount: 1,
+    });
+    expect(wrapped[0].children?.[0].name).toBe("base.yml");
+    expect(findTreeNode(wrapped, "/path/espanso/match")?.isCollectionRoot).toBe(true);
   });
 });

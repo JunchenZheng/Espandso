@@ -22,6 +22,7 @@ export interface EspansoConfigPreviewTreeNode {
   isDir: boolean;
   snippetCount: number;
   fileCount: number;
+  isCollectionRoot?: boolean;
   preview?: EspansoConfigPreview;
   children?: EspansoConfigPreviewTreeNode[];
 }

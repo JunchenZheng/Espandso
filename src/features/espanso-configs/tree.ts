@@ -1,6 +1,12 @@
 import type { EspansoDirectoryInfo } from "../../logic/espansoPaths";
 import type { EspansoConfigPreview, EspansoConfigPreviewTreeNode } from "./types";
 
+export function getEspansoMatchRootName(matchDir: string): string {
+  const normalized = matchDir.replace(/[\\/]+$/u, "");
+  const parts = normalized.split(/[\\/]/u).filter(Boolean);
+  return parts[parts.length - 1] || normalized || "/";
+}
+
 export function getEspansoConfigAncestorPaths(relativePath: string): Set<string> {
   const paths = new Set<string>();
   const parts = relativePath.split("/");
@@ -118,4 +124,26 @@ export function buildEspansoConfigPreviewTree(
   }
 
   return root;
+}
+
+export function wrapEspansoConfigPreviewTreeWithMatchRoot(
+  nodes: EspansoConfigPreviewTreeNode[],
+  matchDir: string,
+): EspansoConfigPreviewTreeNode[] {
+  if (!matchDir) return nodes;
+
+  const normalizedMatchDir = matchDir.replace(/[\\/]+$/u, "");
+
+  return [
+    {
+      name: getEspansoMatchRootName(matchDir),
+      path: normalizedMatchDir || matchDir,
+      relativePath: "",
+      isDir: true,
+      isCollectionRoot: true,
+      snippetCount: nodes.reduce((total, node) => total + node.snippetCount, 0),
+      fileCount: nodes.reduce((total, node) => total + node.fileCount, 0),
+      children: nodes,
+    },
+  ];
 }

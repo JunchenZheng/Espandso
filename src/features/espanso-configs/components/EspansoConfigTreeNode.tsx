@@ -32,13 +32,14 @@ export const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
 }: EspansoConfigTreeNodeProps) {
   const { t } = useI18n();
   const containsActive = activeAncestorPaths.has(node.relativePath || node.path);
-  const [isOpen, setIsOpen] = useState<boolean>(containsActive);
+  const shouldAutoOpen = containsActive || node.isCollectionRoot;
+  const [isOpen, setIsOpen] = useState<boolean>(shouldAutoOpen);
 
   useEffect(() => {
-    if (containsActive) {
+    if (shouldAutoOpen) {
       setIsOpen(true);
     }
-  }, [containsActive]);
+  }, [shouldAutoOpen]);
 
   if (node.isDir) {
     const isActive = node.relativePath === activePath || node.path === activePath;
