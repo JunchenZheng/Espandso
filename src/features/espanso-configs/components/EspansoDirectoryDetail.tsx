@@ -38,7 +38,7 @@ export function EspansoDirectoryDetail({
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           <Button size="sm" onClick={() => onCreateFolder(node.relativePath)} className="gap-1.5">
             <FolderPlus className="h-4 w-4" />
             {t("filesystem.newSubdirectory")}
@@ -57,7 +57,7 @@ export function EspansoDirectoryDetail({
 
       {/* Directory Contents */}
       <ScrollArea className="flex-1 p-6">
-        <div className="max-w-4xl space-y-4">
+        <div className="mx-auto w-full max-w-4xl space-y-4">
           <h3 className="text-sm font-semibold text-foreground/80">
             {t("filesystem.contentsIn", { name: node.name })}
           </h3>
