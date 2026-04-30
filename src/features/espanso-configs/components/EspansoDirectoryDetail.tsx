@@ -1,4 +1,12 @@
-import { ChevronRight, FilePlus, FileText, Folder, FolderOpen, FolderPlus } from "lucide-react";
+import {
+  ChevronRight,
+  FileDown,
+  FilePlus,
+  FileText,
+  Folder,
+  FolderOpen,
+  FolderPlus,
+} from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { ScrollArea } from "../../../components/ui/scroll-area";
 import { useI18n } from "../../../i18n/useI18n";
@@ -9,6 +17,7 @@ export interface EspansoDirectoryDetailProps {
   onSelectFile: (path: string) => void;
   onCreateFile: (parentRelPath?: string) => void;
   onCreateFolder: (parentRelPath?: string) => void;
+  onOpenImportAlfred?: () => void;
 }
 
 export function EspansoDirectoryDetail({
@@ -16,6 +25,7 @@ export function EspansoDirectoryDetail({
   onSelectFile,
   onCreateFile,
   onCreateFolder,
+  onOpenImportAlfred,
 }: EspansoDirectoryDetailProps) {
   const { t } = useI18n();
 
@@ -39,6 +49,18 @@ export function EspansoDirectoryDetail({
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
+          {onOpenImportAlfred && (
+            <Button
+              size="sm"
+              variant="outline"
+              data-testid="directory-import-alfred-btn"
+              onClick={onOpenImportAlfred}
+              className="gap-1.5"
+            >
+              <FileDown className="h-4 w-4" />
+              {t("actions.importAlfred")}
+            </Button>
+          )}
           <Button size="sm" onClick={() => onCreateFolder(node.relativePath)} className="gap-1.5">
             <FolderPlus className="h-4 w-4" />
             {t("filesystem.newSubdirectory")}

@@ -280,6 +280,7 @@ function App() {
     batchDeleteSnippetsFromYaml,
     openYamlFileInDefaultApp,
     importAlfredSnippetsToYaml,
+    importAlfredSnippetsToNewYaml,
   } = useSnippetCommands({
     selectedEspansoPreview,
     snippetEditTarget: snippetEditor.editTarget,
@@ -300,6 +301,7 @@ function App() {
     setEditImagePath: snippetEditor.setImagePath,
     applyPendingDeleteWorkflow,
     loadEspansoConfigPreview,
+    refreshEspansoConfigs: scanDefaultEspansoConfigDir,
     setSelectedEspansoConfigPath,
     loadVisualEditorYaml,
     highlightSnippetIndex,
@@ -712,8 +714,18 @@ function App() {
         }}
         configPaths={espansoConfigs.map((c) => c.path)}
         defaultConfigPath={selectedEspansoConfigPath}
+        targetDirectoryRelPath={selectedDirectoryNode ? activeDirectoryRelPath : undefined}
         initialFilePath={alfredInitialFilePath}
-        onImport={async (selectedSnippets, targetPath) => {
+        onImport={async (selectedSnippets, targetPath, sourceFileName) => {
+          if (selectedDirectoryNode) {
+            await importAlfredSnippetsToNewYaml(
+              selectedSnippets,
+              activeDirectoryRelPath,
+              sourceFileName,
+            );
+            return;
+          }
+
           await importAlfredSnippetsToYaml(selectedSnippets, targetPath);
         }}
       />

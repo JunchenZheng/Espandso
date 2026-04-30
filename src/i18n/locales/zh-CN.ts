@@ -48,6 +48,8 @@ export const zhCN: TranslationTree = {
     parseError: "解析 .alfredsnippets 文件失败，请确认文件格式是否正确。",
     noSnippetsFound: "未在该文件内找到有效的 Snippets。",
     targetFile: "目标 YAML 配置文件",
+    targetDirectory: "目标目录",
+    createTargetFile: "将在此目录中创建新的 {{file}} YAML 文件。",
     selectTargetFilePlaceholder: "请选择目标 YAML 文件",
     selectAll: "全选",
     selectedCount: "已选择 {{selected}} / {{total}} 项",

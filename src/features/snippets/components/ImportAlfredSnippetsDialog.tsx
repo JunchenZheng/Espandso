@@ -20,10 +20,12 @@ export interface ImportAlfredSnippetsDialogProps {
   onClose: () => void;
   configPaths: string[];
   defaultConfigPath?: string;
+  targetDirectoryRelPath?: string;
   initialFilePath?: string | null;
   onImport: (
     selectedSnippets: ParsedAlfredSnippet[],
     targetConfigPath: string,
+    sourceFileName: string,
   ) => Promise<void> | void;
 }
 
@@ -32,6 +34,7 @@ export function ImportAlfredSnippetsDialog({
   onClose,
   configPaths,
   defaultConfigPath,
+  targetDirectoryRelPath,
   initialFilePath,
   onImport,
 }: ImportAlfredSnippetsDialogProps) {
@@ -45,6 +48,7 @@ export function ImportAlfredSnippetsDialog({
   const [isImporting, setIsImporting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+  const isDirectoryTarget = targetDirectoryRelPath !== undefined;
 
   const handleProcessBuffer = useCallback(
     async (buffer: Uint8Array | ArrayBuffer, name: string) => {
@@ -164,19 +168,19 @@ export function ImportAlfredSnippetsDialog({
   }, []);
 
   const handleConfirmImport = useCallback(async () => {
-    if (selectedIds.size === 0 || !targetConfigPath) return;
+    if (selectedIds.size === 0 || (!isDirectoryTarget && !targetConfigPath) || !fileName) return;
 
     const toImport = parsedSnippets.filter((s) => selectedIds.has(s.id));
     setIsImporting(true);
     try {
-      await onImport(toImport, targetConfigPath);
+      await onImport(toImport, targetConfigPath, fileName);
       onClose();
     } catch {
       setErrorMessage(t("alfredImport.parseError"));
     } finally {
       setIsImporting(false);
     }
-  }, [selectedIds, targetConfigPath, parsedSnippets, onImport, onClose, t]);
+  }, [selectedIds, isDirectoryTarget, targetConfigPath, fileName, parsedSnippets, onImport, onClose, t]);
 
   return (
     <Dialog open={isOpen} onOpenChange={(openState) => !openState && onClose()}>
@@ -305,27 +309,45 @@ export function ImportAlfredSnippetsDialog({
               )}
 
           {/* Target Config Selector */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-muted-foreground">
-              {t("alfredImport.targetFile")}
-            </label>
-            <select
-              data-testid="alfred-target-select"
-              value={targetConfigPath}
-              onChange={(e) => setTargetConfigPath(e.target.value)}
-              className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            >
-              {configPaths.length === 0 ? (
-                <option value="">{t("alfredImport.selectTargetFilePlaceholder")}</option>
-              ) : (
-                configPaths.map((path) => (
-                  <option key={path} value={path}>
-                    {path}
-                  </option>
-                ))
+          {isDirectoryTarget ? (
+            <div className="rounded-md border bg-secondary/30 px-3 py-2 text-sm">
+              <div className="text-xs font-semibold text-muted-foreground">
+                {t("alfredImport.targetDirectory")}
+              </div>
+              <div className="mt-1 font-mono text-xs text-foreground">
+                {targetDirectoryRelPath ? `/${targetDirectoryRelPath}` : "/"}
+              </div>
+              {fileName && (
+                <div className="mt-1 text-xs text-muted-foreground">
+                  {t("alfredImport.createTargetFile", {
+                    file: fileName.replace(/\.alfredsnippets$/iu, ".yaml"),
+                  })}
+                </div>
               )}
-            </select>
-          </div>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-muted-foreground">
+                {t("alfredImport.targetFile")}
+              </label>
+              <select
+                data-testid="alfred-target-select"
+                value={targetConfigPath}
+                onChange={(e) => setTargetConfigPath(e.target.value)}
+                className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                {configPaths.length === 0 ? (
+                  <option value="">{t("alfredImport.selectTargetFilePlaceholder")}</option>
+                ) : (
+                  configPaths.map((path) => (
+                    <option key={path} value={path}>
+                      {path}
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+          )}
         </div>
 
         <DialogFooter className="mt-2">
@@ -335,7 +357,7 @@ export function ImportAlfredSnippetsDialog({
           <Button
             data-testid="alfred-submit-btn"
             onClick={handleConfirmImport}
-            disabled={selectedIds.size === 0 || !targetConfigPath || isImporting}
+            disabled={selectedIds.size === 0 || (!isDirectoryTarget && !targetConfigPath) || isImporting}
           >
             {isImporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {t("alfredImport.importCount", { count: selectedIds.size })}

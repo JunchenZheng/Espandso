@@ -220,6 +220,7 @@ export function AppWorkspace({
                     onSelectFile={onSelectConfigPath}
                     onCreateFile={onCreateFile}
                     onCreateFolder={onCreateFolder}
+                    onOpenImportAlfred={onOpenImportAlfred}
                   />
                 ) : (
                   <EmptyState

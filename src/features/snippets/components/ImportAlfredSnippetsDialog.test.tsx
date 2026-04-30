@@ -84,6 +84,56 @@ describe("ImportAlfredSnippetsDialog", () => {
         }),
       ],
       "/path/to/default.yml",
+      "my_collection.alfredsnippets",
+    );
+  });
+
+  it("uses directory target mode without requiring an existing YAML file", async () => {
+    const zip = new JSZip();
+    zip.file(
+      "test.json",
+      JSON.stringify({
+        alfredsnippet: {
+          snippet: "Directory import",
+          keyword: ":dir",
+          name: "Directory Import",
+        },
+      }),
+    );
+    const zipBuffer = await zip.generateAsync({ type: "arraybuffer" });
+    const mockFile = new File([zipBuffer], "common.alfredsnippets");
+
+    const onImport = vi.fn();
+    renderWithProviders(
+      <ImportAlfredSnippetsDialog
+        {...defaultProps}
+        configPaths={[]}
+        defaultConfigPath={undefined}
+        targetDirectoryRelPath="work"
+        onImport={onImport}
+      />,
+    );
+
+    expect(screen.queryByTestId("alfred-target-select")).not.toBeInTheDocument();
+    expect(screen.getByText("/work")).toBeInTheDocument();
+
+    fireEvent.drop(screen.getByTestId("alfred-dropzone"), {
+      dataTransfer: { files: [mockFile] },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(":dir")).toBeInTheDocument();
+      expect(screen.getByText(/common\.yaml/u)).toBeInTheDocument();
+    });
+
+    const submitBtn = screen.getByTestId("alfred-submit-btn");
+    expect(submitBtn).not.toBeDisabled();
+    fireEvent.click(submitBtn);
+
+    expect(onImport).toHaveBeenCalledWith(
+      [expect.objectContaining({ trigger: ":dir", replace: "Directory import" })],
+      "",
+      "common.alfredsnippets",
     );
   });
 });

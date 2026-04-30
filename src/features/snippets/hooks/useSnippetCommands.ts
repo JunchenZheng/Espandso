@@ -6,6 +6,7 @@ import { validate } from "../../../logic/validate";
 import { getSnippetTriggers, isImageFilePath } from "../../../logic/snippetUtils";
 import { checkIsBinaryFilePath } from "../../../logic/fileCheck";
 import { getErrorMessage } from "../../../logic/errors";
+import { getInitialYamlTemplate, resolveTargetPath } from "../../../logic/createFileSystem";
 import type { EspansoConfigFile } from "../../../logic/espansoPaths";
 import type { Snippet, ValidationError } from "../../../logic/types";
 import type { ParsedAlfredSnippet } from "../../../logic/alfredImporter";
@@ -18,6 +19,7 @@ import {
   batchDeleteSnippetsFromYamlFile,
   deleteSnippetFromYamlFile,
   saveSnippetToYamlFile,
+  writeYamlFile,
 } from "../../../repositories/snippetYamlRepository";
 
 type VisualEditorMode = "add" | "delete";
@@ -44,6 +46,7 @@ interface UseSnippetCommandsProps {
   setEditImagePath: (path: string) => void;
   applyPendingDeleteWorkflow: () => Promise<unknown>;
   loadEspansoConfigPreview: (config: EspansoConfigFile) => Promise<unknown>;
+  refreshEspansoConfigs: () => Promise<unknown>;
   setSelectedEspansoConfigPath: (path: string) => void;
   loadVisualEditorYaml: (pathOverride?: string, matchIndexToHighlight?: number) => Promise<void>;
   highlightSnippetIndex?: (snippetIndex: number) => void;
@@ -89,6 +92,27 @@ function buildDraftTriggerConflictSources(
     }));
 }
 
+function getAlfredImportYamlFileName(sourceFileName: string): string {
+  const basename =
+    sourceFileName.split("/").pop() || sourceFileName.split("\\").pop() || sourceFileName;
+  const stem = basename.replace(/\.alfredsnippets$/iu, "").trim() || "alfred_import";
+  return `${stem}.yaml`;
+}
+
+function getDirectConfigFileNames(configs: EspansoConfigFile[], parentRelPath: string): string[] {
+  return configs
+    .filter((file) => {
+      if (!parentRelPath) {
+        return !file.relativePath.includes("/");
+      }
+      const parentPrefix = `${parentRelPath}/`;
+      if (!file.relativePath.startsWith(parentPrefix)) return false;
+      const subPath = file.relativePath.slice(parentPrefix.length);
+      return !subPath.includes("/");
+    })
+    .map((file) => file.name);
+}
+
 export function useSnippetCommands({
   selectedEspansoPreview,
   snippetEditTarget,
@@ -109,6 +133,7 @@ export function useSnippetCommands({
   setEditImagePath,
   applyPendingDeleteWorkflow,
   loadEspansoConfigPreview,
+  refreshEspansoConfigs,
   setSelectedEspansoConfigPath,
   loadVisualEditorYaml,
   highlightSnippetIndex,
@@ -501,6 +526,84 @@ export function useSnippetCommands({
     ],
   );
 
+  const importAlfredSnippetsToNewYaml = useCallback(
+    async (
+      snippetsToImport: ParsedAlfredSnippet[],
+      parentRelPath: string,
+      sourceFileName: string,
+    ) => {
+      if (snippetsToImport.length === 0 || !espansoMatchDir) return;
+
+      const yamlFileName = getAlfredImportYamlFileName(sourceFileName);
+      const existingFileNames = getDirectConfigFileNames(espansoConfigs, parentRelPath);
+      if (existingFileNames.some((name) => name.toLowerCase() === yamlFileName.toLowerCase())) {
+        showAlert(
+          t("filesystem.fileAlreadyExists", { name: yamlFileName }),
+          t("actions.importAlfred"),
+        );
+        return;
+      }
+
+      if (mutationLockRef.current) return;
+      mutationLockRef.current = true;
+      setIsSavingSnippet(true);
+
+      const parentAbsPath = parentRelPath ? `${espansoMatchDir}/${parentRelPath}` : espansoMatchDir;
+      const targetConfigPath = resolveTargetPath(parentAbsPath, yamlFileName);
+
+      try {
+        await writeYamlFile(
+          targetConfigPath,
+          getInitialYamlTemplate(yamlFileName),
+          espansoMatchDir || undefined,
+        );
+
+        for (const item of snippetsToImport) {
+          const newSnippet: Snippet = {
+            trigger: item.trigger || undefined,
+            replace: item.replace,
+            description: item.name || undefined,
+          };
+          await saveSnippetToYamlFile(
+            targetConfigPath,
+            newSnippet,
+            undefined,
+            espansoMatchDir || undefined,
+          );
+        }
+
+        await refreshEspansoConfigs();
+        setSelectedEspansoConfigPath(targetConfigPath);
+        if (isVisualEditorOpen) {
+          await loadVisualEditorYaml(targetConfigPath);
+        }
+        showAlert(
+          t("alfredImport.importSuccess", { count: snippetsToImport.length }),
+          t("actions.importAlfred"),
+        );
+      } catch (error: unknown) {
+        showAlert(
+          t("errors.failedToSaveSnippet", { message: getErrorMessage(error) }),
+          t("errors.genericError"),
+        );
+      } finally {
+        mutationLockRef.current = false;
+        setIsSavingSnippet(false);
+      }
+    },
+    [
+      espansoConfigs,
+      espansoMatchDir,
+      isVisualEditorOpen,
+      loadVisualEditorYaml,
+      refreshEspansoConfigs,
+      setIsSavingSnippet,
+      setSelectedEspansoConfigPath,
+      showAlert,
+      t,
+    ],
+  );
+
   return {
     chooseSnippetFile,
     chooseSnippetImageFile,
@@ -510,5 +613,6 @@ export function useSnippetCommands({
     batchDeleteSnippetsFromYaml,
     openYamlFileInDefaultApp,
     importAlfredSnippetsToYaml,
+    importAlfredSnippetsToNewYaml,
   };
 }
