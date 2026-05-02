@@ -29,7 +29,8 @@ describe("ImportAlfredSnippetsDialog", () => {
   it("renders initial state when isOpen is true", () => {
     renderWithProviders(<ImportAlfredSnippetsDialog {...defaultProps} />);
     expect(screen.getByTestId("alfred-dropzone")).toBeInTheDocument();
-    expect(screen.getByTestId("alfred-target-select")).toHaveValue("/path/to/default.yml");
+    expect(screen.queryByTestId("alfred-target-select")).not.toBeInTheDocument();
+    expect(screen.getByTestId("alfred-target-file")).toHaveTextContent("/path/to/default.yml");
     expect(screen.getByTestId("alfred-submit-btn")).toBeDisabled();
   });
 

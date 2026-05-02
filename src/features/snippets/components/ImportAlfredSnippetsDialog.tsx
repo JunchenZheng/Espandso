@@ -326,26 +326,16 @@ export function ImportAlfredSnippetsDialog({
               )}
             </div>
           ) : (
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-muted-foreground">
+            <div className="rounded-md border bg-secondary/30 px-3 py-2 text-sm">
+              <div className="text-xs font-semibold text-muted-foreground">
                 {t("alfredImport.targetFile")}
-              </label>
-              <select
-                data-testid="alfred-target-select"
-                value={targetConfigPath}
-                onChange={(e) => setTargetConfigPath(e.target.value)}
-                className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              </div>
+              <div
+                data-testid="alfred-target-file"
+                className="mt-1 truncate font-mono text-xs text-foreground"
               >
-                {configPaths.length === 0 ? (
-                  <option value="">{t("alfredImport.selectTargetFilePlaceholder")}</option>
-                ) : (
-                  configPaths.map((path) => (
-                    <option key={path} value={path}>
-                      {path}
-                    </option>
-                  ))
-                )}
-              </select>
+                {targetConfigPath || t("alfredImport.selectTargetFilePlaceholder")}
+              </div>
             </div>
           )}
         </div>
