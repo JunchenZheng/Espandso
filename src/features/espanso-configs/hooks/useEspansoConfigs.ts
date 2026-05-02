@@ -31,6 +31,7 @@ import {
   buildEspansoConfigPreviewTree,
   findTreeNode,
   getEspansoConfigAncestorPaths,
+  wrapEspansoConfigPreviewTreeWithMatchRoot,
 } from "../tree";
 import type { EspansoConfigPreview } from "../types";
 
@@ -219,10 +220,10 @@ export function useEspansoConfigs(options: UseEspansoConfigsOptions = {}) {
     });
   }, [espansoConfigPreviews, espansoConfigs, isYamlWarningsEnabled]);
 
-  const espansoPreviewTree = useMemo(
-    () => buildEspansoConfigPreviewTree(espansoPreviewList, espansoDirectories),
-    [espansoPreviewList, espansoDirectories],
-  );
+  const espansoPreviewTree = useMemo(() => {
+    const tree = buildEspansoConfigPreviewTree(espansoPreviewList, espansoDirectories);
+    return wrapEspansoConfigPreviewTreeWithMatchRoot(tree, espansoMatchDir);
+  }, [espansoPreviewList, espansoDirectories, espansoMatchDir]);
 
   const selectedTreeNode = useMemo(
     () =>

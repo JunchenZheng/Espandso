@@ -1,4 +1,5 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import JSZip from "jszip";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useCallback, useMemo, useState, type ReactElement, type ReactNode } from "react";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -145,6 +146,94 @@ describe("Espanso config integration workflows", () => {
     expect(tauriHarness.invoke).toHaveBeenCalledWith("refresh_search_index_file", {
       filePath: newPath,
       matchDir: tauriHarness.getMatchDir(),
+    });
+  });
+
+  it("uses the selected collection directory as the default create-file location", async () => {
+    const user = userEvent.setup();
+    const matchDir = tauriHarness.getMatchDir();
+    tauriHarness.reset({
+      directories: [`${matchDir}/work`],
+      files: {
+        [`${matchDir}/base.yml`]: baseYaml,
+        [`${matchDir}/work/team.yml`]: [
+          "matches:",
+          "  - trigger: :team",
+          "    replace: Team hello",
+          "",
+        ].join("\n"),
+      },
+    });
+
+    renderWithProviders(<App />);
+
+    await screen.findByText(":hello");
+    await user.click(screen.getByText("work"));
+    expect(await screen.findByText("/work")).toBeInTheDocument();
+
+    await user.click(screen.getByTitle("Create New YAML File in /work"));
+
+    const dialog = await screen.findByRole("dialog", { name: "Create New YAML File" });
+    expect(within(dialog).getByLabelText("Target Location")).toHaveValue("work");
+
+    await user.type(within(dialog).getByLabelText(/File Name/u), "ideas");
+    await user.click(within(dialog).getByRole("button", { name: "Create File" }));
+
+    const newPath = `${matchDir}/work/ideas.yml`;
+    await waitFor(() => {
+      expect(tauriHarness.getFile(newPath)).toContain("Espanso match file: ideas");
+    });
+  });
+
+  it("imports Alfred snippets into a new YAML file in the selected directory", async () => {
+    const user = userEvent.setup();
+    const matchDir = tauriHarness.getMatchDir();
+    tauriHarness.reset({
+      directories: [`${matchDir}/work`],
+      files: {
+        [`${matchDir}/base.yml`]: baseYaml,
+      },
+    });
+    const zip = new JSZip();
+    zip.file(
+      "snippet.json",
+      JSON.stringify({
+        alfredsnippet: {
+          snippet: "Imported from Alfred",
+          keyword: ":alfred",
+          name: "Alfred Import",
+        },
+      }),
+    );
+    const zipBuffer = await zip.generateAsync({ type: "arraybuffer" });
+    const mockFile = new File([zipBuffer], "common.alfredsnippets");
+
+    renderWithProviders(<App />);
+
+    await screen.findByText(":hello");
+    await user.click(screen.getByText("work"));
+    await user.click(await screen.findByTestId("directory-import-alfred-btn"));
+
+    const dialog = await screen.findByRole("dialog", { name: "Import Alfred Snippets" });
+    fireEvent.drop(within(dialog).getByTestId("alfred-dropzone"), {
+      dataTransfer: { files: [mockFile] },
+    });
+
+    await waitFor(() => {
+      expect(within(dialog).getByText(":alfred")).toBeInTheDocument();
+      expect(within(dialog).getByText(/common\.yml/u)).toBeInTheDocument();
+    });
+
+    await user.click(within(dialog).getByTestId("alfred-submit-btn"));
+
+    const newPath = `${matchDir}/work/common.yml`;
+    await waitFor(() => {
+      expect(tauriHarness.getFile(newPath)).toContain("trigger: :alfred");
+      expect(tauriHarness.getFile(newPath)).toContain("replace: Imported from Alfred");
+    });
+    expect(tauriHarness.invoke).toHaveBeenCalledWith("refresh_search_index_file", {
+      filePath: newPath,
+      matchDir,
     });
   });
 });

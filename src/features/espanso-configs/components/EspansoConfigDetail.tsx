@@ -134,10 +134,28 @@ export function EspansoConfigDetail({
     }
   }, [preview.config.path]);
 
-  const exitBatchMode = () => {
+  const exitBatchMode = useCallback(() => {
     setIsBatchMode(false);
     setSelectedIndices(new Set());
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!isBatchMode) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") {
+        return;
+      }
+
+      event.preventDefault();
+      exitBatchMode();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [exitBatchMode, isBatchMode]);
 
   const toggleSelectIndex = (index: number) => {
     setSelectedIndices((prev) => {

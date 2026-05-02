@@ -34,9 +34,9 @@ import { RequiredMark, OptionalMark } from "../../../components/shared/FormMarks
 import { DateInsertMenu } from "./DateInsertMenu";
 import { DateVariableList } from "./DateVariableList";
 import { DateFormatOption } from "../../../logic/dateFormats";
-import { SnippetVar, ValidationError } from "../../../logic/types";
+import { Snippet, SnippetVar, ValidationError } from "../../../logic/types";
 import { DeleteTriggerSelection } from "../../../logic/yamlEditor";
-import { getSnippetPreviewContent, getSnippetTriggers, isImageFilePath } from "../../../logic/snippetUtils";
+import { buildTriggerInput, getSnippetPreviewContent, getSnippetTriggers, isImageFilePath } from "../../../logic/snippetUtils";
 import { isBinaryDomFile } from "../../../logic/fileCheck";
 import { ImportedMatch } from "../../../logic/importYaml";
 import { EspansoConfigPreview } from "../../espanso-configs/types";
@@ -49,7 +49,7 @@ import {
   FormSelectionState,
   TextReplacementFormat,
 } from "../types";
-import { getFormFieldCategory, getTextFieldMode } from "../formSnippet";
+import { formFieldsToConfigs, getFormFieldCategory, getTextFieldMode } from "../formSnippet";
 
 export interface VisualYamlEditorStateProps {
   visualEditorMode: "add" | "delete";
@@ -114,6 +114,13 @@ export interface VisualYamlEditorActionProps {
   saveSnippetToYaml: () => void;
   isSavingSnippet: boolean;
   showAlert: (title: string, description?: string) => void;
+  showConfirm: (
+    description: string,
+    onConfirm: () => void | Promise<void>,
+    title?: string,
+    confirmText?: string,
+    cancelText?: string,
+  ) => void;
   resetSnippetForm: () => void;
   setSnippetEditTarget: (target: SnippetEditTarget | null) => void;
 }
@@ -202,6 +209,7 @@ export function VisualYamlEditorDialog({
     saveSnippetToYaml,
     isSavingSnippet,
     showAlert,
+    showConfirm,
     resetSnippetForm,
     setSnippetEditTarget,
   } = actions;
@@ -213,6 +221,96 @@ export function VisualYamlEditorDialog({
         ["html", t("snippets.textFormatHtml")],
       ]
     : [["plain", t("snippets.textFormatPlain")]];
+
+  const getSnippetKind = (snippet: Snippet): AddSnippetKind => {
+    if (snippet.include_file) return "file";
+    if (snippet.image_path !== undefined) return "image";
+    if (snippet.form !== undefined) return "form";
+    return "text";
+  };
+
+  const getTextReplacementFormat = (snippet: Snippet): TextReplacementFormat => {
+    if (snippet.markdown !== undefined) return "markdown";
+    if (snippet.html !== undefined) return "html";
+    return "plain";
+  };
+
+  const getTextReplacementContent = (snippet: Snippet): string => {
+    if (snippet.markdown !== undefined) return snippet.markdown;
+    if (snippet.html !== undefined) return snippet.html;
+    return snippet.replace || "";
+  };
+
+  const areJsonEqual = (left: unknown, right: unknown) => JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
+
+  const hasUnsavedAddOrEditChanges = () => {
+    if (!snippetEditTarget) {
+      return (
+        editTriggersText.length > 0 ||
+        editReplace.length > 0 ||
+        editIncludeFile.length > 0 ||
+        editImagePath.length > 0 ||
+        editForm.length > 0 ||
+        editDescription.length > 0 ||
+        editVars.length > 0 ||
+        editFormFieldConfigs.length > 0
+      );
+    }
+
+    const originalSnippet = snippetEditTarget.match.originalSnippet || snippetEditTarget.match.snippet;
+    const originalKind = getSnippetKind(originalSnippet);
+
+    if (activeSnippetKind !== originalKind) return true;
+    if (editTriggersText !== buildTriggerInput(originalSnippet).multiline) return true;
+    if (editDescription !== (originalSnippet.description || "")) return true;
+
+    if (activeSnippetKind === "file") {
+      return editIncludeFile !== (snippetEditTarget.match.resourcePath || originalSnippet.include_file || "");
+    }
+
+    if (activeSnippetKind === "image") {
+      return editImagePath !== (originalSnippet.image_path || "");
+    }
+
+    if (activeSnippetKind === "form") {
+      return (
+        editForm !== (originalSnippet.form || "") ||
+        !areJsonEqual(editVars, originalSnippet.vars || []) ||
+        !areJsonEqual(editFormFieldConfigs, formFieldsToConfigs(originalSnippet.form_fields))
+      );
+    }
+
+    return (
+      textReplacementFormat !== getTextReplacementFormat(originalSnippet) ||
+      editReplace !== getTextReplacementContent(originalSnippet) ||
+      !areJsonEqual(editVars, originalSnippet.vars || [])
+    );
+  };
+
+  const hasUnsavedChanges = () => (
+    hasUnsavedAddOrEditChanges() || pendingDeleteSelections.length > 0
+  );
+
+  const closeVisualEditorDialog = () => {
+    onOpenChange(false);
+    resetSnippetForm();
+    setSnippetEditTarget(null);
+  };
+
+  const requestCloseVisualEditorDialog = () => {
+    if (!hasUnsavedChanges()) {
+      closeVisualEditorDialog();
+      return;
+    }
+
+    showConfirm(
+      t("dialogs.discardSnippetChanges.message"),
+      closeVisualEditorDialog,
+      t("dialogs.discardSnippetChanges.title"),
+      t("dialogs.discardSnippetChanges.confirmBtn"),
+      t("dialogs.discardSnippetChanges.cancelBtn"),
+    );
+  };
 
   const handleDialogKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.key !== "Enter" || event.nativeEvent.isComposing || isSavingSnippet) {
@@ -248,11 +346,12 @@ export function VisualYamlEditorDialog({
     <Dialog
       open={isOpen}
       onOpenChange={(open) => {
-        onOpenChange(open);
-        if (!open) {
-          resetSnippetForm();
-          setSnippetEditTarget(null);
+        if (open) {
+          onOpenChange(open);
+          return;
         }
+
+        requestCloseVisualEditorDialog();
       }}
     >
       <DialogContent
@@ -898,7 +997,7 @@ export function VisualYamlEditorDialog({
                   </Button>
                 )}
                 <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                  <Button variant="outline" onClick={() => onOpenChange(false)}>
+                  <Button variant="outline" onClick={requestCloseVisualEditorDialog}>
                     {t("actions.cancel")}
                   </Button>
                   <Button onClick={saveSnippetToYaml} disabled={isSavingSnippet}>

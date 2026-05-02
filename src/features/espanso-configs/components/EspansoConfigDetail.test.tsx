@@ -1,4 +1,5 @@
 import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "../../../test/render";
 import type { EspansoConfigPreview } from "../types";
@@ -66,5 +67,24 @@ describe("EspansoConfigDetail", () => {
       conflictsButton.compareDocumentPosition(visualEditorButton) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+  });
+
+  it("exits batch delete mode when Escape is pressed", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <EspansoConfigDetail
+        preview={makePreview()}
+        onViewSnippet={vi.fn()}
+        onAddSnippet={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Batch Delete" }));
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+
+    await user.keyboard("{Escape}");
+
+    expect(screen.queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Batch Delete" })).toBeInTheDocument();
   });
 });

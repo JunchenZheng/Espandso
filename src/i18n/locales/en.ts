@@ -46,6 +46,8 @@ export const en = {
     parseError: "Failed to parse .alfredsnippets file. Please check if the file format is valid.",
     noSnippetsFound: "No valid snippets were found in this file.",
     targetFile: "Target YAML Config File",
+    targetDirectory: "Target Directory",
+    createTargetFile: "A new {{file}} YAML file will be created in this directory.",
     selectTargetFilePlaceholder: "Select target YAML file",
     selectAll: "Select All",
     selectedCount: "Selected {{selected}} / {{total}} items",
