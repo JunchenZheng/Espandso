@@ -123,7 +123,7 @@ describe("ImportAlfredSnippetsDialog", () => {
 
     await waitFor(() => {
       expect(screen.getByText(":dir")).toBeInTheDocument();
-      expect(screen.getByText(/common\.yaml/u)).toBeInTheDocument();
+      expect(screen.getByText(/common\.yml/u)).toBeInTheDocument();
     });
 
     const submitBtn = screen.getByTestId("alfred-submit-btn");

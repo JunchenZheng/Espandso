@@ -221,12 +221,12 @@ describe("Espanso config integration workflows", () => {
 
     await waitFor(() => {
       expect(within(dialog).getByText(":alfred")).toBeInTheDocument();
-      expect(within(dialog).getByText(/common\.yaml/u)).toBeInTheDocument();
+      expect(within(dialog).getByText(/common\.yml/u)).toBeInTheDocument();
     });
 
     await user.click(within(dialog).getByTestId("alfred-submit-btn"));
 
-    const newPath = `${matchDir}/work/common.yaml`;
+    const newPath = `${matchDir}/work/common.yml`;
     await waitFor(() => {
       expect(tauriHarness.getFile(newPath)).toContain("trigger: :alfred");
       expect(tauriHarness.getFile(newPath)).toContain("replace: Imported from Alfred");

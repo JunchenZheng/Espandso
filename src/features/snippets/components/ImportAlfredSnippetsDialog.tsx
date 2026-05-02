@@ -320,7 +320,7 @@ export function ImportAlfredSnippetsDialog({
               {fileName && (
                 <div className="mt-1 text-xs text-muted-foreground">
                   {t("alfredImport.createTargetFile", {
-                    file: fileName.replace(/\.alfredsnippets$/iu, ".yaml"),
+                    file: fileName.replace(/\.alfredsnippets$/iu, ".yml"),
                   })}
                 </div>
               )}

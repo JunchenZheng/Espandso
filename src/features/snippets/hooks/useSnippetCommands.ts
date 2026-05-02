@@ -96,7 +96,7 @@ function getAlfredImportYamlFileName(sourceFileName: string): string {
   const basename =
     sourceFileName.split("/").pop() || sourceFileName.split("\\").pop() || sourceFileName;
   const stem = basename.replace(/\.alfredsnippets$/iu, "").trim() || "alfred_import";
-  return `${stem}.yaml`;
+  return `${stem}.yml`;
 }
 
 function getDirectConfigFileNames(configs: EspansoConfigFile[], parentRelPath: string): string[] {
