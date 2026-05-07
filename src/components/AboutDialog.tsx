@@ -42,7 +42,10 @@ export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
 
         <div className="space-y-4 py-2">
           {/* App Info Card */}
-          <div className="rounded-lg border bg-card p-3.5 text-card-foreground shadow-sm">
+          <div
+            data-testid="about-app-card"
+            className="rounded-lg border bg-card p-3.5 text-card-foreground shadow-sm"
+          >
             <div className="flex items-center justify-between border-b pb-2">
               <span className="font-semibold text-base">Expandso</span>
               <span className="rounded-full bg-secondary px-2.5 py-0.5 text-sm font-medium">
@@ -61,8 +64,8 @@ export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
           </div>
 
           {/* Open Source Libraries List */}
-          <ScrollArea className="max-h-64 pr-2">
-            <div className="space-y-3">
+          <ScrollArea data-testid="about-libraries-scroll" className="max-h-64">
+            <div data-testid="about-library-list" className="space-y-3">
               {OPEN_SOURCE_LIBRARIES.map((lib: OpenSourceLibrary) => (
                 <div
                   key={lib.name}
