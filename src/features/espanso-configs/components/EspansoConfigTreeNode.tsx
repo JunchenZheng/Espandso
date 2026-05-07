@@ -32,7 +32,7 @@ export const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
 }: EspansoConfigTreeNodeProps) {
   const { t } = useI18n();
   const containsActive = activeAncestorPaths.has(node.relativePath || node.path);
-  const shouldAutoOpen = containsActive || node.isCollectionRoot;
+  const shouldAutoOpen = containsActive || Boolean(node.isCollectionRoot);
   const [isOpen, setIsOpen] = useState<boolean>(shouldAutoOpen);
 
   useEffect(() => {
