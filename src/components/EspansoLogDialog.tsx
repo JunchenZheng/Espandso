@@ -244,7 +244,7 @@ export function EspansoLogDialog({ open, onOpenChange }: EspansoLogDialogProps) 
         </div>
 
         {/* Footer Statistics */}
-        <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-1 border-t">
+        <div className="flex items-center justify-between border-t pt-1 text-xs text-muted-foreground">
           <div className="flex items-center gap-3">
             <span>
               {t("dialogs.logs.totalLines")}:{" "}
@@ -257,7 +257,7 @@ export function EspansoLogDialog({ open, onOpenChange }: EspansoLogDialogProps) 
             )}
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-[10px] text-muted-foreground/70 font-mono">espanso log</span>
+            <span className="font-mono text-xs text-muted-foreground">espanso log</span>
           </div>
         </div>
       </DialogContent>

@@ -234,7 +234,7 @@ export function ImportAlfredSnippetsDialog({
               </div>
             ) : (
               <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                <UploadCloud className="h-10 w-10 text-muted-foreground/70" />
+                <UploadCloud className="h-10 w-10 text-muted-foreground" />
                 <p className="text-sm font-medium">{t("alfredImport.dropzoneHint")}</p>
               </div>
             )}
@@ -294,7 +294,7 @@ export function ImportAlfredSnippetsDialog({
                         <div className="font-mono text-xs font-semibold truncate pr-2">
                           {snippet.trigger || "-"}
                         </div>
-                        <div className="truncate text-xs text-foreground/90 pr-2">
+                        <div className="truncate pr-2 text-xs text-foreground">
                           {snippet.replace}
                         </div>
                         <div className="truncate text-xs text-muted-foreground">

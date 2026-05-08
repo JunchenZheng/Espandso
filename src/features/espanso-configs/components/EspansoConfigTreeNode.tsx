@@ -55,7 +55,7 @@ export const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
               ? "bg-primary text-primary-foreground font-semibold"
               : containsActive
                 ? "text-foreground font-semibold hover:bg-accent/70"
-                : "text-foreground/80 font-medium hover:bg-accent/70",
+                : "text-foreground font-medium hover:bg-accent/70",
           )}
         >
           <button
@@ -73,14 +73,14 @@ export const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
               <ChevronDown
                 className={cn(
                   "h-4 w-4 shrink-0 transition-transform",
-                  isActive ? "text-primary-foreground/80" : "text-muted-foreground/70",
+                  isActive ? "text-primary-foreground" : "text-muted-foreground",
                 )}
               />
             ) : (
               <ChevronRight
                 className={cn(
                   "h-4 w-4 shrink-0 transition-transform",
-                  isActive ? "text-primary-foreground/80" : "text-muted-foreground/70",
+                  isActive ? "text-primary-foreground" : "text-muted-foreground",
                 )}
               />
             )}
@@ -128,7 +128,7 @@ export const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
         "group flex w-full items-center rounded-md transition-colors",
         isActive
           ? "bg-primary text-primary-foreground font-medium"
-          : "text-foreground/80 hover:bg-accent hover:text-foreground",
+          : "text-foreground hover:bg-accent",
       )}
     >
       <button
@@ -145,7 +145,7 @@ export const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
           )}
         />
         <div className="min-w-0 flex-1">
-          <div className="truncate text-xs font-medium">{node.name.replace(/\.ya?ml$/i, "")}</div>
+          <div className="truncate text-sm font-medium">{node.name.replace(/\.ya?ml$/i, "")}</div>
         </div>
       </button>
       {node.preview && (

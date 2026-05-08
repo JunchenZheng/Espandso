@@ -44,7 +44,7 @@ export function AppHeader({
         >
           <Search className="h-4 w-4 text-primary" />
           <span>{t("actions.search")}</span>
-          <kbd className="pointer-events-none hidden h-5 select-none items-center gap-0.5 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100 sm:flex ml-1">
+          <kbd className="pointer-events-none ml-1 hidden h-5 select-none items-center gap-0.5 rounded border bg-muted px-1.5 font-mono text-xs font-medium text-muted-foreground opacity-100 sm:flex">
             {searchShortcutLabel}
           </kbd>
         </Button>

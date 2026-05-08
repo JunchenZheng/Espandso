@@ -40,7 +40,7 @@ export function TriggerConflictsDialog({
             <div className="min-w-0">
               <DialogTitle className="flex items-center gap-2 text-xl font-bold">
                 <span>{t("dialogs.triggerConflicts.title")}</span>
-                <span className="rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-800">
+                <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800">
                   {conflictCount}
                 </span>
               </DialogTitle>
@@ -70,7 +70,7 @@ export function TriggerConflictsDialog({
                 >
                   <div className="grid gap-3 sm:grid-cols-[1fr_1fr]">
                     <div className="min-w-0">
-                      <div className="mb-1 text-[11px] font-semibold uppercase text-red-700">
+                      <div className="mb-1 text-xs font-semibold uppercase text-red-700">
                         {t("dialogs.triggerConflicts.blockingTrigger")}
                       </div>
                       <div className="mono-field truncate text-sm font-semibold text-foreground">
@@ -96,7 +96,7 @@ export function TriggerConflictsDialog({
                       )}
                     </div>
                     <div className="min-w-0">
-                      <div className="mb-1 text-[11px] font-semibold uppercase text-red-700">
+                      <div className="mb-1 text-xs font-semibold uppercase text-red-700">
                         {t("dialogs.triggerConflicts.blockedTrigger")}
                       </div>
                       <div className="mono-field truncate text-sm font-semibold text-foreground">

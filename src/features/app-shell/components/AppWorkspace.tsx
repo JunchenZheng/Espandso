@@ -234,7 +234,7 @@ export function AppWorkspace({
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center p-8 text-center rounded-lg border border-dashed my-auto bg-background/50">
-            <FolderOpen className="h-12 w-12 text-muted-foreground/60 mb-3" />
+            <FolderOpen className="mb-3 h-12 w-12 text-muted-foreground" />
             <h3 className="text-2xl font-semibold mb-1">{t("empty.noYamlFilesTitle")}</h3>
             <p className="text-base text-muted-foreground max-w-md mb-6">
               {isScanningEspanso

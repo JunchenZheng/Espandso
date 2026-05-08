@@ -10,7 +10,7 @@
     --card-foreground: 224 18% 12%;
     --popover: 0 0% 100%;
     --popover-foreground: 224 18% 12%;
-    --primary: 173 80% 28%;
+    --primary: 173 82% 24%;
     --primary-foreground: 0 0% 98%;
     --secondary: 214 24% 92%;
     --secondary-foreground: 224 18% 18%;
@@ -22,7 +22,7 @@
     --destructive-foreground: 0 0% 98%;
     --border: 214 18% 84%;
     --input: 214 18% 84%;
-    --ring: 173 80% 28%;
+    --ring: 173 82% 24%;
     --radius: 0.5rem;
 
     /* Typography Color Palette Standard */

@@ -74,7 +74,7 @@ export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-base text-foreground">{lib.name}</span>
-                      <span className="rounded border bg-background px-1.5 py-0.2 text-[11px] font-mono text-muted-foreground">
+                      <span className="rounded border bg-background px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
                         {lib.license}
                       </span>
                     </div>
@@ -93,7 +93,7 @@ export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
                     {lib.description}
                   </p>
                   {lib.usageNotice && (
-                    <p className="mt-1 text-[11px] text-muted-foreground/80 font-mono italic">
+                    <p className="mt-1 font-mono text-xs italic text-muted-foreground">
                       {lib.usageNotice}
                     </p>
                   )}

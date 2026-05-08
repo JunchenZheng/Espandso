@@ -280,7 +280,7 @@ export function SearchDialog<T extends SearchableConfigPreview>({
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2 min-w-0">
-                        <span className="font-mono font-semibold text-sm text-foreground bg-primary/10 text-primary px-2 py-0.5 rounded border border-primary/20 shrink-0">
+                        <span className="shrink-0 rounded border border-primary/30 bg-primary/10 px-2 py-0.5 font-mono text-sm font-semibold text-foreground">
                           {displayTrigger}
                         </span>
                         <span className="text-xs text-muted-foreground truncate flex items-center gap-1">
@@ -291,17 +291,17 @@ export function SearchDialog<T extends SearchableConfigPreview>({
 
                       <div className="flex items-center gap-1 shrink-0">
                         {res.matchedFields.includes("trigger") && (
-                          <span className="inline-flex items-center rounded-full border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+                          <span className="inline-flex items-center rounded-full border border-emerald-500/40 bg-emerald-500/10 px-1.5 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">
                             {t("search.scopeTrigger")}
                           </span>
                         )}
                         {res.matchedFields.includes("description") && (
-                          <span className="inline-flex items-center rounded-full border border-blue-500/30 bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 dark:text-blue-400">
+                          <span className="inline-flex items-center rounded-full border border-blue-500/40 bg-blue-500/10 px-1.5 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-300">
                             {t("search.scopeDescription")}
                           </span>
                         )}
                         {res.matchedFields.includes("content") && (
-                          <span className="inline-flex items-center rounded-full border border-purple-500/30 bg-purple-500/10 px-1.5 py-0.5 text-[10px] font-medium text-purple-600 dark:text-purple-400">
+                          <span className="inline-flex items-center rounded-full border border-purple-500/40 bg-purple-500/10 px-1.5 py-0.5 text-xs font-medium text-purple-700 dark:text-purple-300">
                             {t("search.scopeContent")}
                           </span>
                         )}
@@ -309,7 +309,7 @@ export function SearchDialog<T extends SearchableConfigPreview>({
                     </div>
 
                     {res.snippet.description && (
-                      <p className="text-xs text-foreground/80 font-medium line-clamp-1">
+                      <p className="line-clamp-1 text-xs font-medium text-foreground">
                         {res.snippet.description}
                       </p>
                     )}

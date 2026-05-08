@@ -80,16 +80,16 @@ export function EspansoDirectoryDetail({
       {/* Directory Contents */}
       <ScrollArea className="flex-1 p-6">
         <div className="mx-auto w-full max-w-4xl space-y-4">
-          <h3 className="text-sm font-semibold text-foreground/80">
+          <h3 className="text-sm font-semibold text-foreground">
             {t("filesystem.contentsIn", { name: node.name })}
           </h3>
           {!node.children || node.children.length === 0 ? (
             <div className="rounded-lg border border-dashed p-8 text-center bg-muted/10">
-              <Folder className="h-10 w-10 text-muted-foreground/50 mx-auto mb-2" />
+              <Folder className="mx-auto mb-2 h-10 w-10 text-muted-foreground" />
               <p className="text-sm font-medium text-muted-foreground">
                 {t("empty.directoryEmpty")}
               </p>
-              <p className="text-xs text-muted-foreground/70 mt-1 mb-4">
+              <p className="mb-4 mt-1 text-xs text-muted-foreground">
                 {t("empty.directoryEmptyDescription")}
               </p>
               <div className="flex justify-center gap-2">
@@ -133,7 +133,7 @@ export function EspansoDirectoryDetail({
                       </div>
                     </div>
                   </div>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground/40 group-hover:text-foreground transition-colors shrink-0" />
+                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground" />
                 </div>
               ))}
             </div>
