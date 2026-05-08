@@ -37,7 +37,7 @@ export function ConfirmAlertDialog({ state, onOpenChange }: ConfirmAlertDialogPr
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>{state.title}</DialogTitle>
-          <DialogDescription className="mt-2 text-sm text-foreground/90 whitespace-pre-line">
+          <DialogDescription className="mt-2 whitespace-pre-line text-sm text-foreground">
             {state.description}
           </DialogDescription>
         </DialogHeader>

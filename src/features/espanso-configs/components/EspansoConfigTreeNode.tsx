@@ -32,7 +32,7 @@ export const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
 }: EspansoConfigTreeNodeProps) {
   const { t } = useI18n();
   const containsActive = activeAncestorPaths.has(node.relativePath || node.path);
-  const shouldAutoOpen = containsActive || node.isCollectionRoot;
+  const shouldAutoOpen = containsActive || Boolean(node.isCollectionRoot);
   const [isOpen, setIsOpen] = useState<boolean>(shouldAutoOpen);
 
   useEffect(() => {
@@ -43,6 +43,8 @@ export const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
 
   if (node.isDir) {
     const isActive = node.relativePath === activePath || node.path === activePath;
+    const isAlwaysOpen = Boolean(node.isCollectionRoot);
+    const showChildren = isAlwaysOpen || isOpen;
 
     return (
       <div className="mb-0.5">
@@ -53,28 +55,32 @@ export const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
               ? "bg-primary text-primary-foreground font-semibold"
               : containsActive
                 ? "text-foreground font-semibold hover:bg-accent/70"
-                : "text-foreground/80 font-medium hover:bg-accent/70",
+                : "text-foreground font-medium hover:bg-accent/70",
           )}
         >
           <button
             className="flex min-w-0 flex-1 items-center gap-2 text-left"
             onClick={() => {
               onSelect(node.relativePath || node.path);
-              setIsOpen(!isOpen);
+              if (!isAlwaysOpen) {
+                setIsOpen(!isOpen);
+              }
             }}
           >
-            {isOpen ? (
+            {isAlwaysOpen ? (
+              <span className="h-4 w-4 shrink-0" aria-hidden="true" />
+            ) : isOpen ? (
               <ChevronDown
                 className={cn(
                   "h-4 w-4 shrink-0 transition-transform",
-                  isActive ? "text-primary-foreground/80" : "text-muted-foreground/70",
+                  isActive ? "text-primary-foreground" : "text-muted-foreground",
                 )}
               />
             ) : (
               <ChevronRight
                 className={cn(
                   "h-4 w-4 shrink-0 transition-transform",
-                  isActive ? "text-primary-foreground/80" : "text-muted-foreground/70",
+                  isActive ? "text-primary-foreground" : "text-muted-foreground",
                 )}
               />
             )}
@@ -86,7 +92,7 @@ export const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
                   : "bg-amber-500/15 text-amber-600 dark:text-amber-400",
               )}
             >
-              {isOpen ? <FolderOpen className="h-4 w-4" /> : <Folder className="h-4 w-4" />}
+              {showChildren ? <FolderOpen className="h-4 w-4" /> : <Folder className="h-4 w-4" />}
             </div>
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-semibold tracking-tight">{node.name}</div>
@@ -94,7 +100,7 @@ export const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
           </button>
           {/* Directory quick-create actions are intentionally not rendered; use the Collection header actions with the selected directory context. */}
         </div>
-        {isOpen && node.children && (
+        {showChildren && node.children && (
           <div className="ml-3.5 mt-0.5 space-y-0.5 border-l border-border/50 pl-2">
             {node.children.map((child) => (
               <EspansoConfigTreeNode
@@ -122,7 +128,7 @@ export const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
         "group flex w-full items-center rounded-md transition-colors",
         isActive
           ? "bg-primary text-primary-foreground font-medium"
-          : "text-foreground/80 hover:bg-accent hover:text-foreground",
+          : "text-foreground hover:bg-accent",
       )}
     >
       <button
@@ -139,7 +145,7 @@ export const EspansoConfigTreeNode = memo(function EspansoConfigTreeNode({
           )}
         />
         <div className="min-w-0 flex-1">
-          <div className="truncate text-xs font-medium">{node.name.replace(/\.ya?ml$/i, "")}</div>
+          <div className="truncate text-sm font-medium">{node.name.replace(/\.ya?ml$/i, "")}</div>
         </div>
       </button>
       {node.preview && (

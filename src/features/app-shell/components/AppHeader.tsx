@@ -1,6 +1,7 @@
 import { RefreshCw, Search, Settings, Terminal } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { useI18n } from "../../../i18n/useI18n";
+import { getSearchShortcutLabel } from "../../../logic/keyboardShortcut";
 import { cn } from "../../../lib/utils";
 
 interface AppHeaderProps {
@@ -21,6 +22,8 @@ export function AppHeader({
   onOpenSettings,
 }: AppHeaderProps) {
   const { t } = useI18n();
+  const searchShortcutLabel = getSearchShortcutLabel();
+  const openSearchLabel = t("search.openSearch", { shortcut: searchShortcutLabel });
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-background p-3">
@@ -35,14 +38,14 @@ export function AppHeader({
           size="sm"
           variant="outline"
           onClick={onOpenSearch}
-          aria-label={t("search.openSearch")}
-          title={t("search.openSearch")}
+          aria-label={openSearchLabel}
+          title={openSearchLabel}
           className="gap-1.5"
         >
           <Search className="h-4 w-4 text-primary" />
           <span>{t("actions.search")}</span>
-          <kbd className="pointer-events-none hidden h-5 select-none items-center gap-0.5 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100 sm:flex ml-1">
-            ⌘K
+          <kbd className="pointer-events-none ml-1 hidden h-5 select-none items-center gap-0.5 rounded border bg-muted px-1.5 font-mono text-xs font-medium text-muted-foreground opacity-100 sm:flex">
+            {searchShortcutLabel}
           </kbd>
         </Button>
         <Button

@@ -52,7 +52,7 @@ export function WarningsDialog({
             <div>
               <DialogTitle className="text-xl font-bold flex items-center gap-2">
                 <span>{t("dialogs.warnings.title")}</span>
-                <span className="rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 text-[11px] font-semibold">
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
                   {activeFilterPreview ? activeFilterPreview.warnings.length : totalWarningsCount}
                 </span>
               </DialogTitle>
@@ -77,7 +77,7 @@ export function WarningsDialog({
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="h-6 px-2 text-[11px] text-amber-800 hover:bg-amber-100 hover:text-amber-900"
+                  className="h-7 px-2 text-xs text-amber-800 hover:bg-amber-100 hover:text-amber-900"
                   onClick={onClearFilter}
                 >
                   {t("dialogs.warnings.showAllFiles", { count: totalWarningsCount })}
@@ -109,7 +109,7 @@ export function WarningsDialog({
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
-                        <span className="rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 text-[11px] font-medium">
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
                           {preview.warnings.length}{" "}
                           {t(preview.warnings.length === 1 ? "counts.warning" : "counts.warnings")}
                         </span>
@@ -117,7 +117,7 @@ export function WarningsDialog({
                           <Button
                             size="sm"
                             variant="outline"
-                            className="h-6 px-2 text-[10px]"
+                            className="h-7 px-2 text-xs"
                             onClick={() => {
                               onSelectFile(preview.config.path);
                               onOpenChange(false);
@@ -130,7 +130,7 @@ export function WarningsDialog({
                           <Button
                             size="sm"
                             variant="secondary"
-                            className="h-6 px-2 text-[10px] gap-1"
+                            className="h-7 gap-1 px-2 text-xs"
                             onClick={() => onOpenFileExternal(preview.config.path)}
                             title={t("dialogs.warnings.openYamlExternalTitle")}
                           >

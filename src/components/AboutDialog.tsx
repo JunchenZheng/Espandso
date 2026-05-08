@@ -42,7 +42,10 @@ export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
 
         <div className="space-y-4 py-2">
           {/* App Info Card */}
-          <div className="rounded-lg border bg-card p-3.5 text-card-foreground shadow-sm">
+          <div
+            data-testid="about-app-card"
+            className="rounded-lg border bg-card p-3.5 text-card-foreground shadow-sm"
+          >
             <div className="flex items-center justify-between border-b pb-2">
               <span className="font-semibold text-base">Expandso</span>
               <span className="rounded-full bg-secondary px-2.5 py-0.5 text-sm font-medium">
@@ -61,8 +64,8 @@ export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
           </div>
 
           {/* Open Source Libraries List */}
-          <ScrollArea className="max-h-64 pr-2">
-            <div className="space-y-3">
+          <ScrollArea data-testid="about-libraries-scroll" className="max-h-64">
+            <div data-testid="about-library-list" className="space-y-3">
               {OPEN_SOURCE_LIBRARIES.map((lib: OpenSourceLibrary) => (
                 <div
                   key={lib.name}
@@ -71,7 +74,7 @@ export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-base text-foreground">{lib.name}</span>
-                      <span className="rounded border bg-background px-1.5 py-0.2 text-[11px] font-mono text-muted-foreground">
+                      <span className="rounded border bg-background px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
                         {lib.license}
                       </span>
                     </div>
@@ -90,7 +93,7 @@ export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
                     {lib.description}
                   </p>
                   {lib.usageNotice && (
-                    <p className="mt-1 text-[11px] text-muted-foreground/80 font-mono italic">
+                    <p className="mt-1 font-mono text-xs italic text-muted-foreground">
                       {lib.usageNotice}
                     </p>
                   )}

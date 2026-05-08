@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Search, X, FileText, Check, Database, Loader2 } from "lucide-react";
+import { Search, X, FileText, Check, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../../components/ui/dialog";
 import { Input } from "../../../components/ui/input";
 import { ScrollArea } from "../../../components/ui/scroll-area";
@@ -12,11 +12,7 @@ import {
 } from "../../../logic/snippetSearch";
 import { getSnippetPreviewContent, getSnippetTriggers } from "../../../logic/snippetUtils";
 import { cn } from "../../../lib/utils";
-import {
-  searchSnippetIndex,
-  SearchIndexStatus,
-  SearchIndexResult,
-} from "../../../tauri/searchIndex";
+import { searchSnippetIndex, SearchIndexResult } from "../../../tauri/searchIndex";
 
 const SEARCH_PAGE_SIZE = 50;
 
@@ -47,7 +43,6 @@ export function SearchDialog<T extends SearchableConfigPreview>({
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [results, setResults] = useState<SearchResult[]>([]);
   const [totalResults, setTotalResults] = useState(0);
-  const [indexStatus, setIndexStatus] = useState<SearchIndexStatus | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const activeSearchIdRef = useRef(0);
@@ -114,7 +109,7 @@ export function SearchDialog<T extends SearchableConfigPreview>({
 
           if (searchId !== activeSearchIdRef.current) return;
 
-          setIndexStatus(resp.indexStatus);
+          // Index status is an internal implementation detail; keep search UI focused on results.
 
           const mapped: SearchResult[] = resp.results.map((r: SearchIndexResult) => ({
             filePath: r.filePath,
@@ -166,20 +161,6 @@ export function SearchDialog<T extends SearchableConfigPreview>({
     onOpenChange(false);
   };
 
-  const getIndexStatusText = () => {
-    if (!indexStatus) return "";
-    if (indexStatus.state === "indexing") {
-      return t("search.indexingStatus");
-    }
-    if (indexStatus.state === "error") {
-      return t("search.indexErrorStatus");
-    }
-    return t("search.indexedReadyStatus", {
-      files: indexStatus.indexedFiles,
-      matches: indexStatus.indexedMatches,
-    });
-  };
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl p-0 gap-0 overflow-hidden border border-border/80 shadow-2xl">
@@ -189,12 +170,6 @@ export function SearchDialog<T extends SearchableConfigPreview>({
               <Search className="h-5 w-5 text-primary shrink-0" />
               <span>{t("search.title")}</span>
             </div>
-            {indexStatus && (
-              <div className="flex items-center gap-1.5 text-xs font-normal text-muted-foreground bg-background/50 px-2 py-0.5 rounded border">
-                <Database className="h-3.5 w-3.5 text-primary" />
-                <span>{getIndexStatusText()}</span>
-              </div>
-            )}
           </DialogTitle>
 
           {/* Search Input Box */}
@@ -272,7 +247,7 @@ export function SearchDialog<T extends SearchableConfigPreview>({
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-10 text-center text-muted-foreground">
               <Loader2 className="h-8 w-8 mb-2 animate-spin text-primary" />
-              <p className="text-sm">{t("search.indexingStatus")}</p>
+              <p className="text-sm">{t("search.searchingStatus")}</p>
             </div>
           ) : query.trim() === "" ? (
             <div className="flex flex-col items-center justify-center py-10 text-center text-muted-foreground">
@@ -305,7 +280,7 @@ export function SearchDialog<T extends SearchableConfigPreview>({
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2 min-w-0">
-                        <span className="font-mono font-semibold text-sm text-foreground bg-primary/10 text-primary px-2 py-0.5 rounded border border-primary/20 shrink-0">
+                        <span className="shrink-0 rounded border border-primary/30 bg-primary/10 px-2 py-0.5 font-mono text-sm font-semibold text-foreground">
                           {displayTrigger}
                         </span>
                         <span className="text-xs text-muted-foreground truncate flex items-center gap-1">
@@ -316,17 +291,17 @@ export function SearchDialog<T extends SearchableConfigPreview>({
 
                       <div className="flex items-center gap-1 shrink-0">
                         {res.matchedFields.includes("trigger") && (
-                          <span className="inline-flex items-center rounded-full border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+                          <span className="inline-flex items-center rounded-full border border-emerald-500/40 bg-emerald-500/10 px-1.5 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">
                             {t("search.scopeTrigger")}
                           </span>
                         )}
                         {res.matchedFields.includes("description") && (
-                          <span className="inline-flex items-center rounded-full border border-blue-500/30 bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 dark:text-blue-400">
+                          <span className="inline-flex items-center rounded-full border border-blue-500/40 bg-blue-500/10 px-1.5 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-300">
                             {t("search.scopeDescription")}
                           </span>
                         )}
                         {res.matchedFields.includes("content") && (
-                          <span className="inline-flex items-center rounded-full border border-purple-500/30 bg-purple-500/10 px-1.5 py-0.5 text-[10px] font-medium text-purple-600 dark:text-purple-400">
+                          <span className="inline-flex items-center rounded-full border border-purple-500/40 bg-purple-500/10 px-1.5 py-0.5 text-xs font-medium text-purple-700 dark:text-purple-300">
                             {t("search.scopeContent")}
                           </span>
                         )}
@@ -334,7 +309,7 @@ export function SearchDialog<T extends SearchableConfigPreview>({
                     </div>
 
                     {res.snippet.description && (
-                      <p className="text-xs text-foreground/80 font-medium line-clamp-1">
+                      <p className="line-clamp-1 text-xs font-medium text-foreground">
                         {res.snippet.description}
                       </p>
                     )}

@@ -406,7 +406,7 @@ export function VisualYamlEditorDialog({
               </div>
 
               {visualEditorMode === "delete" && pendingDeleteSelections.length > 0 && (
-                <span className="inline-flex items-center rounded-full bg-destructive/15 px-2.5 py-0.5 text-[11px] font-semibold text-destructive">
+                <span className="inline-flex items-center rounded-full bg-destructive/15 px-2.5 py-0.5 text-xs font-semibold text-destructive">
                   {t("visualEditor.markedCount", { count: pendingDeleteSelections.length })}
                 </span>
               )}
@@ -495,13 +495,13 @@ export function VisualYamlEditorDialog({
                                   {triggerText}
                                 </span>
                                 {item.snippet.description && (
-                                  <span className="truncate text-muted-foreground text-[11px]">
+                                  <span className="truncate text-xs text-muted-foreground">
                                     ({item.snippet.description})
                                   </span>
                                 )}
                               </div>
                               {summaryContent && (
-                                <div className="mono-field line-clamp-2 max-w-full text-muted-foreground text-[11px] break-all">
+                                <div className="mono-field line-clamp-2 max-w-full break-all text-xs text-muted-foreground">
                                   {summaryContent}
                                 </div>
                               )}
@@ -1070,12 +1070,12 @@ export function VisualYamlEditorDialog({
                         >
                           <span
                             className={cn(
-                              "table-cell pr-3 text-right select-none w-8 border-r font-mono text-[11px]",
+                              "table-cell w-8 select-none border-r pr-3 text-right font-mono text-xs",
                               isHighlighted
                                 ? isDeleteMode
                                   ? "border-destructive/60 bg-destructive/20 text-destructive dark:text-red-300 font-bold"
                                   : "border-amber-500/60 bg-amber-500/30 text-amber-900 dark:text-amber-200 font-bold"
-                                : "text-muted-foreground/40 border-border/40",
+                                : "border-border text-muted-foreground",
                             )}
                           >
                             {lineNumber}

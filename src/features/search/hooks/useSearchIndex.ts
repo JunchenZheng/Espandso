@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { SEARCH_SHORTCUT_KEY } from "../../../logic/keyboardShortcut";
 import type { SearchResult } from "../../../logic/snippetSearch";
 
 export interface UseSearchIndexOptions {
@@ -13,7 +14,7 @@ export function useSearchIndex(options: UseSearchIndexOptions = {}) {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === SEARCH_SHORTCUT_KEY) {
         e.preventDefault();
         setIsSearchOpen((prev) => !prev);
       }

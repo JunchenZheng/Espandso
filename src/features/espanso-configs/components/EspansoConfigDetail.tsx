@@ -185,7 +185,7 @@ export function EspansoConfigDetail({
               {copied ? (
                 <Check className="h-3.5 w-3.5 text-emerald-500" />
               ) : (
-                <Copy className="h-3.5 w-3.5 text-muted-foreground/80 hover:text-foreground" />
+                <Copy className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
               )}
             </button>
           </div>
@@ -235,7 +235,7 @@ export function EspansoConfigDetail({
                   <GitCompareArrows className="h-4 w-4" />
                   {t("actions.triggerConflicts")}
                   {triggerConflictCount > 0 && (
-                    <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-800">
+                    <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-xs font-semibold text-red-800">
                       {triggerConflictCount}
                     </span>
                   )}
