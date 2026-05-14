@@ -1,0 +1,114 @@
+{
+  "$schema": "./screenshot-manifest.schema.json",
+  "version": 1,
+  "defaults": {
+    "viewport": {
+      "width": 1440,
+      "height": 960
+    },
+    "locale": "en",
+    "theme": "light",
+    "outputDirectory": "docs/product/assets/screenshots"
+  },
+  "screenshots": [
+    {
+      "id": "orientation.main-workspace",
+      "title": "Main workspace",
+      "fixture": "docs-basic",
+      "output": "orientation-main-workspace.png",
+      "steps": [
+        { "action": "selectFile", "target": "base.yml" },
+        { "action": "waitForDisplayed", "selector": "text:Collection" },
+        { "action": "waitForDisplayed", "selector": "testid:snippet-row" }
+      ],
+      "capture": { "type": "window" }
+    },
+    {
+      "id": "match-files.create-file",
+      "title": "Create a match file",
+      "fixture": "docs-basic",
+      "output": "match-files-create-file.png",
+      "steps": [
+        { "action": "click", "selector": "title:Create New YAML File" },
+        { "action": "waitForDisplayed", "selector": "text:Create YAML File" }
+      ],
+      "capture": { "type": "window" }
+    },
+    {
+      "id": "snippets.add-text",
+      "title": "Add a text snippet",
+      "fixture": "docs-basic",
+      "output": "snippets-add-text.png",
+      "steps": [
+        { "action": "selectFile", "target": "base.yml" },
+        { "action": "click", "selector": "text:Add Snippet" },
+        { "action": "setValue", "selector": "#trigger-0", "value": ":thanks" },
+        { "action": "setValue", "selector": "#replace", "value": "Thanks for your help." },
+        { "action": "setValue", "selector": "#description", "value": "Quick thank-you message" },
+        { "action": "waitForDisplayed", "selector": "text:Add Text Snippet" }
+      ],
+      "capture": { "type": "window" }
+    },
+    {
+      "id": "snippets.edit-text",
+      "title": "Edit an existing text snippet",
+      "fixture": "docs-basic",
+      "output": "snippets-edit-text.png",
+      "steps": [
+        { "action": "selectFile", "target": "base.yml" },
+        { "action": "clickSnippet", "trigger": ":hello" },
+        { "action": "waitForDisplayed", "selector": "text:Edit Text Snippet" }
+      ],
+      "capture": { "type": "window" }
+    },
+    {
+      "id": "snippets.batch-delete",
+      "title": "Delete multiple snippets",
+      "fixture": "docs-basic",
+      "output": "snippets-batch-delete.png",
+      "steps": [
+        { "action": "selectFile", "target": "base.yml" },
+        { "action": "click", "selector": "text:Batch Delete" },
+        { "action": "clickSnippet", "trigger": ":hello" },
+        { "action": "clickSnippet", "trigger": ":sig" },
+        { "action": "waitForDisplayed", "selector": "text:Delete Selected (2)" }
+      ],
+      "capture": { "type": "window" }
+    },
+    {
+      "id": "search.results",
+      "title": "Search snippet results",
+      "fixture": "docs-basic",
+      "output": "search-results.png",
+      "steps": [
+        { "action": "click", "selector": "text:Search" },
+        { "action": "setValue", "selector": "placeholder:Search snippets by trigger, replacement, or file...", "value": "meeting" },
+        { "action": "waitForDisplayed", "selector": "text::meeting" }
+      ],
+      "capture": { "type": "window" }
+    },
+    {
+      "id": "issues.conflicts-summary",
+      "title": "Review trigger conflicts",
+      "fixture": "docs-conflicts",
+      "output": "issues-conflicts-summary.png",
+      "steps": [
+        { "action": "selectFile", "target": "base.yml" },
+        { "action": "click", "selector": "text:Conflicts" },
+        { "action": "waitForDisplayed", "selector": "text:Trigger Prefix Conflicts" }
+      ],
+      "capture": { "type": "window" }
+    },
+    {
+      "id": "settings.general",
+      "title": "Settings",
+      "fixture": "docs-basic",
+      "output": "settings-general.png",
+      "steps": [
+        { "action": "click", "selector": "text:Settings" },
+        { "action": "waitForDisplayed", "selector": "text:Espanso Directory Location" }
+      ],
+      "capture": { "type": "window" }
+    }
+  ]
+}
