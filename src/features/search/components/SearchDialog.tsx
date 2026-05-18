@@ -163,7 +163,10 @@ export function SearchDialog<T extends SearchableConfigPreview>({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl p-0 gap-0 overflow-hidden border border-border/80 shadow-2xl">
+      <DialogContent
+        data-testid="search-dialog"
+        className="max-w-2xl p-0 gap-0 overflow-hidden border border-border/80 shadow-2xl"
+      >
         <DialogHeader className="p-4 pb-3 border-b bg-secondary/30">
           <DialogTitle className="flex items-center justify-between text-base font-semibold">
             <div className="flex items-center gap-2">

@@ -171,7 +171,10 @@ export function EspansoConfigDetail({
 
   return (
     <>
-      <div className="flex h-14 shrink-0 items-center justify-between gap-3 border-b px-3">
+      <div
+        data-testid="config-detail"
+        className="flex h-14 shrink-0 items-center justify-between gap-3 border-b px-3"
+      >
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-xl font-bold">{preview.config.relativePath}</h2>
           <div className="mt-1 flex items-center gap-1.5 min-w-0">

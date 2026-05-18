@@ -374,6 +374,7 @@ export function SnippetEditDialog({
       requestCloseSnippetDialog();
     }}>
       <DialogContent
+        data-testid="snippet-edit-dialog"
         className="grid h-[calc(100vh-3rem)] max-h-[calc(100vh-3rem)] w-[50vw] min-w-[min(36rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden"
         onKeyDown={handleDialogKeyDown}
         onEscapeKeyDown={(event) => {

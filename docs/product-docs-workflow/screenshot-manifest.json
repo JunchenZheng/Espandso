@@ -30,7 +30,7 @@
       "output": "match-files-create-file.png",
       "steps": [
         { "action": "click", "selector": "title:Create New YAML File" },
-        { "action": "waitForDisplayed", "selector": "text:Create YAML File" }
+        { "action": "waitForDisplayed", "selector": "text:Create New YAML File" }
       ],
       "capture": { "type": "window" }
     },
@@ -45,7 +45,7 @@
         { "action": "setValue", "selector": "#trigger-0", "value": ":thanks" },
         { "action": "setValue", "selector": "#replace", "value": "Thanks for your help." },
         { "action": "setValue", "selector": "#description", "value": "Quick thank-you message" },
-        { "action": "waitForDisplayed", "selector": "text:Add Text Snippet" }
+        { "action": "waitForDisplayed", "selector": "testid:snippet-edit-dialog" }
       ],
       "capture": { "type": "window" }
     },
@@ -57,7 +57,7 @@
       "steps": [
         { "action": "selectFile", "target": "base.yml" },
         { "action": "clickSnippet", "trigger": ":hello" },
-        { "action": "waitForDisplayed", "selector": "text:Edit Text Snippet" }
+        { "action": "waitForDisplayed", "selector": "testid:snippet-edit-dialog" }
       ],
       "capture": { "type": "window" }
     },
@@ -82,7 +82,7 @@
       "output": "search-results.png",
       "steps": [
         { "action": "click", "selector": "text:Search" },
-        { "action": "setValue", "selector": "placeholder:Search snippets by trigger, replacement, or file...", "value": "meeting" },
+        { "action": "setValue", "selector": "placeholder:Search trigger, description or content...", "value": "meeting" },
         { "action": "waitForDisplayed", "selector": "text::meeting" }
       ],
       "capture": { "type": "window" }
@@ -94,8 +94,8 @@
       "output": "issues-conflicts-summary.png",
       "steps": [
         { "action": "selectFile", "target": "base.yml" },
-        { "action": "click", "selector": "text:Conflicts" },
-        { "action": "waitForDisplayed", "selector": "text:Trigger Prefix Conflicts" }
+        { "action": "click", "selector": "textIncludes:Conflicts" },
+        { "action": "waitForDisplayed", "selector": "testid:trigger-conflicts-dialog" }
       ],
       "capture": { "type": "window" }
     },
@@ -106,7 +106,7 @@
       "output": "settings-general.png",
       "steps": [
         { "action": "click", "selector": "text:Settings" },
-        { "action": "waitForDisplayed", "selector": "text:Espanso Directory Location" }
+        { "action": "waitForDisplayed", "selector": "testid:settings-dialog" }
       ],
       "capture": { "type": "window" }
     }

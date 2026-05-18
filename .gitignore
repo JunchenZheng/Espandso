@@ -81,6 +81,9 @@ instance/
 # Sphinx documentation
 docs/_build/
 
+# Generated product documentation screenshots
+docs/product/assets/screenshots/
+
 # PyBuilder
 .pybuilder/
 target/

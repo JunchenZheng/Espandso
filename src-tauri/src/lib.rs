@@ -160,8 +160,8 @@ pub fn run() {
 
     #[cfg(feature = "e2e")]
     let builder = builder
-        .plugin(tauri_plugin_wdio::init())
-        .plugin(tauri_plugin_wdio_webdriver::init());
+        .plugin(tauri_plugin_wdio_webdriver::init())
+        .plugin(tauri_plugin_wdio::init());
 
     builder
         .plugin(tauri_plugin_opener::init())

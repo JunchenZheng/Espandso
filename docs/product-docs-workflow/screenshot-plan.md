@@ -6,12 +6,13 @@ This plan describes how to generate product documentation screenshots from fixed
 
 Create repeatable screenshots for the leaf nodes in `feature-tree.md`. Screenshots must use synthetic data, avoid personal Espanso files, and stay stable across documentation updates.
 
-## Proposed Pipeline
+## Implemented Pipeline
 
 ```text
 screenshot manifest
-  -> seed synthetic Espanso fixture
-  -> build or launch E2E Tauri app
+  -> start Vite in documentation screenshot mode
+  -> mock Tauri APIs with synthetic Espanso fixture data
+  -> drive the real React app UI with Playwright
   -> navigate to a named product state
   -> wait for a stable selector
   -> save PNG to docs/product/assets/screenshots/
@@ -31,14 +32,36 @@ Use `docs/product-docs-workflow/screenshot-manifest.json` as the source of truth
 
 ## Screenshot Harness Options
 
-### Option A: Extend The Existing WDIO/Tauri E2E Runner
+### Option A: Playwright + Vite App UI Harness
 
-Use the current `npm run test:e2e` infrastructure and add a separate screenshot spec.
-
-Recommended command shape:
+Run:
 
 ```bash
 npm run docs:screenshots
+```
+
+This is the current default. It starts the same React application UI in Vite, aliases Tauri APIs to a documentation-only in-memory fixture, and captures screenshots with Playwright.
+
+Why this is the best first option:
+
+- It is fast enough to run repeatedly while adjusting documentation structure.
+- It uses the real app UI components and workflows.
+- It avoids personal Espanso data.
+- It avoids the current embedded WebDriver startup issue in the Tauri E2E layer.
+
+Tradeoff:
+
+- It does not include the native Tauri window shell.
+- Native file dialogs and OS-level behavior are represented by mocks.
+
+### Option B: Extend The Existing WDIO/Tauri E2E Runner
+
+Use the current `npm run test:e2e` infrastructure and the screenshot spec.
+
+Command:
+
+```bash
+npm run docs:screenshots:tauri
 ```
 
 This command can later run:
@@ -48,26 +71,16 @@ npm run build:e2e
 wdio run e2e/wdio.screenshots.conf.ts
 ```
 
-Why this is the best first option:
+Why this is useful later:
 
 - The app already has Tauri E2E wiring.
 - Existing fixtures already avoid personal Espanso data.
 - WDIO can interact with the real desktop app.
 - Screenshots will reflect the actual installed UI, not a mocked React component.
 
-### Option B: Browser-Only Vite Screenshot Harness
+Current limitation:
 
-Launch the Vite frontend and mock Tauri APIs in a documentation-only route.
-
-Why this is useful later:
-
-- Faster than launching the desktop app.
-- Easier to force specific states such as warning dialogs and import previews.
-- Good for high-volume screenshot generation.
-
-Tradeoff:
-
-- It is less faithful to the real desktop shell and native integrations.
+- The embedded `tauri-plugin-wdio-webdriver` server did not become ready during local verification. Keep this path available, but do not block documentation screenshots on it.
 
 ## Fixture Requirements
 
@@ -129,12 +142,10 @@ Visible text can still be used for buttons when labels are stable and user-facin
 
 ## Implementation Steps
 
-1. Add `e2e/helpers/docsFixture.ts` with richer synthetic YAML files.
-2. Add `e2e/helpers/screenshotManifest.ts` to load and validate the manifest.
-3. Add `e2e/specs/docs-screenshots.e2e.ts`.
-4. Add `e2e/wdio.screenshots.conf.ts` that uses the docs fixture.
-5. Add `npm run docs:screenshots`.
-6. Add `npm run docs:check` to verify that every manifest output exists.
+1. Add `npm run docs:check` to verify that every manifest output exists.
+2. Add more manifest entries for the remaining feature-tree leaves.
+3. Add optional crop support for dialog-only images.
+4. Revisit `npm run docs:screenshots:tauri` after the embedded WebDriver startup issue is resolved.
 
 ## Risks
 
