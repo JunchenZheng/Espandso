@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
@@ -91,6 +91,9 @@ async function runStep(page, step) {
 
 async function main() {
   mkdirSync(outputDir, { recursive: true });
+  for (const item of manifest.screenshots) {
+    rmSync(resolve(outputDir, item.output), { force: true });
+  }
 
   const server = await createServer({
     configFile: resolve(repoRoot, "vite.config.ts"),
