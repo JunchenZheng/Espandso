@@ -40,7 +40,15 @@ Run:
 npm run docs:screenshots
 ```
 
-This is the current default. It starts the same React application UI in Vite, aliases Tauri APIs to a documentation-only in-memory fixture, and captures screenshots with Playwright.
+This is the fast development path. It starts the same React application UI in Vite, aliases Tauri APIs to a documentation-only in-memory fixture, and captures screenshots with Playwright.
+
+For final documentation captures, run:
+
+```bash
+npm run docs:screenshots:fresh
+```
+
+This first rebuilds the documentation screenshot frontend bundle, serves the freshly built `dist-gui/` output with Vite preview, and then captures screenshots from that built output.
 
 Why this is the best first option:
 

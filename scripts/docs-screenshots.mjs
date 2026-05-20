@@ -1,8 +1,9 @@
+import { spawnSync } from "node:child_process";
 import { mkdirSync, readFileSync, rmSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { createServer } from "vite";
+import { createServer, preview } from "vite";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const manifestPath = resolve(repoRoot, "docs/product-docs-workflow/screenshot-manifest.json");
@@ -10,9 +11,29 @@ const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
 const outputDir = resolve(repoRoot, manifest.defaults.outputDirectory);
 const port = Number(process.env.EXPANDSO_DOCS_SCREENSHOT_PORT || 4175);
 const baseUrl = `http://127.0.0.1:${port}`;
+const shouldBuildFirst = process.argv.includes("--fresh-build");
 
 process.env.VITE_EXPANDSO_DOCS_SCREENSHOTS = "1";
 process.env.VITE_EXPANDSO_E2E = "0";
+
+function runFreshBuild() {
+  const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
+  const result = spawnSync(npmCommand, ["run", "build:frontend"], {
+    cwd: repoRoot,
+    env: {
+      ...process.env,
+      VITE_EXPANDSO_DOCS_SCREENSHOTS: "1",
+      VITE_EXPANDSO_E2E: "0",
+    },
+    stdio: "inherit",
+  });
+
+  if (result.status !== 0) {
+    throw new Error(
+      `Documentation screenshot build failed with status ${result.status ?? "unknown"}`,
+    );
+  }
+}
 
 function locatorFor(page, selector) {
   if (selector.startsWith("text:")) {
@@ -89,10 +110,18 @@ async function runStep(page, step) {
   await locator.first().waitFor({ state: "visible", timeout: 20000 });
 }
 
-async function main() {
-  mkdirSync(outputDir, { recursive: true });
-  for (const item of manifest.screenshots) {
-    rmSync(resolve(outputDir, item.output), { force: true });
+async function startScreenshotServer() {
+  if (shouldBuildFirst) {
+    runFreshBuild();
+    return await preview({
+      configFile: resolve(repoRoot, "vite.config.ts"),
+      root: repoRoot,
+      preview: {
+        host: "127.0.0.1",
+        port,
+        strictPort: true,
+      },
+    });
   }
 
   const server = await createServer({
@@ -106,6 +135,30 @@ async function main() {
   });
 
   await server.listen();
+  return server;
+}
+
+async function closeScreenshotServer(server) {
+  if ("close" in server) {
+    await server.close();
+    return;
+  }
+
+  await new Promise((resolveClose, rejectClose) => {
+    server.httpServer.close((error) => {
+      if (error) rejectClose(error);
+      else resolveClose();
+    });
+  });
+}
+
+async function main() {
+  mkdirSync(outputDir, { recursive: true });
+  for (const item of manifest.screenshots) {
+    rmSync(resolve(outputDir, item.output), { force: true });
+  }
+
+  const server = await startScreenshotServer();
 
   const browser = await chromium.launch();
   const page = await browser.newPage({
@@ -133,7 +186,7 @@ async function main() {
     }
   } finally {
     await browser.close();
-    await server.close();
+    await closeScreenshotServer(server);
   }
 }
 
