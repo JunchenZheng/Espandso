@@ -355,6 +355,7 @@ export function VisualYamlEditorDialog({
       }}
     >
       <DialogContent
+        data-testid="visual-yaml-editor-dialog"
         className="fixed inset-0 top-0 left-0 translate-x-0 translate-y-0 w-full max-w-none h-full max-h-none rounded-none border-none grid grid-rows-[auto_minmax(0,1fr)] overflow-hidden p-6 gap-4"
         onKeyDown={handleDialogKeyDown}
       >

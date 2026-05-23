@@ -12,86 +12,44 @@
   },
   "screenshots": [
     {
-      "id": "orientation.main-workspace",
-      "title": "Main workspace",
+      "id": "settings",
+      "title": "Settings",
       "fixture": "docs-basic",
-      "output": "orientation-main-workspace.png",
+      "output": "settings.png",
       "steps": [
-        { "action": "selectFile", "target": "base.yml" },
-        { "action": "waitForDisplayed", "selector": "text:Collection" },
-        { "action": "waitForDisplayed", "selector": "testid:snippet-row" }
+        { "action": "click", "selector": "text:Settings" },
+        { "action": "waitForDisplayed", "selector": "testid:settings-dialog" }
       ],
       "capture": { "type": "window" }
     },
     {
-      "id": "match-files.create-file",
-      "title": "Create a match file",
+      "id": "view-logs",
+      "title": "View Logs",
       "fixture": "docs-basic",
-      "output": "match-files-create-file.png",
+      "output": "view-logs.png",
       "steps": [
-        { "action": "click", "selector": "title:Create New YAML File" },
-        { "action": "waitForDisplayed", "selector": "text:Create New YAML File" }
+        { "action": "click", "selector": "text:View Logs" },
+        { "action": "waitForDisplayed", "selector": "text:Espanso Logs" }
       ],
       "capture": { "type": "window" }
     },
     {
-      "id": "snippets.add-text",
-      "title": "Add a text snippet",
+      "id": "search",
+      "title": "Search",
       "fixture": "docs-basic",
-      "output": "snippets-add-text.png",
-      "steps": [
-        { "action": "selectFile", "target": "base.yml" },
-        { "action": "click", "selector": "text:Add Snippet" },
-        { "action": "setValue", "selector": "#trigger-0", "value": ":thanks" },
-        { "action": "setValue", "selector": "#replace", "value": "Thanks for your help." },
-        { "action": "setValue", "selector": "#description", "value": "Quick thank-you message" },
-        { "action": "waitForDisplayed", "selector": "testid:snippet-edit-dialog" }
-      ],
-      "capture": { "type": "window" }
-    },
-    {
-      "id": "snippets.edit-text",
-      "title": "Edit an existing text snippet",
-      "fixture": "docs-basic",
-      "output": "snippets-edit-text.png",
-      "steps": [
-        { "action": "selectFile", "target": "base.yml" },
-        { "action": "clickSnippet", "trigger": ":hello" },
-        { "action": "waitForDisplayed", "selector": "testid:snippet-edit-dialog" }
-      ],
-      "capture": { "type": "window" }
-    },
-    {
-      "id": "snippets.batch-delete",
-      "title": "Delete multiple snippets",
-      "fixture": "docs-basic",
-      "output": "snippets-batch-delete.png",
-      "steps": [
-        { "action": "selectFile", "target": "base.yml" },
-        { "action": "click", "selector": "text:Batch Delete" },
-        { "action": "clickSnippet", "trigger": ":hello" },
-        { "action": "clickSnippet", "trigger": ":sig" },
-        { "action": "waitForDisplayed", "selector": "text:Delete Selected (2)" }
-      ],
-      "capture": { "type": "window" }
-    },
-    {
-      "id": "search.results",
-      "title": "Search snippet results",
-      "fixture": "docs-basic",
-      "output": "search-results.png",
+      "output": "search.png",
       "steps": [
         { "action": "click", "selector": "text:Search" },
         { "action": "setValue", "selector": "placeholder:Search trigger, description or content...", "value": "meeting" },
-        { "action": "waitForDisplayed", "selector": "text::meeting" }
+        { "action": "waitForDisplayed", "selector": "testid:search-dialog" }
       ],
       "capture": { "type": "window" }
     },
     {
-      "id": "issues.conflicts-summary",
-      "title": "Review trigger conflicts",
+      "id": "conflicts",
+      "title": "Conflicts",
       "fixture": "docs-conflicts",
-      "output": "issues-conflicts-summary.png",
+      "output": "conflicts.png",
       "steps": [
         { "action": "selectFile", "target": "base.yml" },
         { "action": "click", "selector": "textIncludes:Conflicts" },
@@ -100,13 +58,72 @@
       "capture": { "type": "window" }
     },
     {
-      "id": "settings.general",
-      "title": "Settings",
+      "id": "visual-editor",
+      "title": "Visual Editor",
       "fixture": "docs-basic",
-      "output": "settings-general.png",
+      "output": "visual-editor.png",
       "steps": [
-        { "action": "click", "selector": "text:Settings" },
-        { "action": "waitForDisplayed", "selector": "testid:settings-dialog" }
+        { "action": "selectFile", "target": "base.yml" },
+        { "action": "click", "selector": "text:Visual Editor" },
+        { "action": "waitForDisplayed", "selector": "testid:visual-yaml-editor-dialog" }
+      ],
+      "capture": { "type": "window" }
+    },
+    {
+      "id": "batch-delete",
+      "title": "Batch Delete",
+      "fixture": "docs-basic",
+      "output": "batch-delete.png",
+      "steps": [
+        { "action": "selectFile", "target": "base.yml" },
+        { "action": "click", "selector": "text:Batch Delete" },
+        { "action": "waitForDisplayed", "selector": "text:Delete Selected (0)" }
+      ],
+      "capture": { "type": "window" }
+    },
+    {
+      "id": "import-alfred",
+      "title": "Import Alfred",
+      "fixture": "docs-basic",
+      "output": "import-alfred.png",
+      "steps": [
+        { "action": "selectFile", "target": "base.yml" },
+        { "action": "click", "selector": "testid:import-alfred-btn" },
+        { "action": "waitForDisplayed", "selector": "text:Import Alfred Snippets" }
+      ],
+      "capture": { "type": "window" }
+    },
+    {
+      "id": "add-snippet",
+      "title": "Add Snippet",
+      "fixture": "docs-basic",
+      "output": "add-snippet.png",
+      "steps": [
+        { "action": "selectFile", "target": "base.yml" },
+        { "action": "click", "selector": "text:Add Snippet" },
+        { "action": "waitForDisplayed", "selector": "testid:snippet-edit-dialog" }
+      ],
+      "capture": { "type": "window" }
+    },
+    {
+      "id": "create-subdirectory",
+      "title": "Create Subdirectory",
+      "fixture": "docs-basic",
+      "output": "create-subdirectory.png",
+      "steps": [
+        { "action": "click", "selector": "title:Create Subdirectory" },
+        { "action": "waitForDisplayed", "selector": "testid:create-folder-dialog" }
+      ],
+      "capture": { "type": "window" }
+    },
+    {
+      "id": "create-new-yaml-file",
+      "title": "Create New YAML File",
+      "fixture": "docs-basic",
+      "output": "create-new-yaml-file.png",
+      "steps": [
+        { "action": "click", "selector": "title:Create New YAML File" },
+        { "action": "waitForDisplayed", "selector": "testid:create-file-dialog" }
       ],
       "capture": { "type": "window" }
     }
