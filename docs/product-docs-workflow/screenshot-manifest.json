@@ -94,14 +94,69 @@
       "capture": { "type": "window" }
     },
     {
-      "id": "add-snippet",
-      "title": "Add Snippet",
+      "id": "add-snippet-text",
+      "title": "Add Snippet Text",
       "fixture": "docs-basic",
-      "output": "add-snippet.png",
+      "output": "add-snippet-text.png",
       "steps": [
         { "action": "selectFile", "target": "base.yml" },
         { "action": "click", "selector": "text:Add Snippet" },
-        { "action": "waitForDisplayed", "selector": "testid:snippet-edit-dialog" }
+        { "action": "waitForDisplayed", "selector": "testid:snippet-edit-dialog" },
+        { "action": "waitForDisplayed", "selector": "#replace" }
+      ],
+      "capture": { "type": "window" }
+    },
+    {
+      "id": "add-snippet-file",
+      "title": "Add Snippet File",
+      "fixture": "docs-basic",
+      "output": "add-snippet-file.png",
+      "steps": [
+        { "action": "selectFile", "target": "base.yml" },
+        { "action": "click", "selector": "text:Add Snippet" },
+        { "action": "click", "selector": "testid:snippet-kind-file" },
+        { "action": "waitForDisplayed", "selector": "#include-file" }
+      ],
+      "capture": { "type": "window" }
+    },
+    {
+      "id": "add-snippet-image",
+      "title": "Add Snippet Image",
+      "fixture": "docs-basic",
+      "output": "add-snippet-image.png",
+      "steps": [
+        { "action": "selectFile", "target": "base.yml" },
+        { "action": "click", "selector": "text:Add Snippet" },
+        { "action": "click", "selector": "testid:snippet-kind-image" },
+        { "action": "waitForDisplayed", "selector": "#image-path" }
+      ],
+      "capture": { "type": "window" }
+    },
+    {
+      "id": "add-snippet-form",
+      "title": "Add Snippet Form",
+      "fixture": "docs-basic",
+      "output": "add-snippet-form.png",
+      "steps": [
+        { "action": "selectFile", "target": "base.yml" },
+        { "action": "click", "selector": "text:Add Snippet" },
+        { "action": "click", "selector": "testid:snippet-kind-form" },
+        { "action": "waitForDisplayed", "selector": "#form" }
+      ],
+      "capture": { "type": "window" }
+    },
+    {
+      "id": "add-snippet-multiple-triggers",
+      "title": "Add Snippet Multiple Triggers",
+      "fixture": "docs-basic",
+      "output": "add-snippet-multiple-triggers.png",
+      "steps": [
+        { "action": "selectFile", "target": "base.yml" },
+        { "action": "click", "selector": "text:Add Snippet" },
+        { "action": "setValue", "selector": "testid:trigger-input-0", "value": ":hello" },
+        { "action": "click", "selector": "testid:add-trigger-alias-btn" },
+        { "action": "setValue", "selector": "testid:trigger-input-1", "value": ":hi" },
+        { "action": "waitForDisplayed", "selector": "testid:trigger-input-1" }
       ],
       "capture": { "type": "window" }
     },

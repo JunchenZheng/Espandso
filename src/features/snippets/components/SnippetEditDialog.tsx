@@ -427,6 +427,7 @@ export function SnippetEditDialog({
                 <div key={idx} className="flex items-center gap-2">
                   <Input
                     id={idx === 0 ? "trigger-0" : undefined}
+                    data-testid={`trigger-input-${idx}`}
                     className="mono-field flex-1"
                     placeholder={`e.g. ${idx === 0 ? ":hello" : idx === 1 ? ":hi" : ":hey"}`}
                     value={line}
@@ -468,6 +469,7 @@ export function SnippetEditDialog({
                 type="button"
                 size="sm"
                 variant="outline"
+                data-testid="add-trigger-alias-btn"
                 className="w-full border-dashed text-xs"
                 onClick={() => setEditTriggersText([...(editTriggersText ? editTriggersText.split("\n") : [""]), ""].join("\n"))}
               >
@@ -480,6 +482,7 @@ export function SnippetEditDialog({
           <div className="grid grid-cols-4 rounded-md border bg-secondary/60 p-1 shrink-0">
             <Button
               type="button"
+              data-testid="snippet-kind-text"
               variant={activeSnippetKind === "text" ? "default" : "ghost"}
               className="h-8"
               onClick={() => {
@@ -492,6 +495,7 @@ export function SnippetEditDialog({
             </Button>
             <Button
               type="button"
+              data-testid="snippet-kind-file"
               variant={activeSnippetKind === "file" ? "default" : "ghost"}
               className="h-8"
               onClick={() => {
@@ -504,6 +508,7 @@ export function SnippetEditDialog({
             </Button>
             <Button
               type="button"
+              data-testid="snippet-kind-image"
               variant={activeSnippetKind === "image" ? "default" : "ghost"}
               className="h-8"
               onClick={() => {
@@ -516,6 +521,7 @@ export function SnippetEditDialog({
             </Button>
             <Button
               type="button"
+              data-testid="snippet-kind-form"
               variant={activeSnippetKind === "form" ? "default" : "ghost"}
               className="h-8"
               onClick={() => {
