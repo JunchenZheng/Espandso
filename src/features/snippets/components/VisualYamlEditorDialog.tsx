@@ -380,6 +380,7 @@ export function VisualYamlEditorDialog({
                   <input
                     type="radio"
                     name="ve-editor-mode"
+                    data-testid="visual-editor-mode-add"
                     className="h-4 w-4 accent-primary cursor-pointer"
                     checked={visualEditorMode === "add"}
                     onChange={() => {
@@ -394,6 +395,7 @@ export function VisualYamlEditorDialog({
                   <input
                     type="radio"
                     name="ve-editor-mode"
+                    data-testid="visual-editor-mode-delete"
                     className="h-4 w-4 accent-primary cursor-pointer"
                     checked={visualEditorMode === "delete"}
                     onChange={() => {
@@ -512,6 +514,7 @@ export function VisualYamlEditorDialog({
                               type="button"
                               size="sm"
                               variant={isMarked ? "secondary" : "ghost"}
+                              data-testid={`visual-editor-delete-toggle-${matchIdx}-${triggerIndex}`}
                               className={cn(
                                 "h-8 shrink-0 gap-1.5 text-xs",
                                 !isMarked && "text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
@@ -573,6 +576,7 @@ export function VisualYamlEditorDialog({
                       <div key={idx} className="flex items-center gap-2">
                         <Input
                           id={idx === 0 ? "ve-trigger-0" : undefined}
+                          data-testid={`visual-editor-trigger-input-${idx}`}
                           className="mono-field flex-1"
                           placeholder={`e.g. ${idx === 0 ? ":hello" : idx === 1 ? ":hi" : ":hey"}`}
                           value={line}
@@ -1001,7 +1005,11 @@ export function VisualYamlEditorDialog({
                   <Button variant="outline" onClick={requestCloseVisualEditorDialog}>
                     {t("actions.cancel")}
                   </Button>
-                  <Button onClick={saveSnippetToYaml} disabled={isSavingSnippet}>
+                  <Button
+                    data-testid="visual-editor-save-btn"
+                    onClick={saveSnippetToYaml}
+                    disabled={isSavingSnippet}
+                  >
                     {isSavingSnippet ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                     {visualEditorMode === "delete"
                       ? t("actions.saveToYaml")
@@ -1060,6 +1068,7 @@ export function VisualYamlEditorDialog({
                         <div
                           key={idx}
                           id={`ve-yaml-line-${lineNumber}`}
+                          data-testid={isHighlighted ? "visual-editor-yaml-highlighted-line" : undefined}
                           className={cn(
                             "table-row transition-colors duration-300",
                             isHighlighted

@@ -58,14 +58,34 @@
       "capture": { "type": "window" }
     },
     {
-      "id": "visual-editor",
-      "title": "Visual Editor",
+      "id": "visual-editor-add-mode",
+      "title": "Visual Editor Add Mode",
       "fixture": "docs-basic",
-      "output": "visual-editor.png",
+      "output": "visual-editor-add-mode.png",
       "steps": [
         { "action": "selectFile", "target": "base.yml" },
         { "action": "click", "selector": "text:Visual Editor" },
-        { "action": "waitForDisplayed", "selector": "testid:visual-yaml-editor-dialog" }
+        { "action": "waitForDisplayed", "selector": "testid:visual-yaml-editor-dialog" },
+        { "action": "setValue", "selector": "testid:visual-editor-trigger-input-0", "value": ":docs-shot" },
+        { "action": "setValue", "selector": "#ve-replace", "value": "Documentation screenshot replacement." },
+        { "action": "setValue", "selector": "#ve-description", "value": "Visual editor add preview" },
+        { "action": "click", "selector": "testid:visual-editor-save-btn" },
+        { "action": "waitForDisplayed", "selector": "testid:visual-editor-yaml-highlighted-line" }
+      ],
+      "capture": { "type": "window" }
+    },
+    {
+      "id": "visual-editor-delete-mode",
+      "title": "Visual Editor Delete Mode",
+      "fixture": "docs-basic",
+      "output": "visual-editor-delete-mode.png",
+      "steps": [
+        { "action": "selectFile", "target": "base.yml" },
+        { "action": "click", "selector": "text:Visual Editor" },
+        { "action": "waitForDisplayed", "selector": "testid:visual-yaml-editor-dialog" },
+        { "action": "click", "selector": "testid:visual-editor-mode-delete" },
+        { "action": "click", "selector": "testid:visual-editor-delete-toggle-0-0" },
+        { "action": "waitForDisplayed", "selector": "testid:visual-editor-yaml-highlighted-line" }
       ],
       "capture": { "type": "window" }
     },
