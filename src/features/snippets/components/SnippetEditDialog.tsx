@@ -820,12 +820,13 @@ export function SnippetEditDialog({
                         textReplacementFormat === format && "border-primary bg-primary/10",
                       )}
                     >
-                      <input
-                        type="radio"
-                        name="text-replacement-format"
-                        className="h-4 w-4 accent-primary"
-                        checked={textReplacementFormat === format}
-                        onChange={() => setTextReplacementFormat(format)}
+                        <input
+                          type="radio"
+                          name="text-replacement-format"
+                          data-testid={`text-format-${format}`}
+                          className="h-4 w-4 accent-primary"
+                          checked={textReplacementFormat === format}
+                          onChange={() => setTextReplacementFormat(format)}
                       />
                       <span>{label}</span>
                     </label>

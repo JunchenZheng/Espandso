@@ -202,6 +202,7 @@ export function SettingsDialog({
                   </Label>
                   <Switch
                     id="experimental-rich-text"
+                    data-testid="rich-text-snippets-switch"
                     checked={enableExperimentalRichText}
                     onCheckedChange={onToggleExperimentalRichText}
                   />

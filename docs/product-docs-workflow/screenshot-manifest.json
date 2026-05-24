@@ -181,6 +181,38 @@
       "capture": { "type": "window" }
     },
     {
+      "id": "add-snippet-markdown-mode",
+      "title": "Add Snippet Markdown Mode",
+      "fixture": "docs-basic",
+      "output": "add-snippet-markdown-mode.png",
+      "steps": [
+        { "action": "click", "selector": "text:Settings" },
+        { "action": "click", "selector": "testid:rich-text-snippets-switch" },
+        { "action": "click", "selector": "text:Done" },
+        { "action": "selectFile", "target": "base.yml" },
+        { "action": "click", "selector": "text:Add Snippet" },
+        { "action": "click", "selector": "testid:text-format-markdown" },
+        { "action": "waitForDisplayed", "selector": "testid:text-format-markdown" }
+      ],
+      "capture": { "type": "window" }
+    },
+    {
+      "id": "add-snippet-html-mode",
+      "title": "Add Snippet HTML Mode",
+      "fixture": "docs-basic",
+      "output": "add-snippet-html-mode.png",
+      "steps": [
+        { "action": "click", "selector": "text:Settings" },
+        { "action": "click", "selector": "testid:rich-text-snippets-switch" },
+        { "action": "click", "selector": "text:Done" },
+        { "action": "selectFile", "target": "base.yml" },
+        { "action": "click", "selector": "text:Add Snippet" },
+        { "action": "click", "selector": "testid:text-format-html" },
+        { "action": "waitForDisplayed", "selector": "testid:text-format-html" }
+      ],
+      "capture": { "type": "window" }
+    },
+    {
       "id": "create-subdirectory",
       "title": "Create Subdirectory",
       "fixture": "docs-basic",

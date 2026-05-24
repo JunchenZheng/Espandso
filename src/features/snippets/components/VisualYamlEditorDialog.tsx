@@ -949,6 +949,7 @@ export function VisualYamlEditorDialog({
                             <input
                               type="radio"
                               name="visual-text-replacement-format"
+                              data-testid={`visual-text-format-${format}`}
                               className="h-4 w-4 accent-primary"
                               checked={textReplacementFormat === format}
                               onChange={() => setTextReplacementFormat(format)}

@@ -161,28 +161,33 @@ async function main() {
   const server = await startScreenshotServer();
 
   const browser = await chromium.launch();
-  const page = await browser.newPage({
-    viewport: manifest.defaults.viewport,
-    deviceScaleFactor: 1,
-  });
-
   try {
     for (const item of manifest.screenshots) {
       console.log(`Capturing ${item.id} -> ${item.output}`);
-      await page.goto(`${baseUrl}/?fixture=${encodeURIComponent(item.fixture)}&shot=${item.id}`, {
-        waitUntil: "networkidle",
+      const context = await browser.newContext({
+        viewport: manifest.defaults.viewport,
+        deviceScaleFactor: 1,
       });
-      await waitForWorkspace(page);
+      const page = await context.newPage();
 
-      for (const step of item.steps) {
-        await runStep(page, step);
+      try {
+        await page.goto(`${baseUrl}/?fixture=${encodeURIComponent(item.fixture)}&shot=${item.id}`, {
+          waitUntil: "networkidle",
+        });
+        await waitForWorkspace(page);
+
+        for (const step of item.steps) {
+          await runStep(page, step);
+        }
+
+        await page.waitForTimeout(350);
+        await page.screenshot({
+          path: resolve(outputDir, item.output),
+          fullPage: false,
+        });
+      } finally {
+        await context.close();
       }
-
-      await page.waitForTimeout(350);
-      await page.screenshot({
-        path: resolve(outputDir, item.output),
-        fullPage: false,
-      });
     }
   } finally {
     await browser.close();
