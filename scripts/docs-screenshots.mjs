@@ -9,6 +9,7 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const manifestPath = resolve(repoRoot, "docs/product-docs-workflow/screenshot-manifest.json");
 const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
 const outputDir = resolve(repoRoot, manifest.defaults.outputDirectory);
+const locales = manifest.defaults.locales || [manifest.defaults.locale || "en"];
 const port = Number(process.env.EXPANDSO_DOCS_SCREENSHOT_PORT || 4175);
 const baseUrl = `http://127.0.0.1:${port}`;
 const shouldBuildFirst = process.argv.includes("--fresh-build");
@@ -61,7 +62,6 @@ function locatorFor(page, selector) {
 
 async function waitForWorkspace(page) {
   await page.getByTestId("app-workspace").waitFor({ state: "visible", timeout: 20000 });
-  await page.getByText("Collection", { exact: true }).first().waitFor({ state: "visible" });
   await page.getByTestId("espanso-config-file").first().waitFor({ state: "visible" });
 }
 
@@ -80,6 +80,15 @@ async function clickSnippet(page, trigger) {
   );
   await row.waitFor({ state: "visible", timeout: 20000 });
   await row.click();
+}
+
+function localeSuffix(locale) {
+  return locale === "zh-CN" ? "zh" : "en";
+}
+
+function outputPathForLocale(output, locale) {
+  const suffix = `[${localeSuffix(locale)}]`;
+  return output.replace(/(\.[^.]+)$/u, `${suffix}$1`);
 }
 
 async function runStep(page, step) {
@@ -155,7 +164,9 @@ async function closeScreenshotServer(server) {
 async function main() {
   mkdirSync(outputDir, { recursive: true });
   for (const item of manifest.screenshots) {
-    rmSync(resolve(outputDir, item.output), { force: true });
+    for (const locale of locales) {
+      rmSync(resolve(outputDir, outputPathForLocale(item.output, locale)), { force: true });
+    }
   }
 
   const server = await startScreenshotServer();
@@ -163,30 +174,36 @@ async function main() {
   const browser = await chromium.launch();
   try {
     for (const item of manifest.screenshots) {
-      console.log(`Capturing ${item.id} -> ${item.output}`);
-      const context = await browser.newContext({
-        viewport: manifest.defaults.viewport,
-        deviceScaleFactor: 1,
-      });
-      const page = await context.newPage();
-
-      try {
-        await page.goto(`${baseUrl}/?fixture=${encodeURIComponent(item.fixture)}&shot=${item.id}`, {
-          waitUntil: "networkidle",
+      for (const locale of locales) {
+        const output = outputPathForLocale(item.output, locale);
+        console.log(`Capturing ${item.id} (${locale}) -> ${output}`);
+        const context = await browser.newContext({
+          viewport: manifest.defaults.viewport,
+          deviceScaleFactor: 1,
         });
-        await waitForWorkspace(page);
+        await context.addInitScript((selectedLocale) => {
+          window.localStorage.setItem("language", selectedLocale);
+        }, locale);
+        const page = await context.newPage();
 
-        for (const step of item.steps) {
-          await runStep(page, step);
+        try {
+          await page.goto(`${baseUrl}/?fixture=${encodeURIComponent(item.fixture)}&shot=${item.id}&locale=${encodeURIComponent(locale)}`, {
+            waitUntil: "networkidle",
+          });
+          await waitForWorkspace(page);
+
+          for (const step of item.steps) {
+            await runStep(page, step);
+          }
+
+          await page.waitForTimeout(350);
+          await page.screenshot({
+            path: resolve(outputDir, output),
+            fullPage: false,
+          });
+        } finally {
+          await context.close();
         }
-
-        await page.waitForTimeout(350);
-        await page.screenshot({
-          path: resolve(outputDir, item.output),
-          fullPage: false,
-        });
-      } finally {
-        await context.close();
       }
     }
   } finally {

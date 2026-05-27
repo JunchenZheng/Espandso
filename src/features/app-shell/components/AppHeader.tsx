@@ -37,6 +37,7 @@ export function AppHeader({
         <Button
           size="sm"
           variant="outline"
+          data-testid="open-search-btn"
           onClick={onOpenSearch}
           aria-label={openSearchLabel}
           title={openSearchLabel}
@@ -62,6 +63,7 @@ export function AppHeader({
         <Button
           size="sm"
           variant="outline"
+          data-testid="open-logs-btn"
           onClick={onOpenLogs}
           aria-label={t("actions.viewLogs")}
           title={t("actions.viewLogs")}
@@ -72,6 +74,7 @@ export function AppHeader({
         <Button
           size="sm"
           variant="outline"
+          data-testid="open-settings-btn"
           onClick={onOpenSettings}
           aria-label={t("actions.settings")}
           title={t("actions.settings")}

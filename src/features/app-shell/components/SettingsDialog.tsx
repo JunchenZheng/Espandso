@@ -228,7 +228,9 @@ export function SettingsDialog({
             <Info className="mr-1 h-3.5 w-3.5" />
             {t("dialogs.about.title")}
           </Button>
-          <Button onClick={() => onOpenChange(false)}>{t("actions.done")}</Button>
+          <Button data-testid="settings-done-btn" onClick={() => onOpenChange(false)}>
+            {t("actions.done")}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

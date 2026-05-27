@@ -232,6 +232,7 @@ export function EspansoConfigDetail({
                 <Button
                   size="sm"
                   variant="outline"
+                  data-testid="open-conflicts-btn"
                   onClick={onOpenTriggerConflicts}
                   title={t("actions.triggerConflictsTitle", { count: triggerConflictCount })}
                 >
@@ -245,12 +246,22 @@ export function EspansoConfigDetail({
                 </Button>
               )}
               {onOpenVisualEditor && (
-                <Button size="sm" variant="outline" onClick={onOpenVisualEditor}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  data-testid="open-visual-editor-btn"
+                  onClick={onOpenVisualEditor}
+                >
                   <Columns className="h-4 w-4" />
                   {t("actions.visualEditor")}
                 </Button>
               )}
-              <Button size="sm" variant="outline" onClick={() => setIsBatchMode(true)}>
+              <Button
+                size="sm"
+                variant="outline"
+                data-testid="open-batch-delete-btn"
+                onClick={() => setIsBatchMode(true)}
+              >
                 <ListChecks className="h-4 w-4" />
                 {t("actions.batchSelect")}
               </Button>
@@ -265,7 +276,7 @@ export function EspansoConfigDetail({
                   {t("actions.importAlfred")}
                 </Button>
               )}
-              <Button size="sm" onClick={onAddSnippet}>
+              <Button size="sm" data-testid="open-add-snippet-btn" onClick={onAddSnippet}>
                 <Plus className="h-4 w-4" />
                 {t("actions.addSnippet")}
               </Button>

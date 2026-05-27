@@ -50,6 +50,8 @@ npm run docs:screenshots:fresh
 
 This first rebuilds the documentation screenshot frontend bundle, serves the freshly built `dist-gui/` output with Vite preview, and then captures screenshots from that built output.
 
+The harness captures every manifest entry in English and Simplified Chinese. Output filenames append the locale before `.png`, for example `settings[en].png` and `settings[zh].png`.
+
 Why this is the best first option:
 
 - It is fast enough to run repeatedly while adjusting documentation structure.

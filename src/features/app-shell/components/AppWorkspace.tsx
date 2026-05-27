@@ -130,6 +130,7 @@ export function AppWorkspace({
                     <Button
                       size="sm"
                       variant="ghost"
+                      data-testid="create-subdirectory-btn"
                       className="h-7 w-7 p-0"
                       title={
                         activeDirectoryRelPath
@@ -143,6 +144,7 @@ export function AppWorkspace({
                     <Button
                       size="sm"
                       variant="ghost"
+                      data-testid="create-yaml-file-btn"
                       className="h-7 w-7 p-0"
                       title={
                         activeDirectoryRelPath

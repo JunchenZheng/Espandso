@@ -6,7 +6,7 @@
       "width": 1440,
       "height": 960
     },
-    "locale": "en",
+    "locales": ["en", "zh-CN"],
     "theme": "light",
     "outputDirectory": "docs/product/assets/screenshots"
   },
@@ -17,7 +17,7 @@
       "fixture": "docs-basic",
       "output": "settings.png",
       "steps": [
-        { "action": "click", "selector": "text:Settings" },
+        { "action": "click", "selector": "testid:open-settings-btn" },
         { "action": "waitForDisplayed", "selector": "testid:settings-dialog" }
       ],
       "capture": { "type": "window" }
@@ -28,8 +28,8 @@
       "fixture": "docs-basic",
       "output": "view-logs.png",
       "steps": [
-        { "action": "click", "selector": "text:View Logs" },
-        { "action": "waitForDisplayed", "selector": "text:Espanso Logs" }
+        { "action": "click", "selector": "testid:open-logs-btn" },
+        { "action": "waitForDisplayed", "selector": "testid:logs-dialog" }
       ],
       "capture": { "type": "window" }
     },
@@ -39,8 +39,8 @@
       "fixture": "docs-basic",
       "output": "search.png",
       "steps": [
-        { "action": "click", "selector": "text:Search" },
-        { "action": "setValue", "selector": "placeholder:Search trigger, description or content...", "value": "meeting" },
+        { "action": "click", "selector": "testid:open-search-btn" },
+        { "action": "setValue", "selector": "testid:search-input", "value": "meeting" },
         { "action": "waitForDisplayed", "selector": "testid:search-dialog" }
       ],
       "capture": { "type": "window" }
@@ -52,7 +52,7 @@
       "output": "conflicts.png",
       "steps": [
         { "action": "selectFile", "target": "base.yml" },
-        { "action": "click", "selector": "textIncludes:Conflicts" },
+        { "action": "click", "selector": "testid:open-conflicts-btn" },
         { "action": "waitForDisplayed", "selector": "testid:trigger-conflicts-dialog" }
       ],
       "capture": { "type": "window" }
@@ -64,7 +64,7 @@
       "output": "visual-editor-add-mode.png",
       "steps": [
         { "action": "selectFile", "target": "base.yml" },
-        { "action": "click", "selector": "text:Visual Editor" },
+        { "action": "click", "selector": "testid:open-visual-editor-btn" },
         { "action": "waitForDisplayed", "selector": "testid:visual-yaml-editor-dialog" },
         { "action": "setValue", "selector": "testid:visual-editor-trigger-input-0", "value": ":docs-shot" },
         { "action": "setValue", "selector": "#ve-replace", "value": "Documentation screenshot replacement." },
@@ -81,7 +81,7 @@
       "output": "visual-editor-delete-mode.png",
       "steps": [
         { "action": "selectFile", "target": "base.yml" },
-        { "action": "click", "selector": "text:Visual Editor" },
+        { "action": "click", "selector": "testid:open-visual-editor-btn" },
         { "action": "waitForDisplayed", "selector": "testid:visual-yaml-editor-dialog" },
         { "action": "click", "selector": "testid:visual-editor-mode-delete" },
         { "action": "click", "selector": "testid:visual-editor-delete-toggle-0-0" },
@@ -96,8 +96,8 @@
       "output": "batch-delete.png",
       "steps": [
         { "action": "selectFile", "target": "base.yml" },
-        { "action": "click", "selector": "text:Batch Delete" },
-        { "action": "waitForDisplayed", "selector": "text:Delete Selected (0)" }
+        { "action": "click", "selector": "testid:open-batch-delete-btn" },
+        { "action": "waitForDisplayed", "selector": "testid:batch-select-all" }
       ],
       "capture": { "type": "window" }
     },
@@ -109,7 +109,7 @@
       "steps": [
         { "action": "selectFile", "target": "base.yml" },
         { "action": "click", "selector": "testid:import-alfred-btn" },
-        { "action": "waitForDisplayed", "selector": "text:Import Alfred Snippets" }
+        { "action": "waitForDisplayed", "selector": "testid:import-alfred-dialog" }
       ],
       "capture": { "type": "window" }
     },
@@ -120,7 +120,7 @@
       "output": "add-snippet-text.png",
       "steps": [
         { "action": "selectFile", "target": "base.yml" },
-        { "action": "click", "selector": "text:Add Snippet" },
+        { "action": "click", "selector": "testid:open-add-snippet-btn" },
         { "action": "waitForDisplayed", "selector": "testid:snippet-edit-dialog" },
         { "action": "waitForDisplayed", "selector": "#replace" }
       ],
@@ -133,7 +133,7 @@
       "output": "add-snippet-file.png",
       "steps": [
         { "action": "selectFile", "target": "base.yml" },
-        { "action": "click", "selector": "text:Add Snippet" },
+        { "action": "click", "selector": "testid:open-add-snippet-btn" },
         { "action": "click", "selector": "testid:snippet-kind-file" },
         { "action": "waitForDisplayed", "selector": "#include-file" }
       ],
@@ -146,7 +146,7 @@
       "output": "add-snippet-image.png",
       "steps": [
         { "action": "selectFile", "target": "base.yml" },
-        { "action": "click", "selector": "text:Add Snippet" },
+        { "action": "click", "selector": "testid:open-add-snippet-btn" },
         { "action": "click", "selector": "testid:snippet-kind-image" },
         { "action": "waitForDisplayed", "selector": "#image-path" }
       ],
@@ -159,7 +159,7 @@
       "output": "add-snippet-form.png",
       "steps": [
         { "action": "selectFile", "target": "base.yml" },
-        { "action": "click", "selector": "text:Add Snippet" },
+        { "action": "click", "selector": "testid:open-add-snippet-btn" },
         { "action": "click", "selector": "testid:snippet-kind-form" },
         { "action": "waitForDisplayed", "selector": "#form" }
       ],
@@ -172,7 +172,7 @@
       "output": "add-snippet-multiple-triggers.png",
       "steps": [
         { "action": "selectFile", "target": "base.yml" },
-        { "action": "click", "selector": "text:Add Snippet" },
+        { "action": "click", "selector": "testid:open-add-snippet-btn" },
         { "action": "setValue", "selector": "testid:trigger-input-0", "value": ":hello" },
         { "action": "click", "selector": "testid:add-trigger-alias-btn" },
         { "action": "setValue", "selector": "testid:trigger-input-1", "value": ":hi" },
@@ -186,11 +186,11 @@
       "fixture": "docs-basic",
       "output": "add-snippet-markdown-mode.png",
       "steps": [
-        { "action": "click", "selector": "text:Settings" },
+        { "action": "click", "selector": "testid:open-settings-btn" },
         { "action": "click", "selector": "testid:rich-text-snippets-switch" },
-        { "action": "click", "selector": "text:Done" },
+        { "action": "click", "selector": "testid:settings-done-btn" },
         { "action": "selectFile", "target": "base.yml" },
-        { "action": "click", "selector": "text:Add Snippet" },
+        { "action": "click", "selector": "testid:open-add-snippet-btn" },
         { "action": "click", "selector": "testid:text-format-markdown" },
         { "action": "waitForDisplayed", "selector": "testid:text-format-markdown" }
       ],
@@ -202,11 +202,11 @@
       "fixture": "docs-basic",
       "output": "add-snippet-html-mode.png",
       "steps": [
-        { "action": "click", "selector": "text:Settings" },
+        { "action": "click", "selector": "testid:open-settings-btn" },
         { "action": "click", "selector": "testid:rich-text-snippets-switch" },
-        { "action": "click", "selector": "text:Done" },
+        { "action": "click", "selector": "testid:settings-done-btn" },
         { "action": "selectFile", "target": "base.yml" },
-        { "action": "click", "selector": "text:Add Snippet" },
+        { "action": "click", "selector": "testid:open-add-snippet-btn" },
         { "action": "click", "selector": "testid:text-format-html" },
         { "action": "waitForDisplayed", "selector": "testid:text-format-html" }
       ],
@@ -218,7 +218,7 @@
       "fixture": "docs-basic",
       "output": "create-subdirectory.png",
       "steps": [
-        { "action": "click", "selector": "title:Create Subdirectory" },
+        { "action": "click", "selector": "testid:create-subdirectory-btn" },
         { "action": "waitForDisplayed", "selector": "testid:create-folder-dialog" }
       ],
       "capture": { "type": "window" }
@@ -229,7 +229,7 @@
       "fixture": "docs-basic",
       "output": "create-new-yaml-file.png",
       "steps": [
-        { "action": "click", "selector": "title:Create New YAML File" },
+        { "action": "click", "selector": "testid:create-yaml-file-btn" },
         { "action": "waitForDisplayed", "selector": "testid:create-file-dialog" }
       ],
       "capture": { "type": "window" }
