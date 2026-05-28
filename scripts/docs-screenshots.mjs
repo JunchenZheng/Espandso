@@ -179,7 +179,7 @@ async function main() {
         console.log(`Capturing ${item.id} (${locale}) -> ${output}`);
         const context = await browser.newContext({
           viewport: manifest.defaults.viewport,
-          deviceScaleFactor: 1,
+          deviceScaleFactor: manifest.defaults.deviceScaleFactor || 1,
         });
         await context.addInitScript((selectedLocale) => {
           window.localStorage.setItem("language", selectedLocale);

@@ -6,6 +6,7 @@
       "width": 1440,
       "height": 960
     },
+    "deviceScaleFactor": 2,
     "locales": ["en", "zh-CN"],
     "theme": "light",
     "outputDirectory": "docs/product/assets/screenshots"
