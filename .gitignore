@@ -84,6 +84,9 @@ docs/_build/
 # Generated product documentation screenshots
 docs/product/assets/screenshots/
 
+# Private documentation workflow; maintained outside the public app repository.
+private-docs-workflow/
+
 # PyBuilder
 .pybuilder/
 target/

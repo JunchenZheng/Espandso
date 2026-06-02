@@ -1,33 +1,41 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import { resolve } from "node:path";
+import { isAbsolute, resolve } from "node:path";
 
 const host = process.env.TAURI_DEV_HOST;
-const docsScreenshotMode = process.env.VITE_EXPANDSO_DOCS_SCREENSHOTS === "1";
-const docsTauriMock = resolve(__dirname, "src/test/docsTauriMocks.ts");
+const externalTauriMockModule = process.env.EXPANDSO_TAURI_MOCK_MODULE;
+const tauriMockModule = externalTauriMockModule
+  ? isAbsolute(externalTauriMockModule)
+    ? externalTauriMockModule
+    : resolve(__dirname, externalTauriMockModule)
+  : undefined;
+
+const tauriMockAliases = tauriMockModule
+  ? {
+      "@tauri-apps/api/core": tauriMockModule,
+      "@tauri-apps/api/event": tauriMockModule,
+      "@tauri-apps/api/path": tauriMockModule,
+      "@tauri-apps/plugin-dialog": tauriMockModule,
+      "@tauri-apps/plugin-fs": tauriMockModule,
+      "@tauri-apps/plugin-opener": tauriMockModule,
+      "@tauri-apps/plugin-shell": tauriMockModule,
+      "@tauri-apps/plugin-store": tauriMockModule,
+    }
+  : undefined;
 
 // https://vite.dev/config/
 export default defineConfig(async () => ({
   plugins: [react()],
-  resolve: docsScreenshotMode
+  resolve: tauriMockAliases
     ? {
-        alias: {
-          "@tauri-apps/api/core": docsTauriMock,
-          "@tauri-apps/api/event": docsTauriMock,
-          "@tauri-apps/api/path": docsTauriMock,
-          "@tauri-apps/plugin-dialog": docsTauriMock,
-          "@tauri-apps/plugin-fs": docsTauriMock,
-          "@tauri-apps/plugin-opener": docsTauriMock,
-          "@tauri-apps/plugin-shell": docsTauriMock,
-          "@tauri-apps/plugin-store": docsTauriMock,
-        },
+        alias: tauriMockAliases,
       }
     : undefined,
   build: {
     outDir: "dist-gui",
     emptyOutDir: true,
   },
-  optimizeDeps: docsScreenshotMode
+  optimizeDeps: tauriMockAliases
     ? {
         entries: ["index.html"],
       }
