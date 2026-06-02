@@ -171,7 +171,10 @@ export function EspansoConfigDetail({
 
   return (
     <>
-      <div className="flex h-14 shrink-0 items-center justify-between gap-3 border-b px-3">
+      <div
+        data-testid="config-detail"
+        className="flex h-14 shrink-0 items-center justify-between gap-3 border-b px-3"
+      >
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-xl font-bold">{preview.config.relativePath}</h2>
           <div className="mt-1 flex items-center gap-1.5 min-w-0">
@@ -229,6 +232,7 @@ export function EspansoConfigDetail({
                 <Button
                   size="sm"
                   variant="outline"
+                  data-testid="open-conflicts-btn"
                   onClick={onOpenTriggerConflicts}
                   title={t("actions.triggerConflictsTitle", { count: triggerConflictCount })}
                 >
@@ -242,12 +246,22 @@ export function EspansoConfigDetail({
                 </Button>
               )}
               {onOpenVisualEditor && (
-                <Button size="sm" variant="outline" onClick={onOpenVisualEditor}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  data-testid="open-visual-editor-btn"
+                  onClick={onOpenVisualEditor}
+                >
                   <Columns className="h-4 w-4" />
                   {t("actions.visualEditor")}
                 </Button>
               )}
-              <Button size="sm" variant="outline" onClick={() => setIsBatchMode(true)}>
+              <Button
+                size="sm"
+                variant="outline"
+                data-testid="open-batch-delete-btn"
+                onClick={() => setIsBatchMode(true)}
+              >
                 <ListChecks className="h-4 w-4" />
                 {t("actions.batchSelect")}
               </Button>
@@ -262,7 +276,7 @@ export function EspansoConfigDetail({
                   {t("actions.importAlfred")}
                 </Button>
               )}
-              <Button size="sm" onClick={onAddSnippet}>
+              <Button size="sm" data-testid="open-add-snippet-btn" onClick={onAddSnippet}>
                 <Plus className="h-4 w-4" />
                 {t("actions.addSnippet")}
               </Button>

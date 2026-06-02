@@ -99,7 +99,10 @@ export function AppWorkspace({
   const { t } = useI18n();
 
   return (
-    <main className="flex h-full w-full overflow-hidden bg-[linear-gradient(180deg,hsl(var(--background))_0%,hsl(var(--secondary))_100%)] p-4">
+    <main
+      data-testid="app-workspace"
+      className="flex h-full w-full overflow-hidden bg-[linear-gradient(180deg,hsl(var(--background))_0%,hsl(var(--secondary))_100%)] p-4"
+    >
       <div className="flex h-full w-full flex-col rounded-lg border bg-secondary/40 p-4 text-left shadow-sm">
         {espansoConfigsCount > 0 ? (
           <div className="flex min-h-0 flex-1 flex-col gap-3">
@@ -117,13 +120,17 @@ export function AppWorkspace({
               className="home-split grid min-h-0 flex-1 overflow-hidden rounded-md border bg-background"
               style={{ "--collection-pane-width": `${collectionPaneWidth}%` } as CSSProperties}
             >
-              <aside className="flex min-h-0 flex-col border-b bg-secondary/30 md:border-b-0">
+              <aside
+                data-testid="collection-pane"
+                className="flex min-h-0 flex-col border-b bg-secondary/30 md:border-b-0"
+              >
                 <div className="flex h-10 shrink-0 items-center justify-between border-b px-3">
                   <h2 className="text-lg font-semibold">{t("navigation.collection")}</h2>
                   <div className="flex items-center gap-1">
                     <Button
                       size="sm"
                       variant="ghost"
+                      data-testid="create-subdirectory-btn"
                       className="h-7 w-7 p-0"
                       title={
                         activeDirectoryRelPath
@@ -137,6 +144,7 @@ export function AppWorkspace({
                     <Button
                       size="sm"
                       variant="ghost"
+                      data-testid="create-yaml-file-btn"
                       className="h-7 w-7 p-0"
                       title={
                         activeDirectoryRelPath

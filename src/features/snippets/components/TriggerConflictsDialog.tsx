@@ -31,7 +31,7 @@ export function TriggerConflictsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md sm:max-w-2xl">
+      <DialogContent data-testid="trigger-conflicts-dialog" className="max-w-md sm:max-w-2xl">
         <DialogHeader>
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-500/15 text-red-700">

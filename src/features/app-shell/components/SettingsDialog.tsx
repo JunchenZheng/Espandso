@@ -50,7 +50,7 @@ export function SettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent data-testid="settings-dialog">
         <DialogHeader>
           <DialogTitle>{t("settings.title")}</DialogTitle>
           <DialogDescription>{t("settings.description")}</DialogDescription>
@@ -202,6 +202,7 @@ export function SettingsDialog({
                   </Label>
                   <Switch
                     id="experimental-rich-text"
+                    data-testid="rich-text-snippets-switch"
                     checked={enableExperimentalRichText}
                     onCheckedChange={onToggleExperimentalRichText}
                   />
@@ -227,7 +228,9 @@ export function SettingsDialog({
             <Info className="mr-1 h-3.5 w-3.5" />
             {t("dialogs.about.title")}
           </Button>
-          <Button onClick={() => onOpenChange(false)}>{t("actions.done")}</Button>
+          <Button data-testid="settings-done-btn" onClick={() => onOpenChange(false)}>
+            {t("actions.done")}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

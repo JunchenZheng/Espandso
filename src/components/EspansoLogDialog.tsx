@@ -119,7 +119,10 @@ export function EspansoLogDialog({ open, onOpenChange }: EspansoLogDialogProps) 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl w-[92vw] max-h-[90vh] flex flex-col p-4 sm:p-6 gap-3 bg-card border-border">
+      <DialogContent
+        data-testid="logs-dialog"
+        className="max-w-4xl w-[92vw] max-h-[90vh] flex flex-col p-4 sm:p-6 gap-3 bg-card border-border"
+      >
         {/* Header */}
         <DialogHeader className="flex flex-row items-center justify-between space-y-0 pb-1 border-b">
           <div className="flex items-center gap-2.5">

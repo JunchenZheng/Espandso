@@ -184,7 +184,10 @@ export function ImportAlfredSnippetsDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(openState) => !openState && onClose()}>
-      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-6">
+      <DialogContent
+        data-testid="import-alfred-dialog"
+        className="max-w-3xl max-h-[90vh] flex flex-col p-6"
+      >
         <DialogHeader>
           <DialogTitle className="text-xl font-bold">{t("alfredImport.title")}</DialogTitle>
           <DialogDescription className="text-sm text-muted-foreground">
