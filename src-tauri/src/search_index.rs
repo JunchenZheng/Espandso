@@ -271,6 +271,10 @@ fn normalize_match_dir(match_dir: &str) -> String {
     match_dir.trim().trim_end_matches(['/', '\\']).to_string()
 }
 
+fn normalize_path_separators(value: &str) -> String {
+    value.replace('\\', "/")
+}
+
 fn escape_like_pattern(value: &str) -> String {
     value
         .replace('\\', "\\\\")
@@ -279,7 +283,7 @@ fn escape_like_pattern(value: &str) -> String {
 }
 
 fn match_dir_like_pattern(match_dir: &str) -> String {
-    let normalized = normalize_match_dir(match_dir);
+    let normalized = match_dir_exact(match_dir);
     if normalized.is_empty() {
         "%".to_string()
     } else {
@@ -288,7 +292,7 @@ fn match_dir_like_pattern(match_dir: &str) -> String {
 }
 
 fn match_dir_exact(match_dir: &str) -> String {
-    normalize_match_dir(match_dir)
+    normalize_path_separators(&normalize_match_dir(match_dir))
 }
 
 fn write_index_state(
@@ -1151,7 +1155,8 @@ pub fn get_status_from_conn(
         let files = conn
             .query_row(
                 "SELECT COUNT(*) FROM indexed_files
-                 WHERE file_path = ?1 OR file_path LIKE ?2 ESCAPE '\\'",
+                 WHERE REPLACE(file_path, '\\', '/') = ?1
+                    OR REPLACE(file_path, '\\', '/') LIKE ?2 ESCAPE '\\'",
                 params![exact, like],
                 |r| r.get(0),
             )
@@ -1159,7 +1164,8 @@ pub fn get_status_from_conn(
         let matches = conn
             .query_row(
                 "SELECT COUNT(*) FROM matches
-                 WHERE file_path = ?1 OR file_path LIKE ?2 ESCAPE '\\'",
+                 WHERE REPLACE(file_path, '\\', '/') = ?1
+                    OR REPLACE(file_path, '\\', '/') LIKE ?2 ESCAPE '\\'",
                 params![match_dir_exact(dir), match_dir_like_pattern(dir)],
                 |r| r.get(0),
             )
@@ -1224,7 +1230,10 @@ pub fn query_snippet_index(
             "
             SELECT COUNT(*)
             FROM matches m
-            WHERE (m.file_path = ?1 OR m.file_path LIKE ?2 ESCAPE '\\')
+            WHERE (
+                REPLACE(m.file_path, '\\', '/') = ?1
+                OR REPLACE(m.file_path, '\\', '/') LIKE ?2 ESCAPE '\\'
+              )
               AND (
                 (?3 = 1 AND m.trigger LIKE ?4 ESCAPE '\\')
                 OR (?5 = 1 AND m.description LIKE ?4 ESCAPE '\\')
@@ -1247,7 +1256,10 @@ pub fn query_snippet_index(
     let sql = "
         SELECT m.file_path, m.relative_path, m.filename, m.snippet_json, m.display_index, m.original_match_index, m.trigger_index, m.trigger, m.description, m.content
         FROM matches m
-        WHERE (m.file_path = ?1 OR m.file_path LIKE ?2 ESCAPE '\\')
+        WHERE (
+            REPLACE(m.file_path, '\\', '/') = ?1
+            OR REPLACE(m.file_path, '\\', '/') LIKE ?2 ESCAPE '\\'
+          )
           AND (
             (?3 = 1 AND m.trigger LIKE ?4 ESCAPE '\\')
             OR (?5 = 1 AND m.description LIKE ?4 ESCAPE '\\')
@@ -1426,7 +1438,10 @@ pub fn query_trigger_prefix_conflicts(
                 AND m.display_index = l.snippet_index
                 AND m.trigger_index = l.trigger_index
              )
-            WHERE (m.file_path = ?1 OR m.file_path LIKE ?2 ESCAPE '\\')
+            WHERE (
+                REPLACE(m.file_path, '\\', '/') = ?1
+                OR REPLACE(m.file_path, '\\', '/') LIKE ?2 ESCAPE '\\'
+              )
 
             UNION ALL
 
@@ -1451,7 +1466,10 @@ pub fn query_trigger_prefix_conflicts(
                 AND m.display_index = l.snippet_index
                 AND m.trigger_index = l.trigger_index
              )
-            WHERE (m.file_path = ?1 OR m.file_path LIKE ?2 ESCAPE '\\')
+            WHERE (
+                REPLACE(m.file_path, '\\', '/') = ?1
+                OR REPLACE(m.file_path, '\\', '/') LIKE ?2 ESCAPE '\\'
+              )
             ORDER BY blocking_trigger, blocked_trigger, blocking_relative_path, blocked_relative_path
             ",
         )
@@ -1857,6 +1875,8 @@ matches:
             match_dir_like_pattern("/tmp/100%_match"),
             "/tmp/100\\%\\_match/%"
         );
+        assert_eq!(match_dir_exact("C:\\match\\"), "C:/match");
+        assert_eq!(match_dir_like_pattern("C:\\match\\"), "C:/match/%");
         assert_eq!(match_dir_exact("/tmp/match/"), "/tmp/match");
         assert!(is_yaml_path(Path::new("base.yml")));
         assert!(is_yaml_path(Path::new("base.YAML")));
@@ -1996,7 +2016,59 @@ matches:
         .unwrap();
 
         assert_eq!(res.total, 1);
-        assert!(res.results[0].file_path.ends_with("match-b/base.yml"));
+        assert!(normalize_path_separators(&res.results[0].file_path).ends_with("match-b/base.yml"));
+    }
+
+    #[test]
+    fn test_search_filters_windows_style_indexed_paths() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("test.sqlite");
+        let conn = open_and_init_db(&db_path).unwrap();
+        let file_path = "C:\\Users\\test\\match\\base.yml";
+
+        conn.execute(
+            "INSERT INTO indexed_files (file_path, relative_path, mtime_ns, file_size, snippet_count, warning_count, warnings_json, indexed_at_ms)
+             VALUES (?1, ?2, 1, 1, 1, 0, '[]', 1)",
+            params![file_path, "base.yml"],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO matches (file_path, relative_path, filename, display_index, original_match_index, trigger_index, trigger, description, content, kind, snippet_json)
+             VALUES (?1, ?2, ?3, 0, 0, 0, ?4, NULL, ?5, 'replace', ?6)",
+            params![
+                file_path,
+                "base.yml",
+                "base.yml",
+                ":win",
+                "windows path content",
+                serde_json::json!({
+                    "trigger": ":win",
+                    "replace": "windows path content"
+                })
+                .to_string()
+            ],
+        )
+        .unwrap();
+
+        let res = query_snippet_index(
+            &db_path,
+            &SearchIndexRequest {
+                match_dir: "C:\\Users\\test\\match".to_string(),
+                query: ":win".to_string(),
+                scope: SearchScope {
+                    trigger: true,
+                    description: false,
+                    content: false,
+                },
+                limit: 10,
+                offset: 0,
+            },
+        )
+        .unwrap();
+
+        assert_eq!(res.index_status.indexed_files, 1);
+        assert_eq!(res.total, 1);
+        assert_eq!(res.results[0].file_path, file_path);
     }
 
     #[test]
