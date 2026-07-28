@@ -35,7 +35,8 @@ jobs:
         run: npm ci
 
       - name: Generate Tauri icons
-        run: npm run generate:icons
+        shell: bash
+        run: ./scripts/generate_icons.sh
 
       - name: Run unit checks
         run: npm run check:unit
@@ -81,7 +82,8 @@ jobs:
         run: npm ci
 
       - name: Generate Tauri icons
-        run: npm run generate:icons
+        shell: bash
+        run: ./scripts/generate_icons.sh
 
       - name: Run unit checks
         run: npm run check:unit
