@@ -1,47 +1,24 @@
 # Expandso
 
-A Tauri desktop app for scanning, previewing, and editing Espanso YAML match files directly.
+[English](README.md) | [中文](README.zh-CN.md)
 
-## Current App Stack
+[Download Expandso v0.5.0](https://github.com/JunchenZheng/Espandso/releases/tag/v0.5.0) | [User Guide](https://expandso.gitbook.io/expandso-user-guide)
 
-- Tauri v2
-- React
-- TypeScript
-- Vite
-- Rust
+Expandso is a user-friendly and intuitive desktop app wrapper for Espanso. It simplifies snippet management by offering a clean GUI to preview YAML configs, add text matches, validate triggers, and restart Espanso in one click.
+
+(Espanso + Expand = Expandso)
 
 ## Features
 
-- **YAML-First Source Of Truth**: Scans the Espanso match directory and edits YAML files in place.
-- **Static Text Snippet Editor**: Adds single-line or multi-line text replacement snippets directly to the selected YAML config.
-- **Multiple Triggers (Aliases)**: Supports Espanso `triggers: [...]` for a single snippet alias group.
-- **Block Literal YAML Writing**: Multi-line replacement texts are written with YAML block literal style.
-- **Validation & Live Reload**: Validates snippet shape and prefix trigger conflicts before saving; Espanso reloads from file changes.
-- **Resource Preview**: Previews existing external resource snippets by resolving their configured shell/echo paths.
-
-## Setup
-
-Check Node.js/npm and install project dependencies:
-
-```bash
-./scripts/setup_npm_env.sh
-```
-
-Check without installing:
-
-```bash
-./scripts/setup_npm_env.sh --check-only
-```
-
-## Development
-
-Run the Tauri app in development mode:
-
-```bash
-npm run tauri dev
-```
+- **Add snippets**: Create text, file, image, and form snippets directly from the desktop app.
+- **Delete snippets**: Remove single snippets or batch-delete selected matches from YAML configs.
+- **Visual YAML editing**: Preview and edit Espanso YAML files with a focused visual editor.
+- **Alfred import**: Import Alfred snippets into the selected Espanso collection.
+- **Conflict detection**: Detect duplicate or conflicting triggers before saving.
 
 ## Command Line Mode
+
+**Command Line Mode currently supports macOS only. Windows and more platforms will be supported in future releases.**
 
 Expandso can add snippets without opening the desktop UI, which makes it suitable for third-party launchers such as Alfred and Raycast.
 
@@ -61,6 +38,60 @@ By default, snippets are written to `base.yml` inside the Espanso match director
 
 On macOS, `./install_tauri_app.sh` installs the command as `~/.local/bin/expandso` by linking it to the executable inside `Expandso.app`. Make sure `~/.local/bin` is in your shell `PATH`.
 
+## Development
+
+### Quick Install
+
+Build the Tauri `.app` bundle, install it to `/Applications`, install the CLI link, stop any old Expandso process, and launch the new app:
+
+```bash
+./install_tauri_app.sh
+```
+
+Install to a custom directory:
+
+```bash
+./install_tauri_app.sh "$HOME/Applications"
+```
+
+### Detailed Commands
+
+Check Node.js/npm and install project dependencies:
+
+```bash
+./scripts/setup_npm_env.sh
+```
+
+Check the local Node.js/npm environment without installing dependencies:
+
+```bash
+./scripts/setup_npm_env.sh --check-only
+```
+
+Run the Vite frontend only:
+
+```bash
+npm run dev
+```
+
+Run the Tauri desktop app in development mode:
+
+```bash
+npm run tauri dev
+```
+
+Type-check and build the frontend into `dist-gui/`:
+
+```bash
+npm run build
+```
+
+Build the macOS `.app` bundle:
+
+```bash
+npm run tauri build
+```
+
 Run focused test layers:
 
 ```bash
@@ -77,26 +108,9 @@ npm run check:unit
 npm run check:all
 ```
 
-## Build And Install On macOS
+macOS builds require Rust/Cargo and Apple Command Line Tools because Tauri produces a native macOS app bundle.
 
-Build the Tauri `.app` bundle and install it to `/Applications`:
+## Documentation
 
-```bash
-./install_tauri_app.sh
-```
-
-Install to a custom directory:
-
-```bash
-./install_tauri_app.sh "$HOME/Applications"
-```
-
-macOS builds still require Rust/Cargo and Apple Command Line Tools because Tauri produces a native macOS app bundle.
-
-## Documentation & UI Guidelines
-
-For details about our UI components, typography hierarchy, and design tokens, see the [UI Design System](file:///Volumes/Sandisk2TB/CodeProject/Espanso_yaml_to_json/docs/DESIGN_SYSTEM.md).
-
-## Current Editing Model
-
-Expandso treats existing Espanso YAML files as the source of truth and writes changes directly to the selected match file.
+- [User Guide](https://expandso.gitbook.io/expandso-user-guide)
+- [UI Design System](docs/DESIGN_SYSTEM.md)
