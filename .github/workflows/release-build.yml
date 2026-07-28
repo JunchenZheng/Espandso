@@ -34,6 +34,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Generate Tauri icons
+        run: npm run generate:icons
+
       - name: Run unit checks
         run: npm run check:unit
 
@@ -76,6 +79,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Generate Tauri icons
+        run: npm run generate:icons
 
       - name: Run unit checks
         run: npm run check:unit
