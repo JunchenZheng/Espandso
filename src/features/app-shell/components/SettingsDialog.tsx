@@ -1,4 +1,14 @@
-import { FileSearch, FlaskConical, Globe, Info, Loader2, ShieldAlert } from "lucide-react";
+import {
+  FileSearch,
+  FlaskConical,
+  Globe,
+  Info,
+  Loader2,
+  Monitor,
+  Moon,
+  ShieldAlert,
+  Sun,
+} from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import {
   Dialog,
@@ -13,6 +23,7 @@ import { Switch } from "../../../components/ui/switch";
 import { useI18n } from "../../../i18n/useI18n";
 import { cn } from "../../../lib/utils";
 import { IS_EXPERIMENTAL_BUILD } from "../../../logic/features";
+import type { ThemePreference } from "../../../logic/features";
 import type { EspansoPathSource } from "../../../logic/espansoPaths";
 
 interface SettingsDialogProps {
@@ -26,6 +37,8 @@ interface SettingsDialogProps {
   onToggleExperimentalYamlWarnings: (checked: boolean) => void;
   enableExperimentalRichText: boolean;
   onToggleExperimentalRichText: (checked: boolean) => void;
+  themePreference: ThemePreference;
+  onThemePreferenceChange: (preference: ThemePreference) => void;
   enablePreSaveConflictCheck: boolean;
   onTogglePreSaveConflictCheck: (checked: boolean) => void;
   onOpenAbout: () => void;
@@ -42,11 +55,22 @@ export function SettingsDialog({
   onToggleExperimentalYamlWarnings,
   enableExperimentalRichText,
   onToggleExperimentalRichText,
+  themePreference,
+  onThemePreferenceChange,
   enablePreSaveConflictCheck,
   onTogglePreSaveConflictCheck,
   onOpenAbout,
 }: SettingsDialogProps) {
   const { t, locale, setLocale } = useI18n();
+  const themeOptions: Array<{
+    value: ThemePreference;
+    label: string;
+    icon: typeof Monitor;
+  }> = [
+    { value: "system", label: t("settings.themeSystem"), icon: Monitor },
+    { value: "light", label: t("settings.themeLight"), icon: Sun },
+    { value: "dark", label: t("settings.themeDark"), icon: Moon },
+  ];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -92,6 +116,43 @@ export function SettingsDialog({
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {t("settings.languageDescription")}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Appearance Setting Block */}
+          <div className="rounded-lg border bg-secondary/40 p-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-background text-primary">
+                <Sun className="h-5 w-5 dark:hidden" />
+                <Moon className="hidden h-5 w-5 dark:block" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <Label className="text-sm font-semibold">{t("settings.appearance")}</Label>
+                  <div className="grid grid-cols-3 rounded-lg border bg-background p-0.5 shadow-sm">
+                    {themeOptions.map(({ value, label, icon: Icon }) => (
+                      <button
+                        key={value}
+                        type="button"
+                        aria-pressed={themePreference === value}
+                        onClick={() => onThemePreferenceChange(value)}
+                        className={cn(
+                          "inline-flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-md px-2 text-xs font-medium transition-colors",
+                          themePreference === value
+                            ? "bg-primary text-primary-foreground shadow-xs"
+                            : "text-muted-foreground hover:text-foreground",
+                        )}
+                      >
+                        <Icon className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">{label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {t("settings.appearanceDescription")}
                 </p>
               </div>
             </div>

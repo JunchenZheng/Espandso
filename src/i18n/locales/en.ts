@@ -39,7 +39,8 @@ export const en = {
   },
   alfredImport: {
     title: "Import Alfred Snippets",
-    description: "Select or drop a .alfredsnippets archive to import its snippets into an Espanso YAML file.",
+    description:
+      "Select or drop a .alfredsnippets archive to import its snippets into an Espanso YAML file.",
     dropzoneHint: "Drag and drop a .alfredsnippets file here, or click to browse",
     selectFile: "Select .alfredsnippets File",
     parsingFile: "Parsing archive file...",
@@ -90,6 +91,11 @@ export const en = {
     languageDescription: "Choose the display language for menus and app controls.",
     english: "English",
     chinese: "中文",
+    appearance: "Appearance",
+    appearanceDescription: "Choose how Expandso handles light and dark colors.",
+    themeSystem: "System",
+    themeLight: "Light",
+    themeDark: "Dark",
     espansoConfigScan: "Espanso Directory Location",
     espansoConfigScanDesc: "Specify or scan the directory where Espanso stores YAML match files.",
     currentPath: "Current Path:",

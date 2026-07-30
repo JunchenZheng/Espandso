@@ -41,7 +41,8 @@ export const zhCN: TranslationTree = {
   },
   alfredImport: {
     title: "从 Alfred Snippets 导入",
-    description: "选择或拖入 .alfredsnippets 归档文件，将其中的 Snippets 批量添加到指定的 Espanso YAML 文件中。",
+    description:
+      "选择或拖入 .alfredsnippets 归档文件，将其中的 Snippets 批量添加到指定的 Espanso YAML 文件中。",
     dropzoneHint: "拖拽 .alfredsnippets 文件到此处，或点击选择",
     selectFile: "选择 .alfredsnippets 文件",
     parsingFile: "正在解析归档文件...",
@@ -92,6 +93,11 @@ export const zhCN: TranslationTree = {
     languageDescription: "选择系统菜单和应用控件的显示语言。",
     english: "English",
     chinese: "中文",
+    appearance: "外观",
+    appearanceDescription: "选择 Expandso 使用浅色、深色，或跟随系统外观。",
+    themeSystem: "跟随系统",
+    themeLight: "浅色",
+    themeDark: "深色",
     espansoConfigScan: "Espanso 配置目录位置",
     espansoConfigScanDesc: "指定或自动扫描 Espanso 存储 YAML match 文件的目录。",
     currentPath: "当前路径：",

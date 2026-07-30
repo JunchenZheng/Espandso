@@ -1,12 +1,17 @@
-import { describe, expect, it, beforeEach } from "vitest";
+import { describe, expect, it, beforeEach, vi } from "vitest";
 import {
   EXPANSO_EXPERIMENTAL_YAML_WARNINGS_KEY,
   EXPANSO_EXPERIMENTAL_RICH_TEXT_KEY,
+  EXPANSO_THEME_PREFERENCE_KEY,
+  applyThemePreference,
   getExperimentalYamlWarningsEnabled,
   getExperimentalRichTextEnabled,
+  getThemePreference,
   setExperimentalYamlWarningsEnabled,
   setExperimentalRichTextEnabled,
+  setThemePreference,
   isYamlWarningsActive,
+  resolveThemePreference,
 } from "./features";
 
 describe("features logic", () => {
@@ -34,6 +39,7 @@ describe("features logic", () => {
     Object.defineProperty(globalThis, "window", {
       value: {
         localStorage: storageMock,
+        matchMedia: () => ({ matches: false }),
       },
       writable: true,
       configurable: true,
@@ -69,5 +75,51 @@ describe("features logic", () => {
   it("should determine if yaml warnings active correctly", () => {
     expect(isYamlWarningsActive(true)).toBe(false);
     expect(isYamlWarningsActive(false)).toBe(false);
+  });
+
+  it("should store and retrieve theme preference", () => {
+    expect(getThemePreference()).toBe("system");
+
+    setThemePreference("dark");
+    expect(storageMock.getItem(EXPANSO_THEME_PREFERENCE_KEY)).toBe("dark");
+    expect(getThemePreference()).toBe("dark");
+
+    setThemePreference("light");
+    expect(storageMock.getItem(EXPANSO_THEME_PREFERENCE_KEY)).toBe("light");
+    expect(getThemePreference()).toBe("light");
+  });
+
+  it("should fall back to system for invalid theme preference values", () => {
+    storageMock.setItem(EXPANSO_THEME_PREFERENCE_KEY, "midnight");
+
+    expect(getThemePreference()).toBe("system");
+  });
+
+  it("should resolve system theme preference from media query", () => {
+    Object.defineProperty(globalThis, "window", {
+      value: {
+        localStorage: storageMock,
+        matchMedia: () => ({ matches: true }),
+      },
+      writable: true,
+      configurable: true,
+    });
+
+    expect(resolveThemePreference("system")).toBe("dark");
+    expect(resolveThemePreference("light")).toBe("light");
+  });
+
+  it("should apply resolved theme to the root element", () => {
+    const root = {
+      classList: {
+        toggle: vi.fn(),
+      },
+      style: {},
+    } as unknown as Pick<HTMLElement, "classList" | "style">;
+
+    expect(applyThemePreference("dark", root)).toBe("dark");
+
+    expect(root.classList.toggle).toHaveBeenCalledWith("dark", true);
+    expect(root.style.colorScheme).toBe("dark");
   });
 });
