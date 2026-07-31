@@ -18,8 +18,6 @@ Expandso is a user-friendly and intuitive desktop app wrapper for Espanso. It si
 
 ## Command Line Mode
 
-**Command Line Mode currently supports macOS only. Windows and more platforms will be supported in future releases.**
-
 Expandso can add snippets without opening the desktop UI, which makes it suitable for third-party launchers such as Alfred and Raycast.
 
 ```bash
@@ -37,6 +35,8 @@ Modes interpret `--content` differently:
 By default, snippets are written to `base.yml` inside the Espanso match directory resolved from `espanso path`, with a platform default fallback. Espanso reloads snippets from file changes, so the CLI does not run `espanso restart` unless `--restart` is passed. Use `--config` to select another YAML file or `--match-dir` to provide a match directory.
 
 On macOS, `./install_tauri_app.sh` installs the command as `~/.local/bin/expandso` by linking it to the executable inside `Expandso.app`. Make sure `~/.local/bin` is in your shell `PATH`.
+
+On Windows, the NSIS installer adds the Expandso install directory to the current user's `PATH` and removes it on uninstall. Open a new terminal after installation before running `expandso`.
 
 ## Development
 

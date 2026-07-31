@@ -16,8 +16,6 @@ Expandso 是一个友好、直观的 Espanso 桌面应用封装。它通过清�
 
 ## 命令行模式
 
-**当前命令行模式仅支持 macOS，后续会支持 Windows 等更多平台。**
-
 Expandso 可以在不打开桌面界面的情况下添加 snippets，因此适合配合 Alfred、Raycast 等第三方启动器使用。
 
 ```bash
@@ -35,6 +33,8 @@ expandso add --mode image --trigger ":logo" --content "$HOME/Pictures/logo.png"
 默认情况下，snippet 会写入 Espanso match 目录下的 `base.yml`。该目录优先通过 `espanso path` 解析，并带有平台默认兜底路径。Espanso 会从文件变更中重新加载 snippets，因此 CLI 不会默认运行 `espanso restart`，除非传入 `--restart`。可以使用 `--config` 选择其他 YAML 文件，或使用 `--match-dir` 指定 match 目录。
 
 在 macOS 上，`./install_tauri_app.sh` 会把命令安装为 `~/.local/bin/expandso`，并链接到 `Expandso.app` 内部的可执行文件。请确保 `~/.local/bin` 已加入 shell 的 `PATH`。
+
+在 Windows 上，NSIS 安装器会自动把 Expandso 安装目录加入当前用户的 `PATH`，并在卸载时移除。安装后请打开新的终端窗口再运行 `expandso`。
 
 ## 开发
 
