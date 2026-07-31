@@ -81,6 +81,7 @@ function App() {
     isLoadingSelectedPreview,
     selectedPreviewError,
     espansoScanMessage,
+    isEspansoInstalled,
     espansoPreviewTree,
     selectedEspansoPreview,
     isSelectedPreviewLoaded,
@@ -562,6 +563,7 @@ function App() {
 
       <AppWorkspace
         espansoMatchDir={espansoMatchDir}
+        isEspansoInstalled={isEspansoInstalled}
         espansoConfigsCount={espansoConfigs.length}
         espansoPreviewTree={espansoPreviewTree}
         selectedEspansoConfigPath={selectedEspansoConfigPath}

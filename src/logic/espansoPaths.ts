@@ -1,4 +1,4 @@
-import { homeDir, tempDir } from "@tauri-apps/api/path";
+import { tempDir } from "@tauri-apps/api/path";
 import { readDir } from "@tauri-apps/plugin-fs";
 import { Command } from "@tauri-apps/plugin-shell";
 
@@ -21,13 +21,14 @@ export interface EspansoConfigScanResult {
   directories: EspansoDirectoryInfo[];
 }
 
-export type EspansoPathSource = "cli" | "default";
+export type EspansoPathSource = "cli" | "default" | "unavailable";
 
 export interface EspansoMatchDirResult {
   matchDir: string;
   configDir?: string;
   source: EspansoPathSource;
   commandStdout?: string;
+  commandError?: string;
 }
 
 export function parseEspansoConfigDir(pathOutput: string): string | null {
@@ -45,23 +46,6 @@ export function parseEspansoConfigDir(pathOutput: string): string | null {
 export function getE2eEspansoMatchDir(tempPath: string): string {
   const temp = tempPath.replace(/[\\/]+$/u, "");
   return `${temp}/expandso-e2e/espanso-config/match`;
-}
-
-async function getDefaultEspansoMatchDir(): Promise<string> {
-  const home = await homeDir();
-  const userAgent = navigator.userAgent.toLowerCase();
-
-  const isMac = userAgent.includes("mac") || userAgent.includes("osx");
-  const isWindows = userAgent.includes("win");
-
-  if (isMac) {
-    return `${home}/Library/Application Support/espanso/match`;
-  } else if (isWindows) {
-    return `${home}/AppData/Roaming/espanso/match`;
-  } else {
-    // Default Linux
-    return `${home}/.config/espanso/match`;
-  }
 }
 
 export async function getEspansoMatchDir(): Promise<string> {
@@ -91,15 +75,29 @@ export async function getEspansoMatchDirDetails(): Promise<EspansoMatchDirResult
           commandStdout: output.stdout,
         };
       }
-    }
-  } catch (e) {
-    console.warn("Failed to resolve Espanso path via CLI, falling back to platform default:", e);
-  }
 
-  return {
-    matchDir: await getDefaultEspansoMatchDir(),
-    source: "default",
-  };
+      return {
+        matchDir: "",
+        source: "unavailable",
+        commandStdout: output.stdout,
+        commandError: "espanso path did not return a Config directory.",
+      };
+    }
+
+    return {
+      matchDir: "",
+      source: "unavailable",
+      commandStdout: output.stdout,
+      commandError: output.stderr || `espanso path exited with code ${output.code}.`,
+    };
+  } catch (e) {
+    console.warn("Failed to resolve Espanso path via CLI:", e);
+    return {
+      matchDir: "",
+      source: "unavailable",
+      commandError: e instanceof Error ? e.message : String(e),
+    };
+  }
 }
 
 export function isEspansoYamlConfigFile(name: string): boolean {
@@ -127,6 +125,15 @@ export async function scanEspansoConfigFiles(
   const rootDir = pathResult.matchDir;
   const files: EspansoConfigFile[] = [];
   const directories: EspansoDirectoryInfo[] = [];
+
+  if (pathResult.source === "unavailable" || !rootDir) {
+    return {
+      matchDir: "",
+      pathSource: pathResult.source,
+      files,
+      directories,
+    };
+  }
 
   async function scanDir(dirPath: string, relativeBase: string) {
     try {

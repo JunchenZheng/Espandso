@@ -17,6 +17,7 @@ import { AppHeader } from "./AppHeader";
 
 interface AppWorkspaceProps {
   espansoMatchDir: string | null;
+  isEspansoInstalled: boolean;
   espansoConfigsCount: number;
   espansoPreviewTree: EspansoConfigPreviewTreeNode[];
   selectedEspansoConfigPath: string;
@@ -58,6 +59,7 @@ interface AppWorkspaceProps {
 
 export function AppWorkspace({
   espansoMatchDir,
+  isEspansoInstalled,
   espansoConfigsCount,
   espansoPreviewTree,
   selectedEspansoConfigPath,
@@ -243,22 +245,33 @@ export function AppWorkspace({
         ) : (
           <div className="flex flex-col items-center justify-center p-8 text-center rounded-lg border border-dashed my-auto bg-background/50">
             <FolderOpen className="mb-3 h-12 w-12 text-muted-foreground" />
-            <h3 className="text-2xl font-semibold mb-1">{t("empty.noYamlFilesTitle")}</h3>
+            <h3 className="text-2xl font-semibold mb-1">
+              {isEspansoInstalled
+                ? t("empty.noYamlFilesTitle")
+                : t("empty.espansoNotInstalledTitle")}
+            </h3>
             <p className="text-base text-muted-foreground max-w-md mb-6">
               {isScanningEspanso
                 ? t("status.scanningEspansoConfigs")
-                : espansoScanMessage || t("empty.noYamlFilesMessage")}
+                : espansoScanMessage ||
+                  (isEspansoInstalled
+                    ? t("empty.noYamlFilesMessage")
+                    : t("empty.espansoNotInstalledMessage"))}
             </p>
             {!isScanningEspanso && (
               <div className="flex flex-wrap justify-center gap-3">
-                <Button onClick={() => onCreateFolder("")}>
-                  <FolderPlus className="h-4 w-4 mr-2" />
-                  {t("filesystem.createFolder")}
-                </Button>
-                <Button variant="outline" onClick={() => onCreateFile("")}>
-                  <FilePlus className="h-4 w-4 mr-2" />
-                  {t("filesystem.createFile")}
-                </Button>
+                {isEspansoInstalled && (
+                  <>
+                    <Button onClick={() => onCreateFolder("")}>
+                      <FolderPlus className="h-4 w-4 mr-2" />
+                      {t("filesystem.createFolder")}
+                    </Button>
+                    <Button variant="outline" onClick={() => onCreateFile("")}>
+                      <FilePlus className="h-4 w-4 mr-2" />
+                      {t("filesystem.createFile")}
+                    </Button>
+                  </>
+                )}
                 <Button variant="ghost" onClick={onRefresh}>
                   <RefreshCw className="h-4 w-4 mr-2" />
                   {t("actions.refresh")}

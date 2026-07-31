@@ -104,6 +104,7 @@ export const en = {
     notDetected: "Not detected",
     resolvedWithCli: "Resolved with espanso path",
     usingPlatformDefault: "Using platform default path",
+    espansoUnavailable: "Espanso CLI not detected",
     experimentalTitle: "Experimental Features",
     experimentalDescription: "Features under active testing.",
     enableYamlWarnings: "YAML Detection & Warnings",
@@ -266,6 +267,9 @@ export const en = {
       "Select a YAML config or directory from the collection list to preview its contents.",
     noYamlFilesTitle: "No YAML Config Files Found",
     noYamlFilesMessage: "Your Espanso match directory does not contain any YAML files yet.",
+    espansoNotInstalledTitle: "Espanso Not Detected",
+    espansoNotInstalledMessage:
+      "Install Espanso and make sure the espanso CLI is available, then refresh the scan.",
     noSupportedSnippets: "No supported snippets",
     noSupportedSnippetsDescription:
       "This YAML file was found, but no supported Espanso matches could be previewed.",

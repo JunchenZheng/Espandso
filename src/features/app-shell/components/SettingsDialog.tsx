@@ -188,7 +188,9 @@ export function SettingsDialog({
                   <p className="mt-1 text-xs text-muted-foreground">
                     {espansoPathSource === "cli"
                       ? t("settings.resolvedWithCli")
-                      : t("settings.usingPlatformDefault")}
+                      : espansoPathSource === "unavailable"
+                        ? t("settings.espansoUnavailable")
+                        : t("settings.usingPlatformDefault")}
                   </p>
                 )}
               </div>

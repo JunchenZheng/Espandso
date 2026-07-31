@@ -106,6 +106,7 @@ export const zhCN: TranslationTree = {
     notDetected: "未检测到",
     resolvedWithCli: "通过 espanso path 解析",
     usingPlatformDefault: "使用平台默认路径",
+    espansoUnavailable: "未检测到 Espanso CLI",
     experimentalTitle: "实验性功能",
     experimentalDescription: "尚在测试中的试验性功能。",
     enableYamlWarnings: "YAML 文件检测与警告",
@@ -265,6 +266,9 @@ export const zhCN: TranslationTree = {
     noSelectionDescription: "请从集合列表中选择 YAML 配置或目录以预览内容。",
     noYamlFilesTitle: "未找到 YAML 配置文件",
     noYamlFilesMessage: "你的 Espanso match 目录中还没有 YAML 文件。",
+    espansoNotInstalledTitle: "未检测到 Espanso",
+    espansoNotInstalledMessage:
+      "请先安装 Espanso，并确保 espanso CLI 可用，然后刷新扫描。",
     noSupportedSnippets: "没有支持的片段",
     noSupportedSnippetsDescription: "已找到此 YAML 文件，但没有可预览的受支持 Espanso match。",
     directoryEmpty: "此目录为空",

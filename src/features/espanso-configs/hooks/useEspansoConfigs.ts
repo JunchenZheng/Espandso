@@ -54,6 +54,7 @@ export function useEspansoConfigs(options: UseEspansoConfigsOptions = {}) {
   const [isLoadingSelectedPreview, setIsLoadingSelectedPreview] = useState<boolean>(false);
   const [selectedPreviewError, setSelectedPreviewError] = useState<string>("");
   const [espansoScanMessage, setEspansoScanMessage] = useState<string>("");
+  const isEspansoInstalled = espansoPathSource !== "unavailable";
 
   useEffect(() => {
     tRef.current = t;
@@ -143,6 +144,16 @@ export function useEspansoConfigs(options: UseEspansoConfigsOptions = {}) {
       try {
         const result = await scanEspansoConfigDirectory();
         setEspansoMatchDir(result.matchDir);
+        if (result.pathSource === "unavailable") {
+          setEspansoPathSource(result.pathSource);
+          setEspansoConfigs([]);
+          setEspansoDirectories([]);
+          setEspansoConfigPreviews([]);
+          setSelectedPreviewError("");
+          setSelectedEspansoConfigPath("");
+          setEspansoScanMessage(translateCurrent("empty.espansoNotInstalledMessage"));
+          return;
+        }
         if (result.matchDir && !options?.skipIndexSync) {
           syncSearchIndex(result.matchDir);
         }
@@ -522,6 +533,7 @@ export function useEspansoConfigs(options: UseEspansoConfigsOptions = {}) {
     isLoadingSelectedPreview,
     selectedPreviewError,
     espansoScanMessage,
+    isEspansoInstalled,
 
     // Derived states
     espansoPreviewTree,
