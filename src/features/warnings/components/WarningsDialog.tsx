@@ -46,13 +46,13 @@ export function WarningsDialog({
       <DialogContent className="max-w-md sm:max-w-xl">
         <DialogHeader>
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 text-amber-700">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 text-amber-700 dark:text-amber-300">
               <AlertTriangle className="h-5 w-5" />
             </div>
             <div>
               <DialogTitle className="text-xl font-bold flex items-center gap-2">
                 <span>{t("dialogs.warnings.title")}</span>
-                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-500/20 dark:text-amber-200">
                   {activeFilterPreview ? activeFilterPreview.warnings.length : totalWarningsCount}
                 </span>
               </DialogTitle>
@@ -65,9 +65,9 @@ export function WarningsDialog({
 
         <div className="space-y-3 py-1">
           {filterPath && activeFilterPreview && (
-            <div className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50/70 p-2.5 text-xs">
-              <div className="flex items-center gap-2 text-amber-900 min-w-0">
-                <Filter className="h-3.5 w-3.5 shrink-0 text-amber-700" />
+            <div className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50/70 p-2.5 text-xs dark:border-amber-500/30 dark:bg-amber-500/10">
+              <div className="flex items-center gap-2 text-amber-900 min-w-0 dark:text-amber-100">
+                <Filter className="h-3.5 w-3.5 shrink-0 text-amber-700 dark:text-amber-300" />
                 <span className="truncate">
                   {t("dialogs.warnings.filteringFor")}:{" "}
                   <strong>{activeFilterPreview.config.relativePath}</strong>
@@ -77,7 +77,7 @@ export function WarningsDialog({
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="h-7 px-2 text-xs text-amber-800 hover:bg-amber-100 hover:text-amber-900"
+                  className="h-7 px-2 text-xs text-amber-800 hover:bg-amber-100 hover:text-amber-900 dark:text-amber-200 dark:hover:bg-amber-500/20 dark:hover:text-amber-100"
                   onClick={onClearFilter}
                 >
                   {t("dialogs.warnings.showAllFiles", { count: totalWarningsCount })}
@@ -109,7 +109,7 @@ export function WarningsDialog({
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
-                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-500/20 dark:text-amber-200">
                           {preview.warnings.length}{" "}
                           {t(preview.warnings.length === 1 ? "counts.warning" : "counts.warnings")}
                         </span>
@@ -145,9 +145,9 @@ export function WarningsDialog({
                       {preview.warnings.map((warn: string, idx: number) => (
                         <div
                           key={`warn-${preview.config.path}-${idx}`}
-                          className="flex items-start gap-2.5 rounded-md border border-amber-200/80 bg-amber-50/50 p-2.5 text-xs text-amber-900 leading-relaxed font-mono"
+                          className="flex items-start gap-2.5 rounded-md border border-amber-200/80 bg-amber-50/50 p-2.5 text-xs text-amber-900 leading-relaxed font-mono dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100"
                         >
-                          <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
+                          <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 mt-0.5 dark:text-amber-300" />
                           <span className="break-all">{warn}</span>
                         </div>
                       ))}

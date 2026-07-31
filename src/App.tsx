@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import "./App.css";
 
@@ -34,8 +34,12 @@ import { detectTriggerPrefixConflictsFromIndex } from "./tauri/searchIndex";
 import {
   getExperimentalRichTextEnabled,
   getPreSaveConflictCheckEnabled,
+  getThemePreference,
+  applyThemePreference,
   setExperimentalRichTextEnabled,
   setPreSaveConflictCheckEnabled,
+  setThemePreference,
+  type ThemePreference,
 } from "./logic/features";
 export type { EspansoConfigPreview } from "./features/espanso-configs/types";
 
@@ -129,6 +133,9 @@ function App() {
   );
   const [enableExperimentalRichText, setEnableExperimentalRichText] = useState<boolean>(() =>
     getExperimentalRichTextEnabled(),
+  );
+  const [themePreference, setThemePreferenceState] = useState<ThemePreference>(() =>
+    getThemePreference(),
   );
   const [isTriggerConflictsOpen, setIsTriggerConflictsOpen] = useState<boolean>(false);
   const [selectedTriggerPrefixConflicts, setSelectedTriggerPrefixConflicts] = useState<
@@ -227,6 +234,25 @@ function App() {
 
   const { alertDialog, showAlert, showConfirm, closeAlertDialog } = useConfirmAlertDialog();
 
+  useLayoutEffect(() => {
+    const mediaQuery =
+      typeof window.matchMedia === "function"
+        ? window.matchMedia("(prefers-color-scheme: dark)")
+        : null;
+    const syncTheme = () => applyThemePreference(themePreference, document.documentElement);
+
+    syncTheme();
+
+    if (themePreference !== "system" || !mediaQuery) {
+      return undefined;
+    }
+
+    mediaQuery.addEventListener("change", syncTheme);
+    return () => {
+      mediaQuery.removeEventListener("change", syncTheme);
+    };
+  }, [themePreference]);
+
   useEffect(() => {
     return () => {
       if (clearUpdateHighlightTimeoutRef.current !== null) {
@@ -318,7 +344,11 @@ function App() {
   );
 
   useEffect(() => {
-    if (!espansoMatchDir || !selectedEspansoPreview || selectedTriggerConflictSources.length === 0) {
+    if (
+      !espansoMatchDir ||
+      !selectedEspansoPreview ||
+      selectedTriggerConflictSources.length === 0
+    ) {
       setSelectedTriggerPrefixConflicts([]);
       return;
     }
@@ -630,6 +660,11 @@ function App() {
         onToggleExperimentalRichText={(checked) => {
           setEnableExperimentalRichText(checked);
           setExperimentalRichTextEnabled(checked);
+        }}
+        themePreference={themePreference}
+        onThemePreferenceChange={(preference) => {
+          setThemePreferenceState(preference);
+          setThemePreference(preference);
         }}
         enablePreSaveConflictCheck={enablePreSaveConflictCheck}
         onTogglePreSaveConflictCheck={(checked) => {

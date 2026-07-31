@@ -546,10 +546,10 @@ export function VisualYamlEditorDialog({
                   <div
                     className={cn(
                       "space-y-2 rounded-lg border p-4 text-sm shrink-0",
-                      addErrors.length > 0
-                        ? "border-destructive/30 bg-destructive/10 text-destructive"
-                        : "border-amber-300 bg-amber-50 text-amber-800",
-                    )}
+                        addErrors.length > 0
+                          ? "border-destructive/30 bg-destructive/10 text-destructive"
+                          : "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100",
+                      )}
                   >
                     {addErrors.map((e, idx) => (
                       <div key={`err-${idx}`} className="flex gap-2">

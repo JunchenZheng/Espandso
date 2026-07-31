@@ -31,7 +31,11 @@ export interface EspansoConfigDetailProps {
   onOpenVisualEditor?: () => void;
   onOpenImportAlfred?: () => void;
   onOpenWarnings?: (path: string) => void;
-  onBatchDelete?: (matchIndices: number[], displayIndices: number[], onComplete: () => void) => void;
+  onBatchDelete?: (
+    matchIndices: number[],
+    displayIndices: number[],
+    onComplete: () => void,
+  ) => void;
 }
 
 export function EspansoConfigDetail({
@@ -53,8 +57,7 @@ export function EspansoConfigDetail({
   const HEADER_HEIGHT = 36;
   // Use rem (not ch): header is text-xs and rows are text-sm, so ch-based tracks misalign.
   const previewGridColumns = "grid-cols-[7.5rem_5.5rem_minmax(0,1fr)_minmax(0,2fr)]";
-  const batchPreviewGridColumns =
-    "grid-cols-[2.25rem_7.5rem_5.5rem_minmax(0,1fr)_minmax(0,2fr)]";
+  const batchPreviewGridColumns = "grid-cols-[2.25rem_7.5rem_5.5rem_minmax(0,1fr)_minmax(0,2fr)]";
   const previewGridClassName = "grid items-center gap-x-4 px-3";
 
   const OVERSCAN_ROWS = 8;
@@ -94,7 +97,8 @@ export function EspansoConfigDetail({
 
   const startIndex = Math.max(0, Math.floor(contentScrollTop / ROW_HEIGHT) - OVERSCAN_ROWS);
   const visibleRowCount =
-    Math.ceil(Math.max(viewportHeight - HEADER_HEIGHT, ROW_HEIGHT) / ROW_HEIGHT) + OVERSCAN_ROWS * 2;
+    Math.ceil(Math.max(viewportHeight - HEADER_HEIGHT, ROW_HEIGHT) / ROW_HEIGHT) +
+    OVERSCAN_ROWS * 2;
   const endIndex = Math.min(snippetCount, startIndex + visibleRowCount);
   const visibleSnippets = preview.snippets.slice(startIndex, endIndex);
 
@@ -198,10 +202,10 @@ export function EspansoConfigDetail({
             <button
               type="button"
               onClick={() => onOpenWarnings?.(preview.config.path)}
-              className="shrink-0 inline-flex h-8 w-8 items-center justify-center rounded-md bg-amber-100 hover:bg-amber-200 text-amber-800 transition-colors cursor-pointer"
+              className="shrink-0 inline-flex h-8 w-8 items-center justify-center rounded-md bg-amber-100 hover:bg-amber-200 text-amber-800 transition-colors cursor-pointer dark:bg-amber-500/20 dark:text-amber-200 dark:hover:bg-amber-500/30"
               title={t("warnings.viewFileTitle")}
             >
-              <AlertTriangle className="h-3.5 w-3.5 text-amber-700" />
+              <AlertTriangle className="h-3.5 w-3.5 text-amber-700 dark:text-amber-200" />
             </button>
           )}
           {isBatchMode ? (
@@ -239,7 +243,7 @@ export function EspansoConfigDetail({
                   <GitCompareArrows className="h-4 w-4" />
                   {t("actions.triggerConflicts")}
                   {triggerConflictCount > 0 && (
-                    <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-xs font-semibold text-red-800">
+                    <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-xs font-semibold text-red-800 dark:bg-red-500/20 dark:text-red-200">
                       {triggerConflictCount}
                     </span>
                   )}
