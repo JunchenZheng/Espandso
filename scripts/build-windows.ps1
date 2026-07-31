@@ -41,17 +41,23 @@ npm run tauri -- build --bundles $Bundle
 
 $BundleDir = Join-Path $RootDir "src-tauri/target/release/bundle/$Bundle"
 $Installers = Get-ChildItem -Path $BundleDir -Filter "*setup.exe" -File -ErrorAction SilentlyContinue
+$StandaloneExe = Join-Path $RootDir "src-tauri/target/release/expandso.exe"
 
 if (-not $Installers) {
   throw "Windows installer was not found in $BundleDir. The raw release executable is not the distributable installer; check the Tauri bundle output above."
 }
 
+if (-not (Test-Path $StandaloneExe)) {
+  throw "Windows standalone executable was not found at $StandaloneExe. Check the Tauri build output above."
+}
+
 $ArtifactPath = Join-Path $RootDir $ArtifactDir
 New-Item -ItemType Directory -Force -Path $ArtifactPath | Out-Null
 $Installers | Copy-Item -Destination $ArtifactPath -Force
+Copy-Item -Path $StandaloneExe -Destination $ArtifactPath -Force
 
 Write-Host ""
-Write-Host "Windows installer output:"
-Get-ChildItem -Path $ArtifactPath -Filter "*setup.exe" -File | ForEach-Object {
+Write-Host "Windows release outputs:"
+Get-ChildItem -Path $ArtifactPath -Filter "*.exe" -File | ForEach-Object {
   Write-Host "  $($_.FullName)"
 }

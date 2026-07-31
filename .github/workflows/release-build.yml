@@ -72,7 +72,7 @@ jobs:
           if-no-files-found: error
 
   build-windows:
-    name: Build Windows installer
+    name: Build Windows release assets
     runs-on: windows-latest
 
     steps:
@@ -112,15 +112,15 @@ jobs:
       - name: Run unit checks
         run: npm run check:unit
 
-      - name: Build Windows installer
+      - name: Build Windows release assets
         shell: pwsh
         run: ./scripts/build-windows.ps1 -SkipInstall -ArtifactDir dist-installers/windows
 
-      - name: Upload Windows installer
+      - name: Upload Windows release assets
         uses: actions/upload-artifact@v4
         with:
-          name: Expandso-windows-installer
-          path: dist-installers/windows/*setup.exe
+          name: Expandso-windows
+          path: dist-installers/windows/*.exe
           if-no-files-found: error
 
   publish-release:
@@ -141,7 +141,7 @@ jobs:
       - name: Download Windows asset
         uses: actions/download-artifact@v4
         with:
-          name: Expandso-windows-installer
+          name: Expandso-windows
           path: dist-release/windows
 
       - name: Create release and upload assets

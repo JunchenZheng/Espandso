@@ -62,6 +62,7 @@ bundle_dir="src-tauri/target/$TARGET/release/bundle/$BUNDLE"
 shopt -s nullglob
 installers=("$bundle_dir"/*setup.exe)
 shopt -u nullglob
+standalone_exe="src-tauri/target/$TARGET/release/expandso.exe"
 
 if [[ "${#installers[@]}" -eq 0 ]]; then
   echo "Error: Windows installer was not found in $bundle_dir." >&2
@@ -69,11 +70,18 @@ if [[ "${#installers[@]}" -eq 0 ]]; then
   exit 1
 fi
 
+if [[ ! -f "$standalone_exe" ]]; then
+  echo "Error: Windows standalone executable was not found at $standalone_exe." >&2
+  echo "Check the Tauri build output above." >&2
+  exit 1
+fi
+
 mkdir -p "$ARTIFACT_DIR"
 cp "${installers[@]}" "$ARTIFACT_DIR/"
+cp "$standalone_exe" "$ARTIFACT_DIR/"
 
 echo ""
-echo "Windows installer output:"
-for installer in "$ARTIFACT_DIR"/*setup.exe; do
-  echo "  $installer"
+echo "Windows release outputs:"
+for artifact in "$ARTIFACT_DIR"/*.exe; do
+  echo "  $artifact"
 done
